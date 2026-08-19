@@ -1465,7 +1465,7 @@ GUARANTEE (if in layout): shield icon, 30-day promise, green-tinted box.
 FAQ (if in layout): 4–5 objections, left accent border on each.
 SCARCITY: High-urgency section just before the final CTA. Use a bold warning/alert box — contrasting background (red, orange, or dark accent), large bold text declaring limited availability ("Only [X] spots remaining", "Price increases [day]", or "This offer closes soon"). Include a static urgency bar or bordered callout. No countdown JS — CSS only. Text must be specific and believable from the copy, not generic.
 FINAL CTA BAND: urgent, full-width, strong headline, primary CTA, guarantee note.
-FOOTER: Simple dark footer with the product/brand name, a brief tagline, and 3 legal links: "Privacy Policy · Terms of Service · Disclaimer". Copyright line at bottom. No excessive content — clean and minimal.
+FOOTER (REQUIRED — always include at the very bottom): Simple dark footer with the product/brand name, a brief tagline, and 3 legal links: "Privacy Policy · Terms of Service · Disclaimer". Copyright © [year] line at bottom. No excessive content — clean and minimal. This section is mandatory and must appear as the last element before </body>.
 
 ━━━ COPY RULES ━━━
 • Use ONLY content from the provided marketing copy
@@ -1480,7 +1480,7 @@ FOOTER: Simple dark footer with the product/brand name, a brief tagline, and 3 l
 • System fonts: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif
 • Fully mobile responsive: @media (max-width: 768px)
 • Pure HTML/CSS — no JavaScript
-• Concise — under 450 lines total
+• Aim for 500–600 lines — enough to include every section including scarcity and footer
 • CTA buttons: NEVER full-width. Always display:inline-block with auto width, centered with text-align:center on the parent. Max-width 360px if needed.
 • Features/What You Get section: list ALL features first, then ONE CTA button at the very bottom. NEVER insert CTA buttons between feature items — no "scroll CTAs" mid-list.
 • Social proof testimonials: each testimonial MUST be a fully self-contained card — quote text AND author name/title/avatar together inside the same box. NEVER split the quote and author into separate columns or rows with large gaps between them. Author info sits directly below the quote inside the same card.
@@ -1494,7 +1494,7 @@ ${copy.slice(0, 5000)}`;
     const model = reqModel || providerCfg.defaultModel;
     console.log(`[mockup] calling AI provider=${provider} model=${model} style="${style.name}" layout="${layout.slice(0,60)}"`);
 
-    let rawHtml = await callAI(providerCfg, resolvedKey, model, designPrompt, 6500);
+    let rawHtml = await callAI(providerCfg, resolvedKey, model, designPrompt, 8500);
 
     console.log(`[mockup] raw response length=${rawHtml?.length ?? 0} first200="${(rawHtml || '').slice(0, 200).replace(/\n/g, '\\n')}"`);
 
