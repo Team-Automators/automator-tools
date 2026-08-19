@@ -1414,12 +1414,12 @@ router.post('/mockup', async (req, res) => {
   ];
 
   const LAYOUTS = [
-    'hero → trust-bar → problem-pain → features-what-you-get → social-proof → pricing-value-stack → guarantee → faq → cta-band',
-    'hero → who-this-is-for → features-what-you-get → social-proof → pricing-value-stack → guarantee → faq → cta-band',
-    'hero → trust-bar → problem-pain → social-proof-early → features-what-you-get → pricing-value-stack → faq → cta-band',
-    'hero → problem-pain → who-this-is-for → features-what-you-get → social-proof → pricing-value-stack → guarantee → cta-band',
-    'hero → trust-bar → features-what-you-get → social-proof → who-this-is-for → pricing-value-stack → guarantee → cta-band',
-    'hero → problem-pain → features-what-you-get → social-proof → guarantee → pricing-value-stack → faq → cta-band',
+    'hero → trust-bar → problem-pain → features-what-you-get → social-proof → pricing-value-stack → guarantee → faq → scarcity → cta-band → footer',
+    'hero → who-this-is-for → features-what-you-get → social-proof → pricing-value-stack → guarantee → faq → scarcity → cta-band → footer',
+    'hero → trust-bar → problem-pain → social-proof-early → features-what-you-get → pricing-value-stack → faq → scarcity → cta-band → footer',
+    'hero → problem-pain → who-this-is-for → features-what-you-get → social-proof → pricing-value-stack → guarantee → scarcity → cta-band → footer',
+    'hero → trust-bar → features-what-you-get → social-proof → who-this-is-for → pricing-value-stack → guarantee → scarcity → cta-band → footer',
+    'hero → problem-pain → features-what-you-get → social-proof → guarantee → pricing-value-stack → faq → scarcity → cta-band → footer',
   ];
 
   const style   = STYLES[Math.floor(Math.random() * STYLES.length)];
@@ -1463,7 +1463,9 @@ PROBLEM/PAIN (if in layout): 3–4 audience frustrations as cards.
 WHO THIS IS FOR (if in layout): two-column qualifier — "For you if…" vs "Not for you if…"
 GUARANTEE (if in layout): shield icon, 30-day promise, green-tinted box.
 FAQ (if in layout): 4–5 objections, left accent border on each.
+SCARCITY: High-urgency section just before the final CTA. Use a bold warning/alert box — contrasting background (red, orange, or dark accent), large bold text declaring limited availability ("Only [X] spots remaining", "Price increases [day]", or "This offer closes soon"). Include a static urgency bar or bordered callout. No countdown JS — CSS only. Text must be specific and believable from the copy, not generic.
 FINAL CTA BAND: urgent, full-width, strong headline, primary CTA, guarantee note.
+FOOTER: Simple dark footer with the product/brand name, a brief tagline, and 3 legal links: "Privacy Policy · Terms of Service · Disclaimer". Copyright line at bottom. No excessive content — clean and minimal.
 
 ━━━ COPY RULES ━━━
 • Use ONLY content from the provided marketing copy
