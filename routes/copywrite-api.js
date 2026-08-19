@@ -1414,12 +1414,12 @@ router.post('/mockup', async (req, res) => {
   ];
 
   const LAYOUTS = [
-    'hero → trust-bar → problem-pain → features-what-you-get → social-proof → pricing-value-stack → guarantee → faq → scarcity → cta-band → footer',
-    'hero → who-this-is-for → features-what-you-get → social-proof → pricing-value-stack → guarantee → faq → scarcity → cta-band → footer',
-    'hero → trust-bar → problem-pain → social-proof-early → features-what-you-get → pricing-value-stack → faq → scarcity → cta-band → footer',
-    'hero → problem-pain → who-this-is-for → features-what-you-get → social-proof → pricing-value-stack → guarantee → scarcity → cta-band → footer',
-    'hero → trust-bar → features-what-you-get → social-proof → who-this-is-for → pricing-value-stack → guarantee → scarcity → cta-band → footer',
-    'hero → problem-pain → features-what-you-get → social-proof → guarantee → pricing-value-stack → faq → scarcity → cta-band → footer',
+    'hero → trust-bar → problem-pain → features-what-you-get → social-proof → pricing-value-stack → guarantee → faq → scarcity → cta-band',
+    'hero → who-this-is-for → features-what-you-get → social-proof → pricing-value-stack → guarantee → faq → scarcity → cta-band',
+    'hero → trust-bar → problem-pain → social-proof-early → features-what-you-get → pricing-value-stack → faq → scarcity → cta-band',
+    'hero → problem-pain → who-this-is-for → features-what-you-get → social-proof → pricing-value-stack → guarantee → scarcity → cta-band',
+    'hero → trust-bar → features-what-you-get → social-proof → who-this-is-for → pricing-value-stack → guarantee → scarcity → cta-band',
+    'hero → problem-pain → features-what-you-get → social-proof → guarantee → pricing-value-stack → faq → scarcity → cta-band',
   ];
 
   const style   = STYLES[Math.floor(Math.random() * STYLES.length)];
@@ -1465,7 +1465,7 @@ GUARANTEE (if in layout): shield icon, 30-day promise, green-tinted box.
 FAQ (if in layout): 4–5 objections, left accent border on each. Keep each answer to 2–3 sentences maximum — brevity is critical so the page has room for scarcity and footer.
 SCARCITY: High-urgency section just before the final CTA. Use a bold warning/alert box — contrasting background (red, orange, or dark accent), large bold text declaring limited availability ("Only [X] spots remaining", "Price increases [day]", or "This offer closes soon"). Include a static urgency bar or bordered callout. No countdown JS — CSS only. Text must be specific and believable from the copy, not generic.
 FINAL CTA BAND: urgent, full-width, strong headline, primary CTA, guarantee note.
-FOOTER (REQUIRED — always include at the very bottom): Simple dark footer with the product/brand name, a brief tagline, and 3 legal links: "Privacy Policy · Terms of Service · Disclaimer". Copyright © [year] line at bottom. No excessive content — clean and minimal. This section is mandatory and must appear as the last element before </body>.
+FOOTER: Do NOT generate a footer — it is automatically appended by the server after generation. End your output with the closing </body></html> tags immediately after the cta-band.
 
 ━━━ COPY RULES ━━━
 • Use ONLY content from the provided marketing copy
@@ -1494,7 +1494,7 @@ ${copy.slice(0, 5000)}`;
     const model = reqModel || providerCfg.defaultModel;
     console.log(`[mockup] calling AI provider=${provider} model=${model} style="${style.name}" layout="${layout.slice(0,60)}"`);
 
-    let rawHtml = await callAI(providerCfg, resolvedKey, model, designPrompt, 8500);
+    let rawHtml = await callAI(providerCfg, resolvedKey, model, designPrompt, 7000);
 
     console.log(`[mockup] raw response length=${rawHtml?.length ?? 0} first200="${(rawHtml || '').slice(0, 200).replace(/\n/g, '\\n')}"`);
 
