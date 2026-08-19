@@ -1,0 +1,25 @@
+{
+  "name": "GHL Automator",
+  "short_name": "Automator",
+  "description": "GoHighLevel AI Copywriting Platform",
+  "theme_color": "#0F172A",
+  "background_color": "#F8FAFC",
+  "display": "standalone",
+  "orientation": "any",
+  "scope": "/",
+  "start_url": "/",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

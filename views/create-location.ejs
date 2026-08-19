@@ -1,0 +1,114 @@
+<%- include('partials/head', { title: 'Create Sub-Account' }) %>
+<%- include('partials/nav') %>
+
+<main class="container">
+  <div class="page-header">
+    <a href="/dashboard" class="back-link">&larr; Dashboard</a>
+    <h1>Create Sub-Account</h1>
+    <p class="text-muted">Provision a new GHL location under your agency. Requires Agency Pro plan.</p>
+  </div>
+
+  <% if (error) { %>
+    <div class="alert alert-error"><%= error %></div>
+  <% } %>
+
+  <% if (result) { %>
+    <div class="alert alert-success">
+      Sub-account created successfully!
+      <% if (result.id || result.location?.id) { %>
+        <br/><strong>ID:</strong> <code><%= result.id || result.location?.id %></code>
+      <% } %>
+    </div>
+    <details class="result-details">
+      <summary>Full API Response</summary>
+      <pre><%= JSON.stringify(result, null, 2) %></pre>
+    </details>
+  <% } %>
+
+  <form method="POST" action="/locations/create" class="form-card">
+    <div class="form-section">
+      <h2>Business Info</h2>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="name">Business Name <span class="required">*</span></label>
+          <input type="text" id="name" name="name" required placeholder="Acme Corp" />
+        </div>
+        <div class="form-group">
+          <label for="email">Email <span class="required">*</span></label>
+          <input type="email" id="email" name="email" required placeholder="owner@acme.com" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="phone">Phone</label>
+          <input type="tel" id="phone" name="phone" placeholder="+1 555-000-0000" />
+        </div>
+        <div class="form-group">
+          <label for="website">Website</label>
+          <input type="url" id="website" name="website" placeholder="https://acme.com" />
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <h2>Owner Details</h2>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="firstName">First Name</label>
+          <input type="text" id="firstName" name="firstName" placeholder="John" />
+        </div>
+        <div class="form-group">
+          <label for="lastName">Last Name</label>
+          <input type="text" id="lastName" name="lastName" placeholder="Doe" />
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <h2>Address</h2>
+      <div class="form-row">
+        <div class="form-group form-group--full">
+          <label for="address">Street Address</label>
+          <input type="text" id="address" name="address" placeholder="123 Main St" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="city">City</label>
+          <input type="text" id="city" name="city" placeholder="Austin" />
+        </div>
+        <div class="form-group">
+          <label for="state">State</label>
+          <input type="text" id="state" name="state" placeholder="TX" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="postalCode">Postal Code</label>
+          <input type="text" id="postalCode" name="postalCode" placeholder="78701" />
+        </div>
+        <div class="form-group">
+          <label for="country">Country</label>
+          <input type="text" id="country" name="country" placeholder="US" value="US" />
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <h2>Settings</h2>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="timezone">Timezone</label>
+          <input type="text" id="timezone" name="timezone" placeholder="America/Chicago" />
+        </div>
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">Create Sub-Account</button>
+      <a href="/dashboard" class="btn btn-outline">Cancel</a>
+    </div>
+  </form>
+</main>
+
+<%- include('partials/foot') %>

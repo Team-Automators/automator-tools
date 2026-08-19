@@ -1,0 +1,110 @@
+<%- include('partials/head', { title: 'Update Sub-Account' }) %>
+<%- include('partials/nav') %>
+
+<main class="container">
+  <div class="page-header">
+    <a href="/dashboard" class="back-link">&larr; Dashboard</a>
+    <h1>Update Sub-Account</h1>
+    <p class="text-muted">Modify an existing GHL location by its ID.</p>
+  </div>
+
+  <% if (error) { %>
+    <div class="alert alert-error"><%= error %></div>
+  <% } %>
+
+  <% if (result) { %>
+    <div class="alert alert-success">Sub-account updated successfully!</div>
+    <details class="result-details">
+      <summary>Full API Response</summary>
+      <pre><%= JSON.stringify(result, null, 2) %></pre>
+    </details>
+  <% } %>
+
+  <form method="POST" action="/locations/update" class="form-card">
+    <div class="form-section">
+      <h2>Target Location</h2>
+      <div class="form-row">
+        <div class="form-group form-group--full">
+          <label for="locationId">Location ID <span class="required">*</span></label>
+          <input type="text" id="locationId" name="locationId" required
+                 placeholder="abc123xyz" value="<%= prefillId %>" />
+          <span class="field-hint">The GHL location/sub-account ID to update.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <h2>Fields to Update</h2>
+      <p class="text-muted section-hint">Leave any field blank to keep its current value.</p>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="name">Business Name</label>
+          <input type="text" id="name" name="name" placeholder="Acme Corp" />
+        </div>
+        <div class="form-group">
+          <label for="email">Email</label>
+          <input type="email" id="email" name="email" placeholder="owner@acme.com" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="phone">Phone</label>
+          <input type="tel" id="phone" name="phone" placeholder="+1 555-000-0000" />
+        </div>
+        <div class="form-group">
+          <label for="website">Website</label>
+          <input type="url" id="website" name="website" placeholder="https://acme.com" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="firstName">First Name</label>
+          <input type="text" id="firstName" name="firstName" placeholder="John" />
+        </div>
+        <div class="form-group">
+          <label for="lastName">Last Name</label>
+          <input type="text" id="lastName" name="lastName" placeholder="Doe" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group form-group--full">
+          <label for="address">Street Address</label>
+          <input type="text" id="address" name="address" placeholder="123 Main St" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="city">City</label>
+          <input type="text" id="city" name="city" placeholder="Austin" />
+        </div>
+        <div class="form-group">
+          <label for="state">State</label>
+          <input type="text" id="state" name="state" placeholder="TX" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="postalCode">Postal Code</label>
+          <input type="text" id="postalCode" name="postalCode" placeholder="78701" />
+        </div>
+        <div class="form-group">
+          <label for="country">Country</label>
+          <input type="text" id="country" name="country" placeholder="US" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="timezone">Timezone</label>
+          <input type="text" id="timezone" name="timezone" placeholder="America/Chicago" />
+        </div>
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">Update Sub-Account</button>
+      <a href="/dashboard" class="btn btn-outline">Cancel</a>
+    </div>
+  </form>
+</main>
+
+<%- include('partials/foot') %>

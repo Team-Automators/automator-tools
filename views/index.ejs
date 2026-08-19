@@ -1,0 +1,46 @@
+<%- include('partials/head', { title: 'Welcome' }) %>
+<%- include('partials/nav') %>
+
+<main class="hero">
+  <div class="hero-content">
+    <div class="hero-badge">GoHighLevel Integration</div>
+    <h1>GHL Automator</h1>
+    <p class="hero-subtitle">
+      Manage your GoHighLevel sub-accounts, users, and contacts from one
+      centralized dashboard. Authenticate once via OAuth and get started.
+    </p>
+
+    <% if (isAuthenticated) { %>
+      <a href="/dashboard" class="btn btn-primary btn-lg">Go to Dashboard</a>
+    <% } else { %>
+      <a href="/auth/connect" class="btn btn-primary btn-lg">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+          <polyline points="10 17 15 12 10 7"/>
+          <line x1="15" y1="12" x2="3" y2="12"/>
+        </svg>
+        Connect with GoHighLevel
+      </a>
+    <% } %>
+  </div>
+
+  <div class="feature-grid">
+    <div class="feature-card">
+      <div class="feature-icon">&#127968;</div>
+      <h3>Sub-Accounts</h3>
+      <p>Create and update GHL sub-accounts (locations) for your agency.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">&#128100;</div>
+      <h3>Users</h3>
+      <p>Provision and manage users across your GHL organization.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">&#128222;</div>
+      <h3>Contacts</h3>
+      <p>Update contact records within any connected sub-account.</p>
+    </div>
+  </div>
+</main>
+
+<%- include('partials/foot') %>

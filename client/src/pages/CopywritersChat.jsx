@@ -1,0 +1,695 @@
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
+import { TYPES } from '../lib/types.js'
+import { PROVIDERS } from '../lib/providers.js'
+import { useAIConfig } from '../hooks/useAIConfig.js'
+import { api, getLocationId } from '../lib/api.js'
+
+function useAutoResize(ref) {
+  function resize() {
+    if (!ref.current) return
+    ref.current.style.height = 'auto'
+    ref.current.style.height = Math.min(ref.current.scrollHeight, 160) + 'px'
+  }
+  return resize
+}
+
+// Strip production notes, stage directions, and script metadata from copy text
+function cleanDisplayText(text) {
+  // Patterns that make an entire line junk — checked after stripping markdown wrappers
+  const JUNK_LINE = [
+    /\[ON[\s-]?SCREEN/i,
+    /\bon[\s-]?screen\s*text\b/i,
+    /^\(?visual\s*:/i,
+    /^\(?(?:pause|beat|hold|cut to|fade in|fade out)\)?\.?$/i,
+    /^segment\s*\d*\s*[:\-—]/i,
+    /^target\s*(?:length|duration|runtime)\s*:/i,
+    /^format\s*:\s*(?:talking|video|slideshow|b[\s-]roll)/i,
+    /\btalking[\s-]head\b/i,
+    /\bb[\s-]roll\b/i,
+    /\bword[\s-]for[\s-]word script\b/i,
+    /^vsl\s*script\b/i,
+  ]
+
+  return text
+    .split('\n')
+    .map(line =>
+      // Remove inline [ON-SCREEN ...] patterns with or without surrounding ** or *
+      line
+        .replace(/\*{0,3}\s*\[ON[\s-]?SCREEN[^\]\n]*\]\s*\*{0,3}/gi, '')
+        .replace(/\*{0,3}\s*\(?Visual:[^*\n]*?\)?\s*\*{0,3}/gi, '')
+        .replace(/\*{0,3}\s*\((?:Pause|Beat|Hold)\)\s*\*{0,3}/gi, '')
+    )
+    .filter(line => {
+      const raw = line.trim()
+      if (raw === '---' || /^-{3,}$/.test(raw)) return false
+      if (!raw) return true  // preserve blank lines for paragraph spacing
+      const plain = raw
+        .replace(/^#+\s+/, '')
+        .replace(/^\*{1,3}|\*{1,3}$/g, '')
+        .replace(/^\[|\]$/g, '')
+        .trim()
+      return !JUNK_LINE.some(re => re.test(plain))
+    })
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
+function ThumbUpIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="14" height="14">
+      <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/>
+      <path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/>
+    </svg>
+  )
+}
+
+function ThumbDownIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="14" height="14">
+      <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3H10z"/>
+      <path d="M17 2h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"/>
+    </svg>
+  )
+}
+
+function MsgBubble({ msg, isLast, onSave, onWorkflow, onFeedback, feedback, onMockup }) {
+  const [copied, setCopied] = useState(false)
+  const isAI = msg.role === 'assistant'
+  const hasContent = msg.content.length > 60
+
+  const displayContent = isAI ? cleanDisplayText(msg.content) : msg.content
+
+  function copy() {
+    navigator.clipboard.writeText(displayContent).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
+
+  return (
+    <div className={`msg-row ${msg.role === 'user' ? 'user' : ''}`}>
+      <div className={`msg-avatar ${isAI ? 'ai' : 'user-av'}`}>
+        {isAI ? '✦' : 'Y'}
+      </div>
+      <div>
+        <div className={`msg-bubble ${isAI ? 'ai' : 'user'}`}>
+          {displayContent}
+        </div>
+        {isAI && hasContent && (
+          <div className="msg-actions">
+            {isLast && (
+              <>
+                <button className="action-btn" onClick={copy}>
+                  {copied ? 'Copied!' : 'Copy to clipboard'}
+                </button>
+                <button className="action-btn save" onClick={onSave}>
+                  Save to Library
+                </button>
+                <button className="action-btn workflow" onClick={() => onWorkflow(msg.content)}>
+                  Add to Workflow →
+                </button>
+                <button className="action-btn mockup-btn" onClick={onMockup}>
+                  Preview Mockup
+                </button>
+              </>
+            )}
+            <button
+              className={`action-btn thumb-btn ${feedback === 'up' ? 'thumb-up-active' : ''}`}
+              onClick={() => onFeedback('up')}
+              title="Good copy — trains brand voice"
+            >
+              <ThumbUpIcon />
+            </button>
+            <button
+              className={`action-btn thumb-btn ${feedback === 'down' ? 'thumb-down-active' : ''}`}
+              onClick={() => onFeedback('down')}
+              title="Not right — avoid this style"
+            >
+              <ThumbDownIcon />
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+export default function CopywritersChat() {
+  const { type } = useParams()
+  const navigate = useNavigate()
+  const locationId = getLocationId()
+  const typeInfo = TYPES[type] || TYPES.general
+  const { config, loading: configLoading } = useAIConfig()
+
+  const [messages, setMessages] = useState([])
+
+  const [input, setInput] = useState('')
+  const [streaming, setStreaming] = useState(false)
+  const [streamText, setStreamText] = useState('')
+  const [showDots, setShowDots] = useState(false)
+  const [feedbackMap, setFeedbackMap] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(`cwc_fb_${type}`) || '{}') } catch { return {} }
+  })
+
+  // Mockup state
+  const [mockup, setMockup] = useState(null) // null | { html, mode, loading }
+  const [mockupMode, setMockupMode] = useState('ai')
+
+  // Brand voice state
+  const [voiceInfo, setVoiceInfo] = useState(null) // null = unknown, false = none, object = exists
+  const [showVoiceDetail, setShowVoiceDetail] = useState(false)
+
+  // Save modal
+  const [showSave, setShowSave] = useState(false)
+  const [customers, setCustomers] = useState([])
+  const [saveTitle, setSaveTitle] = useState('')
+  const [saveCustId, setSaveCustId] = useState('')
+  const [saveCustName, setSaveCustName] = useState('')
+  const [newCustName, setNewCustName] = useState('')
+  const [newCustEmail, setNewCustEmail] = useState('')
+  const [toast, setToast] = useState(null)
+
+  const bottomRef = useRef(null)
+  const textareaRef = useRef(null)
+  const readerRef = useRef(null)
+  const resize = useAutoResize(textareaRef)
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages, streamText, showDots])
+
+  // Load conversation from server on mount; fall back to localStorage if unavailable
+  useEffect(() => {
+    api.getSession(type).then(serverMsgs => {
+      if (serverMsgs.length) {
+        setMessages(serverMsgs)
+      } else {
+        try {
+          const local = JSON.parse(localStorage.getItem(`cwc_msgs_${type}`) || '[]')
+          if (local.length) setMessages(local)
+        } catch {}
+      }
+    }).catch(() => {
+      try {
+        const local = JSON.parse(localStorage.getItem(`cwc_msgs_${type}`) || '[]')
+        if (local.length) setMessages(local)
+      } catch {}
+    })
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    try { localStorage.setItem(`cwc_fb_${type}`, JSON.stringify(feedbackMap)) } catch {}
+  }, [feedbackMap, type])
+
+  // Load brand voice status on mount
+  useEffect(() => {
+    if (!locationId) return
+    api.getBrandVoice().then(data => {
+      if (data?.voice?.profile) setVoiceInfo(data.voice)
+      else setVoiceInfo(false)
+    }).catch(() => setVoiceInfo(false))
+  }, [locationId])
+
+  async function send() {
+    const text = input.trim()
+    if (!text || streaming) return
+    if (!configLoading && !config) {
+      const u = new URL('/settings', window.location.origin)
+      if (locationId) u.searchParams.set('locationId', locationId)
+      navigate(u.pathname + u.search)
+      return
+    }
+
+    const userMsg = { role: 'user', content: text }
+    const allMsgs = [...messages, userMsg]
+    setMessages(allMsgs)
+    setInput('')
+    if (textareaRef.current) textareaRef.current.style.height = 'auto'
+    setStreaming(true)
+    setShowDots(true)
+    setStreamText('')
+
+    // Sanitize messages before sending: remove error messages and fix role sequences
+    function sanitize(msgs) {
+      const cleaned = msgs
+        .filter(m => m.content && !m.content.startsWith('Sorry, something went wrong') && !m.content.startsWith('Error:'))
+        .reduce((acc, m) => {
+          // Merge consecutive same-role messages instead of sending invalid sequences
+          if (acc.length && acc[acc.length - 1].role === m.role) {
+            acc[acc.length - 1] = { ...acc[acc.length - 1], content: acc[acc.length - 1].content + '\n' + m.content }
+          } else {
+            acc.push(m)
+          }
+          return acc
+        }, [])
+      // API requires first message to be from user
+      while (cleaned.length && cleaned[0].role === 'assistant') cleaned.shift()
+      return cleaned
+    }
+
+    try {
+      const resp = await fetch('/copywrite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type,
+          locationId,
+          messages: sanitize(allMsgs).map(m => ({ role: m.role, content: m.content })),
+          provider: config?.provider,
+          apiKey:   config?.apiKey,
+          model:    config?.model,
+        }),
+      })
+
+      if (!resp.ok) {
+        let errMsg = 'Request failed'
+        try { const j = await resp.json(); errMsg = j.error || errMsg } catch {}
+        throw new Error(errMsg)
+      }
+
+      const reader = resp.body.getReader()
+      readerRef.current = reader
+      const decoder = new TextDecoder()
+      let accumulated = ''
+      let errorText = ''
+      let firstToken = true
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        const chunk = decoder.decode(value, { stream: true })
+        const lines = chunk.split('\n')
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue
+          const raw = line.slice(6)
+          if (raw === '[DONE]') break
+          try {
+            const parsed = JSON.parse(raw)
+            if (parsed.error) {
+              errorText = parsed.error
+            } else if (parsed.text) {
+              if (firstToken) { setShowDots(false); firstToken = false }
+              accumulated += parsed.text
+              setStreamText(accumulated)
+            }
+          } catch {}
+        }
+      }
+
+      const content = accumulated || (errorText ? `Error: ${errorText}` : '')
+      if (content) {
+        const finalMsgs = [...allMsgs, { role: 'assistant', content }]
+        setMessages(finalMsgs)
+        // Persist to server (primary) and localStorage (fallback)
+        api.saveSession(type, finalMsgs)
+        try { localStorage.setItem(`cwc_msgs_${type}`, JSON.stringify(finalMsgs)) } catch {}
+      }
+    } catch (e) {
+      // Show error as a toast/note — do NOT save to messages history so it can't corrupt future requests
+      setToast(e?.message || 'Something went wrong. Check your AI settings and try again.')
+      setTimeout(() => setToast(null), 6000)
+      // Remove the user message we optimistically added so they can retry
+      setMessages(prev => prev.slice(0, -1))
+    } finally {
+      setStreamText('')
+      setShowDots(false)
+      setStreaming(false)
+      readerRef.current = null
+    }
+  }
+
+  function handleKey(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      send()
+    }
+  }
+
+  async function handleMockup(content, mode) {
+    setMockupMode(mode)
+    setMockup({ loading: true, mode, html: null, error: null })
+    try {
+      const result = await api.generateMockup({
+        copy: content, type, mode,
+        provider: config?.provider,
+        apiKey:   config?.apiKey,
+        model:    config?.model,
+      })
+      if (result.html) {
+        setMockup({ html: result.html, mode, loading: false, error: null })
+      } else {
+        setMockup({ html: null, mode, loading: false, error: result.error || 'No HTML returned' })
+      }
+    } catch (e) {
+      setMockup({ html: null, mode, loading: false, error: e.message || 'Request failed' })
+    }
+  }
+
+  function handleFeedback(msgIndex, sentiment) {
+    const prev = feedbackMap[msgIndex]
+    if (prev === sentiment) return // already rated this way
+    setFeedbackMap(m => ({ ...m, [msgIndex]: sentiment }))
+    const text = messages[msgIndex]?.content || ''
+    api.addCopyFeedback({ type, text, sentiment }).catch(() => {})
+  }
+
+  async function openSave() {
+    setSaveTitle(`${typeInfo.title} — ${new Date().toLocaleDateString()}`)
+    setSaveCustId('')
+    setSaveCustName('')
+    setNewCustName('')
+    setNewCustEmail('')
+    setShowSave(true)
+    const custs = await api.getCustomers()
+    setCustomers(Array.isArray(custs) ? custs : [])
+  }
+
+  async function doSave() {
+    let customerId = saveCustId || '_unsorted'
+    let customerName = saveCustName || 'Unsorted'
+
+    if (saveCustId === '__new__' && newCustName.trim()) {
+      const created = await api.createCustomer(newCustName.trim(), newCustEmail.trim())
+      customerId = created.id
+      customerName = created.name
+    }
+
+    const lastAi = [...messages].reverse().find(m => m.role === 'assistant')
+    const preview = lastAi?.content.slice(0, 120) || ''
+
+    const copy = await api.saveCopy({
+      customerId,
+      customerName,
+      type,
+      messages,
+      title: saveTitle,
+      preview,
+    })
+
+    setShowSave(false)
+    const viewUrl = `/library/${customerId}/${copy.id}` + (locationId ? `?locationId=${locationId}` : '')
+    setToast({ msg: 'Saved to Library', viewUrl })
+    setTimeout(() => setToast(null), 4000)
+
+    // Trigger background voice analysis — silent, no loading state
+    if (locationId && config) {
+      api.analyzeVoice({
+        provider: config.provider,
+        apiKey:   config.apiKey,
+        model:    config.model,
+      }).then(result => {
+        if (result?.profile) setVoiceInfo({ profile: result.profile, sampleCount: result.sampleCount, updatedAt: Date.now() })
+      }).catch(() => {})
+    }
+  }
+
+  function back() {
+    const u = new URL('/copywriters', window.location.origin)
+    if (locationId) u.searchParams.set('locationId', locationId)
+    navigate(u.pathname + u.search)
+  }
+
+  function addToWorkflow(content) {
+    sessionStorage.setItem('automator_wf_draft', JSON.stringify({
+      content,
+      copywriterType: type,
+      timestamp: Date.now(),
+    }))
+    const u = new URL('/workflows', window.location.origin)
+    if (locationId) u.searchParams.set('locationId', locationId)
+    u.searchParams.set('build', '1')
+    navigate(u.pathname + u.search)
+  }
+
+  const lastAi = [...messages].reverse().find(m => m.role === 'assistant')
+
+  return (
+    <>
+      <div className="topnav">
+        <div className="topnav-left">
+          <button className="btn btn-ghost btn-sm" onClick={back} style={{ padding: '6px 8px' }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
+              <path d="M19 12H5M12 19l-7-7 7-7"/>
+            </svg>
+          </button>
+          <span className="breadcrumb">Copywriters</span>
+          <span className="breadcrumb-sep">/</span>
+          <span className="breadcrumb-current">{typeInfo.title}</span>
+        </div>
+        <div className="topnav-right" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {voiceInfo && (
+            <button
+              className="voice-chip"
+              onClick={() => setShowVoiceDetail(v => !v)}
+              title="Brand voice is trained — click to view"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="12" height="12">
+                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v3M8 22h8"/>
+              </svg>
+              Voice trained
+            </button>
+          )}
+          <span
+            className="badge"
+            style={{ background: typeInfo.colorBg, color: typeInfo.color }}
+          >
+            {type}
+          </span>
+        </div>
+      </div>
+
+      {/* Brand voice detail panel */}
+      {showVoiceDetail && voiceInfo && (
+        <div className="voice-panel">
+          <div className="voice-panel-header">
+            <span className="voice-panel-title">Brand Voice Profile</span>
+            <span className="voice-panel-meta">{voiceInfo.sampleCount} copies analyzed</span>
+            <button
+              className="btn btn-ghost btn-sm"
+              style={{ marginLeft: 'auto', fontSize: '.75rem' }}
+              onClick={() => {
+                if (!confirm('Clear the trained brand voice?')) return
+                api.clearBrandVoice().then(() => { setVoiceInfo(false); setShowVoiceDetail(false) }).catch(() => {})
+              }}
+            >
+              Clear
+            </button>
+            <button className="btn btn-ghost btn-sm" style={{ fontSize: '.75rem' }} onClick={() => setShowVoiceDetail(false)}>
+              Close
+            </button>
+          </div>
+          <p className="voice-panel-body">{voiceInfo.profile}</p>
+        </div>
+      )}
+
+      <div className="chat-shell">
+        <div className="chat-messages">
+          {messages.length === 0 && !showDots && (
+            <div className="empty-state" style={{ flex: 1 }}>
+              <div
+                style={{ width: 56, height: 56, borderRadius: 14, background: typeInfo.colorBg, display: 'flex', alignItems: 'center', justifyContent: 'center', color: typeInfo.color, fontSize: '1.5rem' }}
+                dangerouslySetInnerHTML={{ __html: typeInfo.icon.replace('width="18"', 'width="28"').replace('height="18"', 'height="28"') }}
+              />
+              <div className="empty-title">{typeInfo.title}</div>
+              <div className="empty-sub">Start by telling me what you need — I'll ask the right questions.</div>
+              {voiceInfo && (
+                <div className="empty-voice-note">
+                  Brand voice active — responses will match your established style.
+                </div>
+              )}
+            </div>
+          )}
+
+          {messages.map((msg, i) => (
+            <MsgBubble
+              key={i}
+              msg={msg}
+              isLast={i === messages.length - 1}
+              onSave={openSave}
+              onWorkflow={addToWorkflow}
+              onFeedback={sentiment => handleFeedback(i, sentiment)}
+              feedback={feedbackMap[i] || null}
+              onMockup={() => handleMockup(cleanDisplayText(msg.content), 'ai')}
+            />
+          ))}
+
+          {showDots && (
+            <div className="msg-row">
+              <div className="msg-avatar ai">✦</div>
+              <div className="msg-bubble ai">
+                <div className="typing-dots">
+                  <span/><span/><span/>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {streamText && !showDots && (
+            <div className="msg-row">
+              <div className="msg-avatar ai">✦</div>
+              <div className="msg-bubble ai">{cleanDisplayText(streamText)}</div>
+            </div>
+          )}
+
+          <div ref={bottomRef} />
+        </div>
+
+        <div className="chat-input-bar">
+          <div className="chat-input-row">
+            <textarea
+              ref={textareaRef}
+              className="chat-textarea"
+              placeholder="Type your message…"
+              value={input}
+              rows={1}
+              onChange={e => { setInput(e.target.value); resize() }}
+              onKeyDown={handleKey}
+              disabled={streaming}
+            />
+            <button className="send-btn" onClick={send} disabled={streaming || !input.trim()}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
+                <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+              </svg>
+            </button>
+          </div>
+          <div className="chat-provider-bar">
+            {config ? (
+              <>
+                <span>{PROVIDERS.find(p => p.id === config.provider)?.name || config.provider} · {config.model}</span>
+                <button className="chat-provider-link" onClick={() => {
+                  const u = new URL('/settings', window.location.origin)
+                  if (locationId) u.searchParams.set('locationId', locationId)
+                  navigate(u.pathname + u.search)
+                }}>Change</button>
+              </>
+            ) : (
+              <>
+                <span>No AI provider configured</span>
+                <button className="chat-provider-link" onClick={() => {
+                  const u = new URL('/settings', window.location.origin)
+                  if (locationId) u.searchParams.set('locationId', locationId)
+                  navigate(u.pathname + u.search)
+                }}>Connect →</button>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Mockup modal */}
+      {mockup && (
+        <div className="mockup-overlay">
+          <div className="mockup-modal">
+            <div className="mockup-header">
+              <span className="mockup-title">AI Generated Design</span>
+              <div className="mockup-tabs">
+                {!mockup?.loading && mockup?.html && (
+                  <button
+                    className="mockup-tab active"
+                    onClick={() => handleMockup(lastAi?.content || '', 'ai')}
+                  >
+                    ↺ New Design
+                  </button>
+                )}
+              </div>
+              <button className="mockup-close" onClick={() => setMockup(null)}>✕</button>
+            </div>
+            <div className="mockup-body">
+              {mockup.loading ? (
+                <div className="mockup-loading">
+                  <div className="typing-dots"><span/><span/><span/></div>
+                  <p>Generating AI design… this may take up to 60s</p>
+                </div>
+              ) : mockup.error ? (
+                <div className="mockup-loading">
+                  <p style={{ color: 'var(--danger)', fontWeight: 600 }}>Generation failed</p>
+                  <p style={{ color: 'var(--sub)', fontSize: '.875rem', maxWidth: 400, textAlign: 'center' }}>{mockup.error}</p>
+                  <button className="btn btn-secondary" onClick={() => handleMockup(lastAi?.content || '', mockupMode)}>Retry</button>
+                </div>
+              ) : (
+                <iframe
+                  className="mockup-frame"
+                  srcDoc={mockup.html}
+                  title="Page Mockup"
+                  sandbox="allow-scripts"
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Save modal */}
+      {showSave && (
+        <div className="modal-backdrop" onClick={() => setShowSave(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-title">Save to Library</div>
+
+            <div className="form-group">
+              <label className="form-label">Title</label>
+              <input
+                className="form-input"
+                value={saveTitle}
+                onChange={e => setSaveTitle(e.target.value)}
+                onFocus={e => e.target.select()}
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Customer folder</label>
+              <select
+                className="form-input form-select"
+                value={saveCustId}
+                onChange={e => {
+                  const v = e.target.value
+                  setSaveCustId(v)
+                  const found = customers.find(c => c.id === v)
+                  setSaveCustName(found ? found.name : '')
+                }}
+              >
+                <option value="">Unsorted</option>
+                {customers.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+                <option value="__new__">+ New customer…</option>
+              </select>
+            </div>
+
+            {saveCustId === '__new__' && (
+              <>
+                <div className="form-group">
+                  <label className="form-label">Customer name</label>
+                  <input className="form-input" value={newCustName} onChange={e => setNewCustName(e.target.value)} placeholder="Acme Corp" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Email (optional)</label>
+                  <input className="form-input" type="email" value={newCustEmail} onChange={e => setNewCustEmail(e.target.value)} placeholder="name@company.com" />
+                </div>
+              </>
+            )}
+
+            <div className="modal-actions">
+              <button className="btn btn-primary flex-1" onClick={doSave} disabled={!lastAi}>
+                Save
+              </button>
+              <button className="btn btn-secondary" onClick={() => setShowSave(false)}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast */}
+      {toast && (
+        <div className="toast">
+          {toast.msg}
+          <a href={toast.viewUrl}>View →</a>
+        </div>
+      )}
+    </>
+  )
+}

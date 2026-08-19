@@ -1,0 +1,94 @@
+<%- include('partials/head', { title: 'Create User' }) %>
+<%- include('partials/nav') %>
+
+<main class="container">
+  <div class="page-header">
+    <a href="/dashboard" class="back-link">&larr; Dashboard</a>
+    <h1>Create User</h1>
+    <p class="text-muted">Add a new user to your GoHighLevel organization.</p>
+  </div>
+
+  <% if (error) { %>
+    <div class="alert alert-error"><%= error %></div>
+  <% } %>
+
+  <% if (result) { %>
+    <div class="alert alert-success">
+      User created successfully!
+      <% if (result.id || result.user?.id) { %>
+        <br/><strong>ID:</strong> <code><%= result.id || result.user?.id %></code>
+      <% } %>
+    </div>
+    <details class="result-details">
+      <summary>Full API Response</summary>
+      <pre><%= JSON.stringify(result, null, 2) %></pre>
+    </details>
+  <% } %>
+
+  <form method="POST" action="/users/create" class="form-card">
+    <div class="form-section">
+      <h2>User Details</h2>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="firstName">First Name <span class="required">*</span></label>
+          <input type="text" id="firstName" name="firstName" required placeholder="Jane" />
+        </div>
+        <div class="form-group">
+          <label for="lastName">Last Name <span class="required">*</span></label>
+          <input type="text" id="lastName" name="lastName" required placeholder="Smith" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="email">Email <span class="required">*</span></label>
+          <input type="email" id="email" name="email" required placeholder="jane@example.com" />
+        </div>
+        <div class="form-group">
+          <label for="phone">Phone</label>
+          <input type="tel" id="phone" name="phone" placeholder="+1 555-000-0000" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group form-group--full">
+          <label for="password">Password <span class="required">*</span></label>
+          <input type="password" id="password" name="password" required placeholder="Min 8 characters" />
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <h2>Role &amp; Permissions</h2>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="type">User Type <span class="required">*</span></label>
+          <select id="type" name="type" required>
+            <option value="account">Account</option>
+            <option value="agency">Agency</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="role">Role <span class="required">*</span></label>
+          <select id="role" name="role" required>
+            <option value="user">User</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group form-group--full">
+          <label for="locationIds">Location IDs</label>
+          <input type="text" id="locationIds" name="locationIds"
+                 placeholder="loc123, loc456 (comma-separated)" />
+          <span class="field-hint">Assign user to one or more sub-accounts.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">Create User</button>
+      <a href="/dashboard" class="btn btn-outline">Cancel</a>
+    </div>
+  </form>
+</main>
+
+<%- include('partials/foot') %>

@@ -1,0 +1,183 @@
+<%- include('partials/head', { title: 'Workflow Actions' }) %>
+<%- include('partials/nav') %>
+
+<main class="container container--wide">
+  <div class="page-header">
+    <a href="/dashboard" class="back-link">&larr; Dashboard</a>
+    <h1>Workflow Automation Actions</h1>
+    <p class="text-muted">
+      Configure the webhook URL below in your GHL Marketplace app settings.
+      These actions will then appear in the GHL Workflow Builder for all connected locations.
+    </p>
+  </div>
+
+  <!-- Webhook URL card -->
+  <div class="wh-card">
+    <div class="wh-card__icon">&#128279;</div>
+    <div class="wh-card__body">
+      <div class="wh-card__label">Webhook URL &mdash; paste this in your GHL Marketplace app &rarr; Actions &rarr; Webhook URL</div>
+      <div class="wh-card__url-row">
+        <code id="webhookUrl" class="wh-card__url"><%= webhookUrl %></code>
+        <button class="btn btn-outline btn-sm" onclick="copyWebhook()">Copy</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Install stats -->
+  <div class="stats-row">
+    <div class="stat-pill">
+      <span class="stat-num"><%= installCount %></span>
+      <span class="stat-label">Connected Location<%= installCount !== 1 ? 's' : '' %></span>
+    </div>
+    <div class="stat-pill">
+      <span class="stat-num"><%= actions.length %></span>
+      <span class="stat-label">Available Actions</span>
+    </div>
+    <a href="/workflow-actions/catalog.json" target="_blank" class="btn btn-outline btn-sm">
+      View Catalog JSON
+    </a>
+  </div>
+
+  <!-- Action cards -->
+  <h2 class="section-title">Available Actions</h2>
+  <div class="wa-grid">
+    <% actions.forEach(action => { %>
+    <div class="wa-card">
+      <div class="wa-card__header">
+        <span class="wa-card__icon"><%= action.icon %></span>
+        <div>
+          <div class="wa-card__name"><%= action.name %></div>
+          <code class="wa-card__key"><%= action.key %></code>
+        </div>
+      </div>
+      <p class="wa-card__desc"><%= action.description %></p>
+
+      <div class="wa-fields">
+        <div class="wa-fields__title">Input Fields</div>
+        <table class="fields-table">
+          <thead>
+            <tr><th>Key</th><th>Label</th><th>Type</th><th>Required</th></tr>
+          </thead>
+          <tbody>
+            <% action.fields.forEach(f => { %>
+            <tr>
+              <td><code><%= f.key %></code></td>
+              <td><%= f.label %></td>
+              <td><span class="type-badge"><%= f.type %></span></td>
+              <td>
+                <% if (f.required) { %>
+                  <span class="badge badge--required">required</span>
+                <% } else { %>
+                  <span class="badge badge--optional">optional</span>
+                <% } %>
+              </td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+
+      <% if (action.outputs && action.outputs.length) { %>
+      <div class="wa-fields wa-fields--outputs">
+        <div class="wa-fields__title">Output Fields (available in next workflow steps)</div>
+        <table class="fields-table">
+          <thead>
+            <tr><th>Key</th><th>Label</th></tr>
+          </thead>
+          <tbody>
+            <% action.outputs.forEach(o => { %>
+            <tr>
+              <td><code><%= o.key %></code></td>
+              <td><%= o.label %></td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+      <% } %>
+    </div>
+    <% }) %>
+  </div>
+
+  <!-- Connected Locations -->
+  <h2 class="section-title" style="margin-top:3rem;">Connected Locations</h2>
+  <% if (installCount === 0) { %>
+    <div class="empty-state">
+      <p>No locations connected yet. <a href="/auth/connect">Connect a GHL account</a> to get started.</p>
+    </div>
+  <% } else { %>
+  <div class="installs-table-wrap">
+    <table class="installs-table">
+      <thead>
+        <tr>
+          <th>Location ID</th>
+          <th>Company ID</th>
+          <th>User Type</th>
+          <th>Connected At</th>
+          <th>Token Expires</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% Object.values(installs).forEach(inst => { %>
+        <tr>
+          <td><code><%= inst.locationId || '—' %></code></td>
+          <td><code><%= inst.companyId  || '—' %></code></td>
+          <td><%= inst.userType || '—' %></td>
+          <td><%= inst.installedAt ? new Date(inst.installedAt).toLocaleString() : '—' %></td>
+          <td class="<%= inst.tokenExpiresAt < Date.now() ? 'text-error' : '' %>">
+            <%= inst.tokenExpiresAt ? new Date(inst.tokenExpiresAt).toLocaleString() : '—' %>
+          </td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+  <% } %>
+
+  <!-- Setup guide -->
+  <div class="setup-guide">
+    <h2>Setup Guide</h2>
+    <ol class="guide-steps">
+      <li>
+        <strong>Open the GHL Marketplace Developer Portal</strong> at
+        <code>marketplace.gohighlevel.com</code> and open your app.
+      </li>
+      <li>
+        <strong>Go to Actions</strong> (or Custom Actions) in your app settings.
+        Click <em>Add Action</em> for each action listed above.
+      </li>
+      <li>
+        For each action, set:
+        <ul>
+          <li><strong>Name</strong> &mdash; use the action name shown above</li>
+          <li><strong>Key / Identifier</strong> &mdash; use the <code>key</code> value exactly</li>
+          <li><strong>Webhook URL</strong> &mdash; paste the URL from the card at the top of this page</li>
+          <li><strong>Input Fields</strong> &mdash; add each field from the Input Fields table</li>
+        </ul>
+      </li>
+      <li>
+        <strong>Save &amp; publish</strong> your app changes on the marketplace.
+      </li>
+      <li>
+        Users who install the app via OAuth will now see all 5 actions in their
+        <strong>Workflow Builder &rarr; Actions</strong> panel.
+      </li>
+      <li>
+        When a workflow fires an action, GHL POSTs to your webhook URL.
+        This app will execute the action using the location&rsquo;s stored OAuth token
+        and send the result back to GHL automatically.
+      </li>
+    </ol>
+  </div>
+</main>
+
+<script>
+function copyWebhook() {
+  const url = document.getElementById('webhookUrl').textContent;
+  navigator.clipboard.writeText(url).then(() => {
+    alert('Webhook URL copied!');
+  });
+}
+</script>
+
+<%- include('partials/foot') %>

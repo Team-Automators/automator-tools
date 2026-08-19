@@ -1,0 +1,90 @@
+<%- include('partials/head', { title: 'App Setup' }) %>
+<%- include('partials/nav') %>
+
+<main class="container container--narrow">
+  <div class="page-header">
+    <h1>App Setup</h1>
+    <p class="text-muted">
+      Enter your GHL Private API Key to activate workflow actions for this sub-location.
+    </p>
+  </div>
+
+  <% if (error) { %>
+    <div class="alert alert-error"><%= error %></div>
+  <% } %>
+
+  <% if (success) { %>
+    <div class="alert alert-success"><%= success %></div>
+    <div style="margin-top:1.5rem;display:flex;gap:.75rem;">
+      <a href="/dashboard" class="btn btn-primary">Go to Dashboard</a>
+      <a href="/workflow-actions" class="btn btn-outline">View Workflow Actions</a>
+    </div>
+  <% } else { %>
+
+  <div class="install-card">
+    <div class="install-info">
+      <div class="install-info__row">
+        <span class="install-info__label">Location ID</span>
+        <code class="install-info__val"><%= locationId || 'unknown' %></code>
+      </div>
+      <% if (companyId) { %>
+      <div class="install-info__row">
+        <span class="install-info__label">Company ID</span>
+        <code class="install-info__val"><%= companyId %></code>
+      </div>
+      <% } %>
+      <div class="install-info__row">
+        <span class="install-info__label">Status</span>
+        <span class="badge <%= alreadySet ? 'badge--success' : 'badge--warn' %>">
+          <%= alreadySet ? 'Key registered' : 'Key required' %>
+        </span>
+      </div>
+    </div>
+
+    <form method="POST" action="/install" class="key-form">
+      <div class="form-group">
+        <label for="privateApiKey">Private API Key</label>
+        <input type="password" id="privateApiKey" name="privateApiKey"
+               required autocomplete="off"
+               placeholder="pit-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
+        <span class="field-hint">
+          Found in GHL &rarr; <strong>Settings</strong> &rarr; <strong>Integrations</strong> &rarr; <strong>API Key</strong>
+          (Private Integration Token for this sub-location).
+        </span>
+      </div>
+      <div class="form-actions" style="padding:0;margin-top:1.25rem;background:transparent;border:none;">
+        <button type="submit" class="btn btn-primary">Verify &amp; Save Key</button>
+        <% if (alreadySet) { %>
+          <form method="POST" action="/install/delete" style="display:inline;">
+            <button type="submit" class="btn btn-danger" onclick="return confirm('Remove the stored key?')">Remove Key</button>
+          </form>
+        <% } %>
+      </div>
+    </form>
+  </div>
+
+  <div class="how-it-works">
+    <h2>How it works</h2>
+    <ol class="guide-steps">
+      <li>
+        Get your <strong>Private API Key</strong> from GHL &rarr; Settings &rarr; Integrations &rarr; API Key.
+      </li>
+      <li>
+        Paste it above. We verify the key against GHL before saving.
+      </li>
+      <li>
+        In your <strong>GHL Marketplace app settings</strong>, add this webhook header so GHL
+        sends the key on every action call automatically:
+        <pre class="code-block">Authorization: Bearer {your_private_api_key}</pre>
+      </li>
+      <li>
+        Every workflow action will now use your key to authenticate API calls — no OAuth
+        session needed at runtime.
+      </li>
+    </ol>
+  </div>
+
+  <% } %>
+</main>
+
+<%- include('partials/foot') %>

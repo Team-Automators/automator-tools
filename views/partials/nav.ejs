@@ -1,0 +1,30 @@
+<nav class="navbar">
+  <a href="/" class="nav-brand">GHL Automator</a>
+  <% if (isAuthenticated) { %>
+  <ul class="nav-links">
+    <li><a href="/dashboard">Dashboard</a></li>
+    <li class="dropdown">
+      <span>Sub-Accounts</span>
+      <ul class="dropdown-menu">
+        <li><a href="/locations/create">Create</a></li>
+        <li><a href="/locations/update">Update</a></li>
+      </ul>
+    </li>
+    <li class="dropdown">
+      <span>Users</span>
+      <ul class="dropdown-menu">
+        <li><a href="/users/create">Create</a></li>
+        <li><a href="/users/update">Update</a></li>
+      </ul>
+    </li>
+    <li class="dropdown">
+      <span>Contacts</span>
+      <ul class="dropdown-menu">
+        <li><a href="/contacts/update">Update</a></li>
+      </ul>
+    </li>
+    <li><a href="/workflow-actions">Workflow Actions</a></li>
+    <li><a href="/auth/disconnect" class="btn btn-outline">Disconnect</a></li>
+  </ul>
+  <% } %>
+</nav>

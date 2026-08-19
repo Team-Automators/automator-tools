@@ -1,0 +1,110 @@
+<%- include('partials/head', { title: 'Update Contact' }) %>
+<%- include('partials/nav') %>
+
+<main class="container">
+  <div class="page-header">
+    <a href="/dashboard" class="back-link">&larr; Dashboard</a>
+    <h1>Update Contact</h1>
+    <p class="text-muted">Modify a contact record by its ID.</p>
+  </div>
+
+  <% if (error) { %>
+    <div class="alert alert-error"><%= error %></div>
+  <% } %>
+
+  <% if (result) { %>
+    <div class="alert alert-success">Contact updated successfully!</div>
+    <details class="result-details">
+      <summary>Full API Response</summary>
+      <pre><%= JSON.stringify(result, null, 2) %></pre>
+    </details>
+  <% } %>
+
+  <form method="POST" action="/contacts/update" class="form-card">
+    <div class="form-section">
+      <h2>Target Contact</h2>
+      <div class="form-row">
+        <div class="form-group form-group--full">
+          <label for="contactId">Contact ID <span class="required">*</span></label>
+          <input type="text" id="contactId" name="contactId" required
+                 placeholder="con_abc123" value="<%= prefillId %>" />
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <h2>Fields to Update</h2>
+      <p class="text-muted section-hint">Leave any field blank to keep its current value.</p>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="firstName">First Name</label>
+          <input type="text" id="firstName" name="firstName" placeholder="John" />
+        </div>
+        <div class="form-group">
+          <label for="lastName">Last Name</label>
+          <input type="text" id="lastName" name="lastName" placeholder="Doe" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="email">Email</label>
+          <input type="email" id="email" name="email" placeholder="john@example.com" />
+        </div>
+        <div class="form-group">
+          <label for="phone">Phone</label>
+          <input type="tel" id="phone" name="phone" placeholder="+1 555-000-0000" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="companyName">Company Name</label>
+          <input type="text" id="companyName" name="companyName" placeholder="Acme Corp" />
+        </div>
+        <div class="form-group">
+          <label for="source">Source</label>
+          <input type="text" id="source" name="source" placeholder="website, referral..." />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group form-group--full">
+          <label for="address1">Address</label>
+          <input type="text" id="address1" name="address1" placeholder="123 Main St" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="city">City</label>
+          <input type="text" id="city" name="city" placeholder="Austin" />
+        </div>
+        <div class="form-group">
+          <label for="state">State</label>
+          <input type="text" id="state" name="state" placeholder="TX" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="postalCode">Postal Code</label>
+          <input type="text" id="postalCode" name="postalCode" placeholder="78701" />
+        </div>
+        <div class="form-group">
+          <label for="country">Country</label>
+          <input type="text" id="country" name="country" placeholder="US" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group form-group--full">
+          <label for="tags">Tags</label>
+          <input type="text" id="tags" name="tags" placeholder="vip, hot-lead, customer (comma-separated)" />
+          <span class="field-hint">Replaces all existing tags on the contact.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">Update Contact</button>
+      <a href="/dashboard" class="btn btn-outline">Cancel</a>
+    </div>
+  </form>
+</main>
+
+<%- include('partials/foot') %>

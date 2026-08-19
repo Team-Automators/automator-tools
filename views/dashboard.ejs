@@ -1,0 +1,65 @@
+<%- include('partials/head', { title: 'Dashboard' }) %>
+<%- include('partials/nav') %>
+
+<main class="container">
+  <div class="page-header">
+    <h1>Dashboard</h1>
+    <p class="text-muted">Connected to GoHighLevel</p>
+  </div>
+
+  <div class="info-cards">
+    <% if (locationId) { %>
+    <div class="info-card">
+      <span class="info-label">Location ID</span>
+      <code class="info-value"><%= locationId %></code>
+    </div>
+    <% } %>
+    <% if (companyId) { %>
+    <div class="info-card">
+      <span class="info-label">Company ID</span>
+      <code class="info-value"><%= companyId %></code>
+    </div>
+    <% } %>
+    <% if (userType) { %>
+    <div class="info-card">
+      <span class="info-label">User Type</span>
+      <code class="info-value"><%= userType %></code>
+    </div>
+    <% } %>
+  </div>
+
+  <div class="action-grid">
+    <a href="/locations/create" class="action-card">
+      <div class="action-icon">&#10133;</div>
+      <h3>Create Sub-Account</h3>
+      <p>Provision a new location under your agency.</p>
+    </a>
+    <a href="/locations/update" class="action-card">
+      <div class="action-icon">&#9998;</div>
+      <h3>Update Sub-Account</h3>
+      <p>Modify details of an existing location.</p>
+    </a>
+    <a href="/users/create" class="action-card">
+      <div class="action-icon">&#128100;</div>
+      <h3>Create User</h3>
+      <p>Add a new user to your GHL organization.</p>
+    </a>
+    <a href="/users/update" class="action-card">
+      <div class="action-icon">&#128101;</div>
+      <h3>Update User</h3>
+      <p>Edit an existing user's profile and permissions.</p>
+    </a>
+    <a href="/contacts/update" class="action-card">
+      <div class="action-icon">&#128222;</div>
+      <h3>Update Contact</h3>
+      <p>Modify a contact record in a sub-account.</p>
+    </a>
+    <a href="/workflow-actions" class="action-card action-card--highlight">
+      <div class="action-icon">&#9889;</div>
+      <h3>Workflow Actions</h3>
+      <p>Webhook URL, action catalog, and connected locations for automation.</p>
+    </a>
+  </div>
+</main>
+
+<%- include('partials/foot') %>
