@@ -154,6 +154,10 @@ img { max-width: 100%; display: block; }
 }
 .nav-item:hover { background: var(--sb-hover); color: var(--sb-active); }
 .nav-item.active { background: rgba(37,99,235,.2); color: #60A5FA; }
+.sb-ai-status {
+  padding: 0 10px 8px;
+  display: flex;
+}
 .sb-user-wrap {
   position: relative;
   padding: 10px;

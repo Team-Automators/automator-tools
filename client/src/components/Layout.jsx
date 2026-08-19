@@ -145,6 +145,17 @@ export default function Layout() {
           ))}
         </nav>
 
+        <div className="sb-ai-status">
+          {config?.apiKey ? (
+            <span className="chip chip-green" style={{ fontSize: '.72rem', gap: 5 }}>
+              <svg width="7" height="7" viewBox="0 0 8 8"><circle cx="4" cy="4" r="4" fill="currentColor"/></svg>
+              AI Active
+            </span>
+          ) : (
+            <span className="chip chip-red" style={{ fontSize: '.72rem' }}>AI not configured</span>
+          )}
+        </div>
+
         <div className="sb-user-wrap" ref={menuRef}>
           <div className="sb-user" onClick={() => setMenuOpen(v => !v)}>
             <div className="sb-avatar"><span>{initials}</span></div>
