@@ -163,6 +163,7 @@ export default function CopywritersChat() {
   const [cycleCountdown, setCycleCountdown] = useState(0)
   const cycleTimerRef = useRef(null)
   const countdownRef = useRef(null)
+  const autoSavedCopyId = useRef(null)
 
   // GHL Prompt modal state
   const [ghlPrompt, setGhlPrompt] = useState(null) // null | { loading, text, error }
@@ -225,6 +226,7 @@ export default function CopywritersChat() {
   // Always start with a fresh conversation on mount
   useEffect(() => {
     setMessages([])
+    autoSavedCopyId.current = null
     try { localStorage.removeItem(`cwc_msgs_${type}`) } catch {}
   }, [type])
 
@@ -331,9 +333,19 @@ export default function CopywritersChat() {
       if (content) {
         const finalMsgs = [...allMsgs, { role: 'assistant', content }]
         setMessages(finalMsgs)
-        // Persist to server (primary) and localStorage (fallback)
         api.saveSession(type, finalMsgs)
         try { localStorage.setItem(`cwc_msgs_${type}`, JSON.stringify(finalMsgs)) } catch {}
+
+        // Auto-save to Library so it appears in Dashboard activities
+        const autoTitle = `${typeInfo.title} — ${new Date().toLocaleDateString()}`
+        const autoPreview = content.slice(0, 120)
+        if (!autoSavedCopyId.current) {
+          api.saveCopy({ customerId: '_unsorted', customerName: '', type, messages: finalMsgs, title: autoTitle, preview: autoPreview })
+            .then(saved => { if (saved?.id) autoSavedCopyId.current = saved.id })
+            .catch(() => {})
+        } else {
+          api.updateCopy(autoSavedCopyId.current, { messages: finalMsgs }).catch(() => {})
+        }
       }
     } catch (e) {
       // Show error as a toast/note — do NOT save to messages history so it can't corrupt future requests
