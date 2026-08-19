@@ -222,24 +222,11 @@ export default function CopywritersChat() {
     }
   }, [mockup])
 
-  // Load conversation from server on mount; fall back to localStorage if unavailable
+  // Always start with a fresh conversation on mount
   useEffect(() => {
-    api.getSession(type).then(serverMsgs => {
-      if (serverMsgs.length) {
-        setMessages(serverMsgs)
-      } else {
-        try {
-          const local = JSON.parse(localStorage.getItem(`cwc_msgs_${type}`) || '[]')
-          if (local.length) setMessages(local)
-        } catch {}
-      }
-    }).catch(() => {
-      try {
-        const local = JSON.parse(localStorage.getItem(`cwc_msgs_${type}`) || '[]')
-        if (local.length) setMessages(local)
-      } catch {}
-    })
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    setMessages([])
+    try { localStorage.removeItem(`cwc_msgs_${type}`) } catch {}
+  }, [type])
 
   useEffect(() => {
     try { localStorage.setItem(`cwc_fb_${type}`, JSON.stringify(feedbackMap)) } catch {}
