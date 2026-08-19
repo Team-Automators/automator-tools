@@ -1110,14 +1110,83 @@ ${samples.join('\n\n---\n\n')}`;
 // ── POST /copywrite/generate-ghl-prompt ──────────────────────────────────────
 
 router.post('/generate-ghl-prompt', async (req, res) => {
-  const { copy, provider = 'claude', apiKey, model: reqModel } = req.body;
-  if (!copy) return res.status(400).json({ error: 'copy is required' });
+  const { copy, html, provider = 'claude', apiKey, model: reqModel } = req.body;
+  if (!copy && !html) return res.status(400).json({ error: 'copy or html is required' });
 
   const resolvedKey = apiKey || (provider === 'claude' ? process.env.ANTHROPIC_API_KEY : null);
   if (!resolvedKey) return res.status(400).json({ error: 'No API key configured' });
 
   const providerCfg = PROVIDER_MAP[provider];
   if (!providerCfg) return res.status(400).json({ error: `Unknown provider: ${provider}` });
+
+  // If HTML is provided, analyze the actual rendered design instead of just the raw copy
+  if (html) {
+    const htmlPrompt = `You are an expert web designer and funnel strategist. Analyze the HTML sales funnel page below and produce a complete, ready-to-use AI builder prompt that can recreate this EXACT design in any AI website builder (Framer AI, Durable, Wix AI, Webflow AI, etc.).
+
+Extract everything from the HTML: the exact color palette, typography style, section structure, component patterns, and all copy. The output prompt must be detailed enough that another AI can reproduce the same design from scratch.
+
+Output ONLY the prompt — no explanation, no preamble.
+
+Structure the output exactly like this:
+
+Build a complete sales funnel page that exactly matches the following design specification.
+
+━━━ DESIGN IDENTITY ━━━
+Visual Style: [identify the aesthetic — e.g. "Bold & Dramatic dark theme", "Clean editorial light", "Warm coaching style", "Tech precision data-driven", "Elegant premium", "High-urgency conversion-focused"]
+Color Palette:
+  • Page background: [extract exact hex from HTML/CSS]
+  • Accent / CTA color: [extract exact hex]
+  • Card/section background: [extract exact hex]
+  • Body text color: [extract exact hex]
+  • Muted text color: [extract exact hex]
+  • Border color: [extract exact hex]
+  • Hero gradient: [extract the gradient CSS value]
+Typography:
+  • Heading weight: [extract font-weight from headings]
+  • Body text size: [extract font-size]
+  • Button style: [describe border-radius, padding, text-transform, letter-spacing]
+  • Special type treatments: [e.g. monospace numbers, tracked uppercase labels, italic accents]
+
+━━━ PAGE SECTIONS (build in this exact order) ━━━
+[For each section found in the HTML, describe:]
+
+SECTION N — [SECTION NAME]
+Layout pattern: [describe the exact layout — e.g. "split left/right", "centered full-width", "2-column grid", "stacked rows"]
+Visual components: [describe each element — e.g. "large number badge left, text right", "circular avatar above headline", "chat-bubble cards with rotation"]
+Background: [describe the section background]
+Content:
+[Extract the ACTUAL copy text from the HTML for this section — headlines, body text, feature names, testimonial quotes, prices, etc.]
+
+[Repeat for every section in the page]
+
+━━━ COMPONENT SPECIFICATIONS ━━━
+Buttons: [exact style from CSS — color, border-radius, padding, font-weight, text-transform]
+Cards: [border-radius, shadow, border style]
+Section dividers: [flat cuts / angled / curved SVG waves / hairlines]
+Mobile: Fully responsive — stack all columns on mobile at 768px breakpoint
+
+━━━ EXACT COPY TO USE ━━━
+[List all the actual text content extracted from the HTML: product name, tagline, all headlines, all body text, all feature names, all testimonials with names, pricing details, guarantee text, FAQ questions and answers, CTA button text]
+
+━━━ TECHNICAL REQUIREMENTS ━━━
+- No navigation menu (distraction-free funnel)
+- All CTAs link to the pricing section
+- Mobile responsive
+- Fast loading
+
+HTML FUNNEL PAGE TO ANALYZE:
+${html.slice(0, 12000)}`;
+
+    try {
+      const model = reqModel || providerCfg.defaultModel;
+      const prompt = await callAI(providerCfg, resolvedKey, model, htmlPrompt, 2500);
+      if (!prompt || prompt.length < 100) return res.status(500).json({ error: 'Failed to generate prompt' });
+      return res.json({ ok: true, prompt: prompt.trim() });
+    } catch (err) {
+      console.error('[generate-ghl-prompt/html]', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  }
 
   const extractPrompt = `You are an expert funnel strategist. Analyze the sales funnel copy below and produce a complete, ready-to-use AI builder prompt that can be pasted into ANY AI website or funnel builder (Framer AI, Durable, Wix AI, Webflow AI, etc.) to recreate this exact funnel from scratch.
 

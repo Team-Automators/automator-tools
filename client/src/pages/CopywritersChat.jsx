@@ -389,12 +389,13 @@ export default function CopywritersChat() {
     }
   }
 
-  async function handleGeneratePrompt(content) {
+  async function handleGeneratePrompt(content, html) {
     setGhlPromptCopied(false)
     setGhlPrompt({ loading: true, text: null, error: null })
     try {
       const result = await api.generateGhlPrompt({
         copy: content,
+        html: html || null,
         provider: config?.provider,
         apiKey:   config?.apiKey,
         model:    config?.model,
@@ -689,12 +690,22 @@ export default function CopywritersChat() {
                   <button className="btn btn-secondary" onClick={() => handleMockup(lastAi?.content || '', mockupMode)}>Retry</button>
                 </div>
               ) : (
-                <iframe
-                  className="mockup-frame"
-                  srcDoc={mockup.html}
-                  title="Page Mockup"
-                  sandbox="allow-scripts"
-                />
+                <>
+                  <iframe
+                    className="mockup-frame"
+                    srcDoc={mockup.html}
+                    title="Page Mockup"
+                    sandbox="allow-scripts"
+                  />
+                  <div className="mockup-footer">
+                    <button
+                      className="btn btn-primary mockup-gen-prompt-btn"
+                      onClick={() => handleGeneratePrompt(cleanDisplayText(lastAi?.content || ''), mockup.html)}
+                    >
+                      Generate Prompt from This Design
+                    </button>
+                  </div>
+                </>
               )}
             </div>
           </div>

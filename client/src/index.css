@@ -2363,6 +2363,20 @@ img { max-width: 100%; display: block; }
 }
 .action-btn.ghl-prompt-btn:hover { background: #0284C7; border-color: #0284C7; }
 
+/* ── Mockup footer with Generate Prompt button ──────────────────────────────── */
+.mockup-footer {
+  padding: 10px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  display: flex;
+  justify-content: center;
+}
+.mockup-gen-prompt-btn {
+  background: #0EA5E9; border-color: #0EA5E9;
+  font-weight: 600; font-size: .9rem;
+}
+.mockup-gen-prompt-btn:hover { background: #0284C7; border-color: #0284C7; }
+
 /* ── Auto-cycle toggle in mockup header ─────────────────────────────────────── */
 .mockup-tab.auto-cycle-on {
   background: #16A34A; color: #fff; border-color: #16A34A; font-weight: 600;

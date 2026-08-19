@@ -284,11 +284,11 @@ export const api = {
     } catch {}
   },
 
-  async generateGhlPrompt({ copy, provider, apiKey, model }) {
+  async generateGhlPrompt({ copy, html, provider, apiKey, model }) {
     const r = await fetch('/copywrite/generate-ghl-prompt', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ copy, provider, apiKey, model }),
+      body: JSON.stringify({ copy, html, provider, apiKey, model }),
     })
     return r.json()
   },

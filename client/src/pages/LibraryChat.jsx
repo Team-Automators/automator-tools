@@ -267,12 +267,13 @@ export default function LibraryChat() {
     }
   }
 
-  async function handleGeneratePrompt(content) {
+  async function handleGeneratePrompt(content, html) {
     setGhlPromptCopied(false)
     setGhlPrompt({ loading: true, text: null, error: null })
     try {
       const result = await api.generateGhlPrompt({
         copy: cleanDisplayText(content),
+        html: html || null,
         provider: config?.provider,
         apiKey:   config?.apiKey,
         model:    config?.model,
@@ -645,12 +646,25 @@ export default function LibraryChat() {
                   <button className="btn btn-secondary" onClick={() => { const lastAiMsg = [...messages].reverse().find(m => m.role === 'assistant'); handleMockup(lastAiMsg?.content || '', mockupMode) }}>Retry</button>
                 </div>
               ) : (
-                <iframe
-                  className="mockup-frame"
-                  srcDoc={mockup.html}
-                  title="Page Mockup"
-                  sandbox="allow-scripts"
-                />
+                <>
+                  <iframe
+                    className="mockup-frame"
+                    srcDoc={mockup.html}
+                    title="Page Mockup"
+                    sandbox="allow-scripts"
+                  />
+                  <div className="mockup-footer">
+                    <button
+                      className="btn btn-primary mockup-gen-prompt-btn"
+                      onClick={() => {
+                        const lastAiMsg = [...messages].reverse().find(m => m.role === 'assistant')
+                        handleGeneratePrompt(lastAiMsg?.content || '', mockup.html)
+                      }}
+                    >
+                      Generate Prompt from This Design
+                    </button>
+                  </div>
+                </>
               )}
             </div>
           </div>
