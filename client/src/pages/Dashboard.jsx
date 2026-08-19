@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, getLocationId } from '../lib/api.js'
+import { useAIConfig } from '../hooks/useAIConfig.js'
 import { TYPES, TYPE_ORDER } from '../lib/types.js'
 
 const PAGE_SIZE = 5
@@ -45,6 +46,7 @@ function Pagination({ type, page, total, onPage }) {
 export default function Dashboard() {
   const navigate = useNavigate()
   const locationId = getLocationId()
+  const { config } = useAIConfig()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [pages, setPages] = useState({}) // { [typeKey]: pageIndex }
@@ -80,9 +82,9 @@ export default function Dashboard() {
     )
   }
 
-  const allCopies   = data?.recentCopies || []
-  const totalCopies = data?.totalCopies ?? allCopies.length
-  const hasPITs     = data?.hasPITs
+  const allCopies    = data?.recentCopies || []
+  const totalCopies  = data?.totalCopies ?? allCopies.length
+  const aiReady      = !!(config?.apiKey)
   const locationName = data?.locationName || 'My Location'
 
   // Group by type preserving TYPE_ORDER
@@ -102,13 +104,13 @@ export default function Dashboard() {
           <span className="breadcrumb-current">Dashboard</span>
         </div>
         <div className="topnav-right">
-          {hasPITs ? (
+          {aiReady ? (
             <span className="chip chip-green">
               <svg width="8" height="8" viewBox="0 0 8 8"><circle cx="4" cy="4" r="4" fill="currentColor"/></svg>
-              Connected
+              AI Active
             </span>
           ) : (
-            <span className="chip chip-red">Not connected</span>
+            <span className="chip chip-red">AI not configured</span>
           )}
         </div>
       </div>
@@ -141,7 +143,7 @@ export default function Dashboard() {
           <div className="stat-card">
             <div className="stat-label">AI Status</div>
             <div className="stat-value" style={{ fontSize: '1rem', marginTop: 8 }}>
-              {hasPITs
+              {aiReady
                 ? <span className="chip chip-green">Active</span>
                 : <span className="chip chip-red">Setup required</span>
               }
