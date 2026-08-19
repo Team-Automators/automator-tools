@@ -1174,12 +1174,15 @@ Mobile: Fully responsive — stack all columns on mobile at 768px breakpoint
 - Mobile responsive
 - Fast loading
 
+CRITICAL: Your output must be a COMPLETE, self-contained prompt that ends properly. Do NOT cut off mid-sentence. After the last section, always end with this exact closing line:
+"Build this page now as a single complete HTML file with all CSS included."
+
 HTML FUNNEL PAGE TO ANALYZE:
 ${html.replace(/<style[\s\S]*?<\/style>/gi, '<style>[CSS OMITTED FOR BREVITY]</style>').slice(0, 24000)}`;
 
     try {
       const model = reqModel || providerCfg.defaultModel;
-      const prompt = await callAI(providerCfg, resolvedKey, model, htmlPrompt, 3500);
+      const prompt = await callAI(providerCfg, resolvedKey, model, htmlPrompt, 5000);
       if (!prompt || prompt.length < 100) return res.status(500).json({ error: 'Failed to generate prompt' });
       return res.json({ ok: true, prompt: prompt.trim() });
     } catch (err) {
