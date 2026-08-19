@@ -1477,6 +1477,7 @@ FINAL CTA BAND: urgent, full-width, strong headline, primary CTA, guarantee note
 • Pure HTML/CSS — no JavaScript
 • Concise — under 450 lines total
 • CTA buttons: NEVER full-width. Always display:inline-block with auto width, centered with text-align:center on the parent. Max-width 360px if needed.
+• Features/What You Get section: list ALL features first, then ONE CTA button at the very bottom. NEVER insert CTA buttons between feature items — no "scroll CTAs" mid-list.
 
 OUTPUT: Return ONLY the HTML document. No preamble, no markdown fences.
 
