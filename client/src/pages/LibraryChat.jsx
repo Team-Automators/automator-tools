@@ -152,6 +152,10 @@ export default function LibraryChat() {
   // Mockup state
   const [mockup, setMockup] = useState(null)
   const [mockupMode, setMockupMode] = useState('ai')
+  const [autoCycle, setAutoCycle] = useState(false)
+  const [cycleCountdown, setCycleCountdown] = useState(0)
+  const cycleTimerRef = useRef(null)
+  const countdownRef = useRef(null)
 
   // GHL Prompt modal state
   const [ghlPrompt, setGhlPrompt] = useState(null)
@@ -182,6 +186,36 @@ export default function LibraryChat() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, streamText, showDots])
+
+  // Auto-cycle: when a design finishes loading and autoCycle is on, countdown then regenerate
+  useEffect(() => {
+    if (autoCycle && mockup && !mockup.loading && mockup.html && !mockup.error) {
+      const DELAY = 20
+      setCycleCountdown(DELAY)
+      countdownRef.current = setInterval(() => {
+        setCycleCountdown(c => {
+          if (c <= 1) { clearInterval(countdownRef.current); return 0 }
+          return c - 1
+        })
+      }, 1000)
+      cycleTimerRef.current = setTimeout(() => {
+        const lastAiMsg = [...messages].reverse().find(m => m.role === 'assistant')
+        if (lastAiMsg) handleMockup(cleanDisplayText(lastAiMsg.content), 'ai')
+      }, DELAY * 1000)
+    }
+    return () => {
+      clearTimeout(cycleTimerRef.current)
+      clearInterval(countdownRef.current)
+    }
+  }, [autoCycle, mockup?.html, mockup?.loading])
+
+  useEffect(() => {
+    if (!mockup) {
+      setAutoCycle(false)
+      clearTimeout(cycleTimerRef.current)
+      clearInterval(countdownRef.current)
+    }
+  }, [mockup])
 
   // Persist feedback across refreshes/navigation
   useEffect(() => {
@@ -571,15 +605,29 @@ export default function LibraryChat() {
               <span className="mockup-title">AI Generated Design</span>
               <div className="mockup-tabs">
                 {!mockup?.loading && mockup?.html && (
-                  <button
-                    className="mockup-tab active"
-                    onClick={() => {
-                      const lastAiMsg = [...messages].reverse().find(m => m.role === 'assistant')
-                      handleMockup(lastAiMsg?.content || '', 'ai')
-                    }}
-                  >
-                    ↺ New Design
-                  </button>
+                  <>
+                    <button
+                      className="mockup-tab active"
+                      onClick={() => {
+                        setAutoCycle(false)
+                        clearTimeout(cycleTimerRef.current)
+                        clearInterval(countdownRef.current)
+                        const lastAiMsg = [...messages].reverse().find(m => m.role === 'assistant')
+                        handleMockup(lastAiMsg?.content || '', 'ai')
+                      }}
+                    >
+                      ↺ New Design
+                    </button>
+                    <button
+                      className={`mockup-tab ${autoCycle ? 'auto-cycle-on' : ''}`}
+                      onClick={() => setAutoCycle(v => !v)}
+                      title="Auto-cycle through different designs every 20 seconds"
+                    >
+                      {autoCycle
+                        ? (cycleCountdown > 0 ? `⏸ Next in ${cycleCountdown}s` : '⏸ Auto')
+                        : '▶ Auto'}
+                    </button>
+                  </>
                 )}
               </div>
               <button className="mockup-close" onClick={() => setMockup(null)}>✕</button>
