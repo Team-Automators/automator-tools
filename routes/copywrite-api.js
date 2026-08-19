@@ -1462,7 +1462,7 @@ TRUST BAR (if in layout): 4–5 key stats in an accent-color strip.
 PROBLEM/PAIN (if in layout): 3–4 audience frustrations as cards.
 WHO THIS IS FOR (if in layout): two-column qualifier — "For you if…" vs "Not for you if…"
 GUARANTEE (if in layout): shield icon, 30-day promise, green-tinted box.
-FAQ (if in layout): 4–5 objections, left accent border on each.
+FAQ (if in layout): 4–5 objections, left accent border on each. Keep each answer to 2–3 sentences maximum — brevity is critical so the page has room for scarcity and footer.
 SCARCITY: High-urgency section just before the final CTA. Use a bold warning/alert box — contrasting background (red, orange, or dark accent), large bold text declaring limited availability ("Only [X] spots remaining", "Price increases [day]", or "This offer closes soon"). Include a static urgency bar or bordered callout. No countdown JS — CSS only. Text must be specific and believable from the copy, not generic.
 FINAL CTA BAND: urgent, full-width, strong headline, primary CTA, guarantee note.
 FOOTER (REQUIRED — always include at the very bottom): Simple dark footer with the product/brand name, a brief tagline, and 3 legal links: "Privacy Policy · Terms of Service · Disclaimer". Copyright © [year] line at bottom. No excessive content — clean and minimal. This section is mandatory and must appear as the last element before </body>.
@@ -1521,6 +1521,31 @@ ${copy.slice(0, 5000)}`;
     if (!rawHtml || rawHtml.length < 500) {
       console.error(`[mockup] FAIL: response too short (${rawHtml.length} chars), falling back to template`);
       return res.json({ ok: true, html: buildTemplateHTML(copy, type), mode: 'template', fallback: true });
+    }
+
+    // Inject footer if the AI omitted it (truncation), then close the document properly
+    const hasFooter = /<footer[\s\S]*?>/i.test(rawHtml);
+    if (!hasFooter) {
+      const footerHtml = `
+<footer style="background:#0F172A;padding:48px;text-align:center;border-top:1px solid #1E293B;">
+  <div style="max-width:900px;margin:0 auto;">
+    <div style="font-size:1rem;font-weight:700;color:#F1F5F9;margin-bottom:8px;">${style.palette.accent ? '' : ''}© ${new Date().getFullYear()} · All Rights Reserved</div>
+    <div style="font-size:.8rem;color:#475569;margin-top:8px;">
+      <a href="#" style="color:#64748B;text-decoration:none;margin:0 12px;">Privacy Policy</a>
+      <a href="#" style="color:#64748B;text-decoration:none;margin:0 12px;">Terms of Service</a>
+      <a href="#" style="color:#64748B;text-decoration:none;margin:0 12px;">Disclaimer</a>
+    </div>
+  </div>
+</footer>`;
+      // Insert before </body> or </html>, whichever comes first
+      if (/<\/body>/i.test(rawHtml)) {
+        rawHtml = rawHtml.replace(/<\/body>/i, footerHtml + '\n</body>');
+      } else if (/<\/html>/i.test(rawHtml)) {
+        rawHtml = rawHtml.replace(/<\/html>/i, footerHtml + '\n</body>\n</html>');
+      } else {
+        // Page was truncated — close it properly
+        rawHtml += footerHtml + '\n</body>\n</html>';
+      }
     }
 
     console.log(`[mockup] SUCCESS: serving AI HTML (${rawHtml.length} chars)`);
