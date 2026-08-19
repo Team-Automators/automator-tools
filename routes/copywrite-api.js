@@ -1175,11 +1175,11 @@ Mobile: Fully responsive — stack all columns on mobile at 768px breakpoint
 - Fast loading
 
 HTML FUNNEL PAGE TO ANALYZE:
-${html.slice(0, 12000)}`;
+${html.replace(/<style[\s\S]*?<\/style>/gi, '<style>[CSS OMITTED FOR BREVITY]</style>').slice(0, 24000)}`;
 
     try {
       const model = reqModel || providerCfg.defaultModel;
-      const prompt = await callAI(providerCfg, resolvedKey, model, htmlPrompt, 2500);
+      const prompt = await callAI(providerCfg, resolvedKey, model, htmlPrompt, 3500);
       if (!prompt || prompt.length < 100) return res.status(500).json({ error: 'Failed to generate prompt' });
       return res.json({ ok: true, prompt: prompt.trim() });
     } catch (err) {
@@ -1328,7 +1328,7 @@ router.post('/mockup', async (req, res) => {
       structure: {
         hero: 'SPLIT LAYOUT: left half is bold oversized headline + subheadline + CTA stacked vertically; right half is the hero image (picsum.photos) filling the half. Dark overlay on image side. Section height 100vh.',
         features: 'NUMBERED LIST: large amber number (01, 02, 03…) on the left in huge font, feature title + description on the right. Full-width rows, dark card background, top border in accent color.',
-        proof: 'STACKED FULL-WIDTH: each testimonial is a full-width dark card with a large opening quote mark in accent color, italic quote text large (1.2rem), name + outcome badge on the right.',
+        proof: 'STACKED FULL-WIDTH CARDS: each testimonial is a self-contained dark card (full width). Inside each card: large opening quote mark (accent color, top-left), then italic quote text below it (1.2rem, full width), then a bottom row with avatar circle + name + company all grouped on the left, and an outcome badge on the right. Everything inside one card — no split columns, no content outside the card.',
         pricing: 'DARK CARD: single centered dark (#141414) card with amber accent borders. Items listed with ✓ checkmark left, crossed-out value right. Bold "Total Value" and "Only $XXX" lines in amber.',
         dividers: 'No decorative dividers — sections are separated by stark background color changes (dark/darker/darkest). Sharp edges, no curves.',
       },
@@ -1478,6 +1478,7 @@ FINAL CTA BAND: urgent, full-width, strong headline, primary CTA, guarantee note
 • Concise — under 450 lines total
 • CTA buttons: NEVER full-width. Always display:inline-block with auto width, centered with text-align:center on the parent. Max-width 360px if needed.
 • Features/What You Get section: list ALL features first, then ONE CTA button at the very bottom. NEVER insert CTA buttons between feature items — no "scroll CTAs" mid-list.
+• Social proof testimonials: each testimonial MUST be a fully self-contained card — quote text AND author name/title/avatar together inside the same box. NEVER split the quote and author into separate columns or rows with large gaps between them. Author info sits directly below the quote inside the same card.
 
 OUTPUT: Return ONLY the HTML document. No preamble, no markdown fences.
 
