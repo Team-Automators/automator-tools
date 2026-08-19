@@ -70,7 +70,7 @@ function ThumbDownIcon() {
   )
 }
 
-function MsgBubble({ msg, isLast, onFeedback, feedback, onMockup }) {
+function MsgBubble({ msg, isLast, onFeedback, feedback, onMockup, onGeneratePrompt }) {
   const [copied, setCopied] = useState(false)
   const isAI = msg.role === 'assistant'
   const hasContent = msg.content.length > 60
@@ -102,6 +102,9 @@ function MsgBubble({ msg, isLast, onFeedback, feedback, onMockup }) {
                 </button>
                 <button className="action-btn mockup-btn" onClick={onMockup}>
                   Preview Mockup
+                </button>
+                <button className="action-btn ghl-prompt-btn" onClick={() => onGeneratePrompt(msg.content)}>
+                  Generate Prompt
                 </button>
               </>
             )}
@@ -149,6 +152,10 @@ export default function LibraryChat() {
   // Mockup state
   const [mockup, setMockup] = useState(null)
   const [mockupMode, setMockupMode] = useState('ai')
+
+  // GHL Prompt modal state
+  const [ghlPrompt, setGhlPrompt] = useState(null)
+  const [ghlPromptCopied, setGhlPromptCopied] = useState(false)
 
   // Brand voice state
   const [voiceInfo, setVoiceInfo] = useState(null)
@@ -223,6 +230,26 @@ export default function LibraryChat() {
       }
     } catch (e) {
       setMockup({ html: null, mode, loading: false, error: e.message || 'Request failed' })
+    }
+  }
+
+  async function handleGeneratePrompt(content) {
+    setGhlPromptCopied(false)
+    setGhlPrompt({ loading: true, text: null, error: null })
+    try {
+      const result = await api.generateGhlPrompt({
+        copy: cleanDisplayText(content),
+        provider: config?.provider,
+        apiKey:   config?.apiKey,
+        model:    config?.model,
+      })
+      if (result.prompt) {
+        setGhlPrompt({ loading: false, text: result.prompt, error: null })
+      } else {
+        setGhlPrompt({ loading: false, text: null, error: result.error || 'Failed to generate prompt' })
+      }
+    } catch (e) {
+      setGhlPrompt({ loading: false, text: null, error: e.message || 'Request failed' })
     }
   }
 
@@ -471,6 +498,7 @@ export default function LibraryChat() {
                 onFeedback={sentiment => handleFeedback(i, sentiment)}
                 feedback={feedbackMap[i] || null}
                 onMockup={() => handleMockup(cleanDisplayText(msg.content), 'ai')}
+                onGeneratePrompt={() => handleGeneratePrompt(msg.content)}
               />
             )
           })}
@@ -577,6 +605,60 @@ export default function LibraryChat() {
                 />
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* GHL Prompt modal */}
+      {ghlPrompt && (
+        <div className="modal-backdrop" onClick={() => setGhlPrompt(null)}>
+          <div className="modal" style={{ maxWidth: 640 }} onClick={e => e.stopPropagation()}>
+            <div className="modal-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span>GoHighLevel Ask AI Prompt</span>
+              <button className="mockup-close" style={{ position: 'static' }} onClick={() => setGhlPrompt(null)}>✕</button>
+            </div>
+
+            {ghlPrompt.loading ? (
+              <div style={{ padding: '32px 0', textAlign: 'center' }}>
+                <div className="typing-dots"><span/><span/><span/></div>
+                <p style={{ color: 'var(--sub)', marginTop: 12, fontSize: '.9rem' }}>Analyzing funnel copy…</p>
+              </div>
+            ) : ghlPrompt.error ? (
+              <p style={{ color: 'var(--danger)', padding: '16px 0' }}>{ghlPrompt.error}</p>
+            ) : (
+              <>
+                <p style={{ color: 'var(--sub)', fontSize: '.85rem', marginBottom: 12 }}>
+                  Copy this prompt and paste it into the <strong>Ask AI</strong> field inside GoHighLevel to generate emails, SMS, or social content that matches your funnel.
+                </p>
+                <textarea
+                  readOnly
+                  value={ghlPrompt.text}
+                  style={{
+                    width: '100%', minHeight: 320, padding: '12px 14px',
+                    background: 'var(--surface)', border: '1px solid var(--border)',
+                    borderRadius: 8, color: 'var(--text)', fontSize: '.85rem',
+                    lineHeight: 1.6, resize: 'vertical', fontFamily: 'inherit',
+                    boxSizing: 'border-box',
+                  }}
+                  onFocus={e => e.target.select()}
+                />
+                <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
+                  <button
+                    className="btn btn-primary"
+                    style={{ flex: 1 }}
+                    onClick={() => {
+                      navigator.clipboard.writeText(ghlPrompt.text).then(() => {
+                        setGhlPromptCopied(true)
+                        setTimeout(() => setGhlPromptCopied(false), 2500)
+                      })
+                    }}
+                  >
+                    {ghlPromptCopied ? '✓ Copied!' : 'Copy Prompt'}
+                  </button>
+                  <button className="btn btn-secondary" onClick={() => setGhlPrompt(null)}>Close</button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

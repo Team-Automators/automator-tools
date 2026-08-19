@@ -284,6 +284,15 @@ export const api = {
     } catch {}
   },
 
+  async generateGhlPrompt({ copy, provider, apiKey, model }) {
+    const r = await fetch('/copywrite/generate-ghl-prompt', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ copy, provider, apiKey, model }),
+    })
+    return r.json()
+  },
+
   async generateMockup({ copy, type, mode, provider, apiKey, model }) {
     const r = await fetch('/copywrite/mockup', {
       method: 'POST',

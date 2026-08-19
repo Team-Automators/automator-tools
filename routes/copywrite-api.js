@@ -1107,6 +1107,67 @@ ${samples.join('\n\n---\n\n')}`;
   }
 });
 
+// ── POST /copywrite/generate-ghl-prompt ──────────────────────────────────────
+
+router.post('/generate-ghl-prompt', async (req, res) => {
+  const { copy, provider = 'claude', apiKey, model: reqModel } = req.body;
+  if (!copy) return res.status(400).json({ error: 'copy is required' });
+
+  const resolvedKey = apiKey || (provider === 'claude' ? process.env.ANTHROPIC_API_KEY : null);
+  if (!resolvedKey) return res.status(400).json({ error: 'No API key configured' });
+
+  const providerCfg = PROVIDER_MAP[provider];
+  if (!providerCfg) return res.status(400).json({ error: `Unknown provider: ${provider}` });
+
+  const extractPrompt = `You are a GoHighLevel marketing expert. Analyze the sales funnel copy below and produce a ready-to-use "Ask AI" prompt for GoHighLevel.
+
+The output prompt must be structured so a GHL user can paste it directly into the "Ask AI" field to generate follow-up marketing content (emails, SMS, social ads) that matches the funnel.
+
+Output ONLY the formatted prompt — no explanation, no preamble, no quotes around it.
+
+Format the output exactly like this:
+
+You are a direct-response copywriter. Use the product brief below to write persuasive marketing content.
+
+PRODUCT: [extract product/program name]
+AUDIENCE: [extract who this is for — be specific]
+CORE PROBLEM: [extract the main pain point or frustration they have]
+TRANSFORMATION: [what result/outcome does the product deliver]
+
+KEY BENEFITS:
+• [benefit 1]
+• [benefit 2]
+• [benefit 3]
+• [benefit 4]
+
+OFFER:
+Price: [extract price]
+Guarantee: [extract guarantee or "30-day money-back guarantee"]
+Bonus/Included: [list 2–3 key inclusions if present]
+
+TONE: [extract tone — e.g. "direct and motivational", "warm and coaching", "authoritative and results-driven"]
+CTA: [extract main call to action — e.g. "Join Now", "Get Instant Access"]
+
+---
+
+Write a [EMAIL / SMS / SOCIAL AD — user will fill this in] that speaks directly to {{contact.first_name}} about the problem above and presents this offer in a compelling, conversational way. Keep it concise, benefit-focused, and end with a clear call to action.
+
+SALES FUNNEL COPY TO ANALYZE:
+${copy.slice(0, 6000)}`;
+
+  try {
+    const model = reqModel || providerCfg.defaultModel;
+    const prompt = await callAI(providerCfg, resolvedKey, model, extractPrompt, 1200);
+    if (!prompt || prompt.length < 100) {
+      return res.status(500).json({ error: 'Failed to generate prompt' });
+    }
+    res.json({ ok: true, prompt: prompt.trim() });
+  } catch (err) {
+    console.error('[generate-ghl-prompt]', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── POST /copywrite/mockup ────────────────────────────────────────────────────
 
 router.post('/mockup', async (req, res) => {

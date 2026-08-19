@@ -2357,6 +2357,12 @@ img { max-width: 100%; display: block; }
 }
 .action-btn.mockup-btn:hover { background: #6D28D9; border-color: #6D28D9; }
 
+/* ── Generate GHL Prompt button ─────────────────────────────────────────────── */
+.action-btn.ghl-prompt-btn {
+  background: #0EA5E9; color: #fff; border-color: #0EA5E9; font-weight: 600;
+}
+.action-btn.ghl-prompt-btn:hover { background: #0284C7; border-color: #0284C7; }
+
 /* ── Mockup modal (full screen) ──────────────────────────────────────────────── */
 .mockup-overlay {
   position: fixed; inset: 0; z-index: 1000;
