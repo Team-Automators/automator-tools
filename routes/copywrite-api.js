@@ -1247,55 +1247,97 @@ router.post('/mockup', async (req, res) => {
   const providerCfg = PROVIDER_MAP[provider];
   if (!providerCfg) return res.status(400).json({ error: `Unknown provider: ${provider}` });
 
-  // Each STYLE is a fundamentally different visual identity — not just a color swap
+  // Each STYLE is a completely different visual identity AND structural pattern
   const STYLES = [
     {
       name: 'Bold & Dramatic',
       palette: { bg:'#0A0A0A', accent:'#F59E0B', card:'#141414', text:'#F8FAFC', muted:'#9CA3AF', border:'#2a2a2a' },
       hero: 'linear-gradient(135deg,#1a1100 0%,#0A0A0A 60%)',
-      aesthetic: 'Dark, high-contrast, aggressive. Oversized font weights (800–900), tight line-height, full-bleed dark sections. Buttons are sharp-cornered (border-radius 4px). Typography is powerful — large numbers, bold labels, minimal decoration.',
-      typeTreatment: 'font-weight:900 for headings; letter-spacing:-0.02em; hero headline font-size clamp(2.5rem,6vw,5rem).',
-      buttonStyle: 'background:#F59E0B; color:#000; font-weight:800; border-radius:4px; text-transform:uppercase; letter-spacing:.08em;',
+      aesthetic: 'Dark, high-contrast, aggressive. Oversized font weights (800–900), tight line-height, full-bleed dark sections throughout. Minimal decoration — let the type and contrast do the work.',
+      typeTreatment: 'font-weight:900 for headings; letter-spacing:-0.03em; hero headline font-size clamp(3rem,7vw,5.5rem); all-caps labels.',
+      buttonStyle: 'background:#F59E0B; color:#000; font-weight:800; border-radius:4px; text-transform:uppercase; letter-spacing:.1em; padding:18px 40px;',
+      structure: {
+        hero: 'SPLIT LAYOUT: left half is bold oversized headline + subheadline + CTA stacked vertically; right half is the hero image (picsum.photos) filling the half. Dark overlay on image side. Section height 100vh.',
+        features: 'NUMBERED LIST: large amber number (01, 02, 03…) on the left in huge font, feature title + description on the right. Full-width rows, dark card background, top border in accent color.',
+        proof: 'STACKED FULL-WIDTH: each testimonial is a full-width dark card with a large opening quote mark in accent color, italic quote text large (1.2rem), name + outcome badge on the right.',
+        pricing: 'DARK CARD: single centered dark (#141414) card with amber accent borders. Items listed with ✓ checkmark left, crossed-out value right. Bold "Total Value" and "Only $XXX" lines in amber.',
+        dividers: 'No decorative dividers — sections are separated by stark background color changes (dark/darker/darkest). Sharp edges, no curves.',
+      },
     },
     {
       name: 'Clean & Editorial',
       palette: { bg:'#FAFAF9', accent:'#2563EB', card:'#fff', text:'#111827', muted:'#6B7280', border:'#E5E7EB' },
       hero: 'linear-gradient(160deg,#1E3A8A 0%,#2563EB 100%)',
-      aesthetic: 'Spacious, editorial, refined. Wide padding, generous whitespace, hairline dividers. Body text at 17–18px with comfortable leading. Accent used only on key CTAs. Sections separated by generous vertical space.',
-      typeTreatment: 'font-weight:300 for body, 700 for headings; line-height:1.7; hero headline font-size clamp(2rem,5vw,4rem).',
-      buttonStyle: 'background:#2563EB; color:#fff; font-weight:600; border-radius:8px; padding:14px 32px;',
+      aesthetic: 'Spacious, editorial, magazine-quality. Maximum whitespace, thin hairline rules, type as the design. Everything breathes. The accent color appears sparingly — only on CTAs and key labels.',
+      typeTreatment: 'font-weight:300 for body text; 700–800 for headings; line-height:1.75; hero headline font-size clamp(2.5rem,5vw,4.5rem); wide letter-spacing on eyebrow labels.',
+      buttonStyle: 'background:#2563EB; color:#fff; font-weight:600; border-radius:3px; padding:14px 36px; letter-spacing:.02em;',
+      structure: {
+        hero: 'TEXT-ONLY CENTERED: no background image. Large centered headline with a thin underline accent under a key word. Subheadline in light weight below. CTA button + small social proof counter below. Generous top/bottom padding (120px). Hero bg is solid navy gradient.',
+        features: '2-COLUMN CARD GRID: clean white cards with only a top accent-color border (3px), no other decoration. Feature title bold, description in muted text. Even grid spacing. Subtle box-shadow on hover state (use CSS :hover).',
+        proof: 'EDITORIAL QUOTE STYLE: large oversized quotation mark (5rem, accent color) above each testimonial. Quote in italics, wide line-height. Name and role in small caps below a hairline rule. 3 cards in a row.',
+        pricing: 'MINIMAL CENTERED: white background, max-width 560px centered. Simple list items with a left accent-color dot. Clean typography hierarchy. "Total Value" and "Only $XXX" in large type with a thin rule above each.',
+        dividers: 'Thin 1px hairline rules between sections. Generous vertical padding (80–100px). No colored section backgrounds except the hero.',
+      },
     },
     {
       name: 'Warm & Coaching',
       palette: { bg:'#FFFBF7', accent:'#EA580C', card:'#FFF7ED', text:'#1C1917', muted:'#78716C', border:'#FED7AA' },
       hero: 'linear-gradient(135deg,#7C2D12 0%,#C2410C 100%)',
-      aesthetic: 'Warm, personal, approachable — like a trusted mentor. Rounded corners (border-radius 16–24px), warm cream backgrounds, soft orange accents. Story-driven layout. Testimonials feel like real conversations.',
-      typeTreatment: 'font-weight:500–700; line-height:1.6; hero headline mixes normal and bold weight.',
-      buttonStyle: 'background:#EA580C; color:#fff; font-weight:700; border-radius:50px; padding:16px 40px;',
+      aesthetic: 'Warm, human, personal — like a trusted friend who happens to be an expert. Everything is rounded, soft, and approachable. Story-driven narrative flow.',
+      typeTreatment: 'font-weight:600–700; line-height:1.65; hero headline in two lines with a warm friendly tone; body text at 17px.',
+      buttonStyle: 'background:#EA580C; color:#fff; font-weight:700; border-radius:50px; padding:16px 44px; box-shadow:0 4px 20px rgba(234,88,12,.35);',
+      structure: {
+        hero: 'CENTERED WITH AVATAR: centered layout. Above the headline, show a circular avatar image (picsum.photos/seed/SEED/80/80) with a warm "Hi, I\'m [name]" greeting in small text. Then the big headline. Subheadline. CTA pill button. Background is warm gradient with a subtle pattern overlay.',
+        features: 'ICON CARDS WITH WARM BACKGROUND: 2-column grid of rounded cards (border-radius:20px) on cream (#FFF7ED) background. Each card has a large emoji in a warm orange rounded square, bold title, short description. Cards have a warm shadow.',
+        proof: 'CONVERSATION CARDS: testimonials styled like chat bubbles (border-radius:20px, tail on bottom-left). Avatar in a circle, name + star rating above the bubble. 3 cards stacked with slight rotation (-1deg, 0deg, 1deg) for a handcrafted feel.',
+        pricing: 'WARM FEATURE BOX: cream background box with orange top border and a warm shadow. Items have ✓ checkmarks in orange. A dashed orange divider above the total. Price in large warm text.',
+        dividers: 'Curved SVG wave dividers between major sections (use inline SVG path). Sections alternate between warm white and cream.',
+      },
     },
     {
       name: 'Tech & Precision',
       palette: { bg:'#F8FAFC', accent:'#0EA5E9', card:'#fff', text:'#0F172A', muted:'#64748B', border:'#CBD5E1' },
       hero: 'linear-gradient(135deg,#0C4A6E 0%,#0284C7 100%)',
-      aesthetic: 'Data-driven, systematic, precise. Strict grid, monospace accents for stats, badge-style labels, structured lists. Stats in large monospace numerals. Communicates authority through structure.',
-      typeTreatment: 'Monospace (Courier New) for numbers and stats; sans-serif for body; font-weight:600 for headings.',
-      buttonStyle: 'background:#0EA5E9; color:#fff; font-weight:600; border-radius:6px; border:2px solid #0EA5E9;',
+      aesthetic: 'Data-driven, systematic, credibility-first. The design communicates expertise through structure, not decoration. Monospace numbers, data badges, precise alignment.',
+      typeTreatment: 'Monospace font (Courier New, monospace) for ALL numbers, stats, and prices; system sans-serif for body; font-weight:600–700 for headings.',
+      buttonStyle: 'background:#0EA5E9; color:#fff; font-weight:600; border-radius:6px; border:2px solid #0EA5E9; padding:14px 32px; letter-spacing:.01em;',
+      structure: {
+        hero: 'LEFT-SPLIT WITH METRICS: left side has the headline + CTA; right side shows a "results dashboard" — 3–4 metric tiles (big monospace numbers: "2,400+ members", "94% success rate") in a grid. Background: dark navy left half bleeding into white right half.',
+        features: 'STRUCTURED ROWS: each feature is a full-width horizontal row with a left number badge (monospace, accent color), feature name in bold, description in muted text, and a status badge ("Included ✓") on the far right. Separated by 1px borders.',
+        proof: 'STAT + QUOTE HYBRID: each testimonial card shows a large metric at the top (e.g. "↑ 340% ROI") in monospace accent color, then the quote, then name + role. Cards have a left accent-color border (4px).',
+        pricing: 'TABLE LAYOUT: items in a structured table-like list with columns: Item | Description | Value. Headers in muted small caps. Total row highlighted in light blue. Price in large monospace text.',
+        dividers: 'Clean section breaks with a subtle blue-tinted background (#F0F9FF) for alternating sections. No curves — geometric and precise.',
+      },
     },
     {
       name: 'Elegant & Premium',
       palette: { bg:'#FAF9F7', accent:'#9333EA', card:'#fff', text:'#1a1a2e', muted:'#6B7280', border:'#E9D5FF' },
       hero: 'linear-gradient(160deg,#3B0764 0%,#7E22CE 100%)',
-      aesthetic: 'Sophisticated, high-end, aspirational. Generous vertical padding (80–120px per section), subtle gradients, premium feel. Thin-weight text with wide tracking on labels. Cards have no borders — only elegant shadows.',
-      typeTreatment: 'font-weight:300 labels with letter-spacing:.15em uppercase; 700 for headings; hero italic or mixed weight.',
-      buttonStyle: 'background:linear-gradient(135deg,#7C3AED,#9333EA); color:#fff; font-weight:600; border-radius:50px; padding:16px 48px;',
+      aesthetic: 'Sophisticated, aspirational, high-ticket. Every element whispers "quality." Generous space, muted palette with controlled purple accents, premium typography.',
+      typeTreatment: 'Uppercase tracked labels (letter-spacing:.2em, font-size:.75rem) for section eyebrows; 300-weight body; 700-weight headings; hero headline with an italic word for personality.',
+      buttonStyle: 'background:linear-gradient(135deg,#7C3AED,#9333EA); color:#fff; font-weight:500; border-radius:60px; padding:18px 52px; letter-spacing:.04em;',
+      structure: {
+        hero: 'MINIMAL LUXURY: full viewport height. Centered text on the gradient. Eyebrow label in small tracked uppercase. Main headline in 3–4 lines, one word italicized. Subheadline in light weight below. Ghost-style outlined CTA button (white border, transparent bg) + solid CTA side by side.',
+        features: 'ALTERNATING ROWS: each feature alternates left-right — odd features have image/icon left + text right; even features have text left + icon right. Large section numbers in faint purple behind each. Generous padding between rows.',
+        proof: 'LARGE FEATURE QUOTE: the first testimonial takes the full width — huge quote, prominent. Below it, two smaller testimonials side by side. All have subtle purple left-border accents.',
+        pricing: 'GRADIENT CARD: single elegant card with a purple gradient border (CSS gradient border trick). Items in a refined list with em-dash separators. "Total Value" and "Only $XXX" in large elegant typography.',
+        dividers: 'Gentle gradient fades between sections. Sections use very subtle purple-tinted backgrounds (#FAF5FF) alternating with pure white. No hard lines.',
+      },
     },
     {
       name: 'Energetic & Conversion',
       palette: { bg:'#fff', accent:'#DC2626', card:'#FEF2F2', text:'#111827', muted:'#4B5563', border:'#FECACA' },
       hero: 'linear-gradient(135deg,#7F1D1D 0%,#DC2626 100%)',
-      aesthetic: 'High-urgency, direct-response. Urgency bars, "spots limited" callouts, bold red CTAs. Social proof appears early and repeatedly. Dense with proof, benefits, and urgency signals. Nothing subtle.',
-      typeTreatment: 'font-weight:800 for headings; urgency text in red/orange; large bold price display; checkmarks before every benefit.',
-      buttonStyle: 'background:#DC2626; color:#fff; font-weight:800; border-radius:6px; font-size:1.1rem; text-transform:uppercase; letter-spacing:.05em;',
+      aesthetic: 'Maximum urgency, zero subtlety. This page is built to convert. Red everywhere it matters, social proof early and often, urgency signals constant.',
+      typeTreatment: 'font-weight:800–900 for headings; urgency text in red; large bold price; all benefits have checkmarks; every section has a sub-CTA.',
+      buttonStyle: 'background:#DC2626; color:#fff; font-weight:900; border-radius:8px; font-size:1.15rem; text-transform:uppercase; letter-spacing:.06em; padding:18px 44px; box-shadow:0 4px 24px rgba(220,38,38,.4);',
+      structure: {
+        hero: 'URGENCY HERO: red countdown-style banner at the very top ("⚠️ Offer closes in 24 hours"). Then full-width hero with centered bold headline. Below headline, 3 quick benefit bullets (✓ ✓ ✓). Then a large CTA button. Then a row of trust badges (Secure · Guaranteed · Instant Access).',
+        features: 'CHECKLIST with INLINE CTAs: simple full-width checklist rows (✓ icon, benefit text). After every 3rd feature, insert a small "Get Access Now →" link in accent color to maintain conversion pressure.',
+        proof: 'PROOF-HEAVY GRID: 3 testimonial cards with a prominent outcome badge at the top of each card (e.g. "Lost 40 lbs in 90 days" in red). Star rating, quote, name. Below the 3 cards, add a social proof bar: "Join 2,400+ people already inside".',
+        pricing: 'URGENCY PRICING: red urgency strip at top ("🔥 Founding Member Pricing — Ends Soon"). Items with ✓ and crossed-out values. After the list, a bold "YOU SAVE $X" callout in red. Then the price. Then the CTA button directly below (unlike other styles — this style puts the button here for conversion).',
+        dividers: 'Red accent divider lines (2px, full-width) between sections. Some sections have a light red-tinted background (#FEF2F2). Occasional urgency strips between sections.',
+      },
     },
   ];
 
@@ -1313,9 +1355,9 @@ router.post('/mockup', async (req, res) => {
   const imgSeed = clientSeed ? String(clientSeed).slice(-6) : Math.random().toString(36).slice(2, 8);
   const genId   = clientSeed || Date.now();
 
-  const designPrompt = `You are an elite conversion-focused web designer. Generation ID: ${genId} — each generation must produce a visually distinct page. Do NOT repeat the same layout or visual patterns from previous generations.
+  const designPrompt = `You are an elite conversion-focused web designer. Generation ID: ${genId} — produce a completely unique page. Do NOT default to a generic sales page template.
 
-YOUR TASK: Read the marketing copy below, understand the product and audience, then design and build a complete high-converting sales funnel page as one self-contained HTML file that fully expresses this aesthetic identity:
+YOUR TASK: Read the marketing copy below, then build a complete HTML sales funnel page using EXACTLY the structural patterns specified. Each section must be built as described — not as a generic version.
 
 ━━━ AESTHETIC: ${style.name} ━━━
 ${style.aesthetic}
@@ -1331,47 +1373,40 @@ Hero gradient: ${style.hero}
 ━━━ SECTION ORDER ━━━
 Build in this exact sequence: ${layout}
 
-Let the ${style.name} aesthetic define how EACH section looks — don't default to a generic design. The aesthetic should be unmistakable throughout.
+━━━ STRUCTURAL PATTERNS (build each section EXACTLY as described) ━━━
 
-━━━ SECTION REQUIREMENTS ━━━
-HERO: Full-width, commanding. Eyebrow label pill, transformation headline (5–8 words), subheadline, CTA button, trust signal. Hero bg image: https://picsum.photos/seed/${imgSeed}H/1600/900 with overlay.
+HERO — ${style.structure.hero}
 
-TRUST BAR (if in layout): 4–5 key stats/achievements in accent-color strip.
+FEATURES/WHAT YOU GET — ${style.structure.features}
 
-PROBLEM/PAIN (if in layout): 3–4 real audience frustrations. Make them feel seen and understood.
+SOCIAL PROOF — ${style.structure.proof}
 
-WHO THIS IS FOR (if in layout): Two columns — "✓ Perfect for you if…" vs "✗ Not for you if…"
+PRICING/VALUE STACK — ${style.structure.pricing}
+Standard content: urgency strip at top, each item with crossed-out value, "Total Value: $X,XXX", "Only $XXX" in large text.
 
-FEATURES/WHAT YOU GET: Every item with emoji icon, bold title, short description. CTA button at the end.
+SECTION TRANSITIONS — ${style.structure.dividers}
 
-SOCIAL PROOF: Exactly 3 testimonials. Each: outcome badge, ★★★★★, specific italic quote, avatar (picsum.photos/seed/${imgSeed}T1/80/80, T2, T3), name, role.
-
-PRICING/VALUE STACK:
-• Urgency strip at top (⏰ limited time or scarcity)
-• Each deliverable: ✓ label left, <s>$XXX</s> crossed-out value right
-• "Total Value: $X,XXX" summary line
-• "Only $XXX" in large accent text
-• NO button in this section
-
-GUARANTEE (if in layout): Shield 🛡️, 30-day money-back promise, specific terms from the copy.
-
-FAQ (if in layout): 4–5 real buyer objections answered. Left accent border on each card.
-
-FINAL CTA BAND: Urgent, full-width. Strong headline, primary CTA button, guarantee reminder.
+TRUST BAR (if in layout): 4–5 key stats in an accent-color strip.
+PROBLEM/PAIN (if in layout): 3–4 audience frustrations as cards.
+WHO THIS IS FOR (if in layout): two-column qualifier — "For you if…" vs "Not for you if…"
+GUARANTEE (if in layout): shield icon, 30-day promise, green-tinted box.
+FAQ (if in layout): 4–5 objections, left accent border on each.
+FINAL CTA BAND: urgent, full-width, strong headline, primary CTA, guarantee note.
 
 ━━━ COPY RULES ━━━
-• Use ONLY claims and results from the provided marketing copy
-• Extract real product name, prices, features, testimonials from the copy
-• If testimonials are absent, write 3 realistic ones that genuinely fit the product
-• No [brackets], no placeholder text — write finished, real copy
+• Use ONLY content from the provided marketing copy
+• Extract real product name, prices, features, testimonials
+• If testimonials absent, write 3 realistic ones that fit the product
+• No [brackets], no placeholders — finished real copy only
+• Image seed for picsum.photos: ${imgSeed} (use ${imgSeed}H for hero, ${imgSeed}T1/${imgSeed}T2/${imgSeed}T3 for avatars)
 
 ━━━ TECHNICAL ━━━
 • Single complete <!DOCTYPE html><html>…</html> document
-• All CSS in one <style> tag — no external resources, no @import
+• All CSS in one <style> tag — no external resources
 • System fonts: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif
 • Fully mobile responsive: @media (max-width: 768px)
-• Pure HTML/CSS — no JavaScript needed
-• Concise code — under 420 lines total
+• Pure HTML/CSS — no JavaScript
+• Concise — under 450 lines total
 
 OUTPUT: Return ONLY the HTML document. No preamble, no markdown fences.
 
