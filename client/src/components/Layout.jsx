@@ -171,7 +171,7 @@ export default function Layout() {
               <button
                 className="user-menu-item danger"
                 onClick={() => {
-                  localStorage.removeItem('ghl_location_id')
+                  localStorage.removeItem('ghl_ai_config')
                   window.location.href = '/login'
                 }}
               >

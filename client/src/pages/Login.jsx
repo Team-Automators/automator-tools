@@ -144,6 +144,12 @@ export default function Login() {
               <div style={{ fontSize: '.875rem', color: 'var(--sub)' }}>
                 Enter your own API key — this stays on this device only
               </div>
+              {locationId && (
+                <div style={{ marginTop: 10, padding: '7px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, fontSize: '.8rem', color: 'var(--sub)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>Location: <strong style={{ color: 'var(--text)', fontFamily: 'monospace' }}>{locationId}</strong></span>
+                  <button type="button" style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: '.8rem', padding: 0 }} onClick={() => { localStorage.removeItem('ghl_location_id'); setStep(1); setLocationId('') }}>Change</button>
+                </div>
+              )}
             </div>
 
             <form onSubmit={handleAPIKeySubmit}>
