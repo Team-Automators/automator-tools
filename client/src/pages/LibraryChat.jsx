@@ -175,7 +175,7 @@ export default function LibraryChat() {
     api.getCopy(copyId).then(c => {
       if (!c) { setLoadError(true); setLoading(false); return }
       setCopy(c)
-      setMessages([])
+      setMessages(c.messages || [])
       setLoading(false)
     }).catch(() => {
       setLoadError(true)
