@@ -1476,6 +1476,7 @@ FINAL CTA BAND: urgent, full-width, strong headline, primary CTA, guarantee note
 • Fully mobile responsive: @media (max-width: 768px)
 • Pure HTML/CSS — no JavaScript
 • Concise — under 450 lines total
+• CTA buttons: NEVER full-width. Always display:inline-block with auto width, centered with text-align:center on the parent. Max-width 360px if needed.
 
 OUTPUT: Return ONLY the HTML document. No preamble, no markdown fences.
 

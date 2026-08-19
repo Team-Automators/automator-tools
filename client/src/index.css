@@ -870,7 +870,7 @@ img { max-width: 100%; display: block; }
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  z-index: 200;
+  z-index: 1100;
   padding: 0;
 }
 @media (min-width: 540px) {
@@ -2369,11 +2369,13 @@ img { max-width: 100%; display: block; }
   border-top: 1px solid var(--border);
   background: var(--surface);
   display: flex;
+  align-items: center;
   justify-content: center;
 }
 .mockup-gen-prompt-btn {
   background: #0EA5E9; border-color: #0EA5E9;
   font-weight: 600; font-size: .9rem;
+  width: auto; max-width: 320px;
 }
 .mockup-gen-prompt-btn:hover { background: #0284C7; border-color: #0284C7; }
 
