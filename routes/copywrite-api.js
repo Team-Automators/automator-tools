@@ -1119,45 +1119,106 @@ router.post('/generate-ghl-prompt', async (req, res) => {
   const providerCfg = PROVIDER_MAP[provider];
   if (!providerCfg) return res.status(400).json({ error: `Unknown provider: ${provider}` });
 
-  const extractPrompt = `You are a GoHighLevel marketing expert. Analyze the sales funnel copy below and produce a ready-to-use "Ask AI" prompt for GoHighLevel.
+  const extractPrompt = `You are an expert funnel strategist. Analyze the sales funnel copy below and produce a complete, ready-to-use AI builder prompt that can be pasted into ANY AI website or funnel builder (Framer AI, Durable, Wix AI, Webflow AI, etc.) to recreate this exact funnel from scratch.
 
-The output prompt must be structured so a GHL user can paste it directly into the "Ask AI" field to generate follow-up marketing content (emails, SMS, social ads) that matches the funnel.
+The output must be a self-contained blueprint — section by section — with the actual copy, structure, and design direction so the AI builder knows exactly what to build.
 
-Output ONLY the formatted prompt — no explanation, no preamble, no quotes around it.
+Output ONLY the prompt — no explanation, no preamble, no quotes around it.
 
-Format the output exactly like this:
+Structure the output exactly like this:
 
-You are a direct-response copywriter. Use the product brief below to write persuasive marketing content.
+Build a complete high-converting sales funnel page for the following product. Use the exact copy, sections, and structure described below.
 
-PRODUCT: [extract product/program name]
-AUDIENCE: [extract who this is for — be specific]
-CORE PROBLEM: [extract the main pain point or frustration they have]
-TRANSFORMATION: [what result/outcome does the product deliver]
+━━━ PRODUCT OVERVIEW ━━━
+Product Name: [extract exact product/program name]
+Tagline: [extract or derive a 1-line tagline]
+Target Audience: [extract who this is for — be specific about demographics, situation, pain]
+Core Transformation: [what result does the customer get? Before → After]
+Tone & Voice: [extract tone — e.g. "bold and direct", "warm and coaching", "authoritative"]
 
-KEY BENEFITS:
-• [benefit 1]
-• [benefit 2]
-• [benefit 3]
-• [benefit 4]
-
-OFFER:
+━━━ OFFER DETAILS ━━━
 Price: [extract price]
-Guarantee: [extract guarantee or "30-day money-back guarantee"]
-Bonus/Included: [list 2–3 key inclusions if present]
+Guarantee: [extract guarantee terms, or use "30-day money-back guarantee, no questions asked"]
+What's Included: [list every item/module/bonus from the copy with its value if mentioned]
 
-TONE: [extract tone — e.g. "direct and motivational", "warm and coaching", "authoritative and results-driven"]
-CTA: [extract main call to action — e.g. "Join Now", "Get Instant Access"]
+━━━ PAGE SECTIONS (build in this order) ━━━
 
----
+SECTION 1 — HERO
+Headline: [extract the main headline]
+Subheadline: [extract the subheadline or core promise]
+CTA Button Text: [extract CTA]
+Trust Line Below Button: [e.g. "🔒 Secure checkout · 30-day guarantee"]
+Background: Full-width image with dark overlay, large bold headline centered or left-aligned
 
-Write a [EMAIL / SMS / SOCIAL AD — user will fill this in] that speaks directly to {{contact.first_name}} about the problem above and presents this offer in a compelling, conversational way. Keep it concise, benefit-focused, and end with a clear call to action.
+SECTION 2 — PROBLEM / PAIN POINTS
+Intro: [extract or derive an empathetic opening line]
+Pain Points (list each as a card with an ✗ icon):
+• [pain point 1 from copy]
+• [pain point 2 from copy]
+• [pain point 3 from copy]
+Closing Line: [empathetic bridge line]
+
+SECTION 3 — FEATURES / WHAT YOU GET
+Section Heading: [extract heading like "Here's Everything You Get"]
+Features (each with an emoji icon, bold title, and 1-sentence description):
+• [feature 1]
+• [feature 2]
+• [feature 3]
+[list all features from the copy]
+End with a CTA button
+
+SECTION 4 — SOCIAL PROOF
+Section Heading: [e.g. "Real Results From Real People"]
+Testimonial 1: "[quote]" — [Name, Role/Location] | Result badge: [outcome]
+Testimonial 2: "[quote]" — [Name, Role/Location] | Result badge: [outcome]
+Testimonial 3: "[quote]" — [Name, Role/Location] | Result badge: [outcome]
+[extract from copy; if absent, note that realistic ones matching the product should be written]
+
+SECTION 5 — VALUE STACK / PRICING
+Section Heading: [extract or use "Your Investment Today"]
+Urgency Note: [extract scarcity/urgency line, e.g. "Doors close Friday"]
+Value Items (each line: item name on left, crossed-out dollar value on right):
+• [item] — $[value]
+[list all items with values]
+Total Value: $[sum]
+Price: Only $[price]
+No button in this section
+
+SECTION 6 — GUARANTEE
+Heading: [extract or use "You're Protected by Our 30-Day Guarantee"]
+Body: [extract guarantee terms]
+Visual: Shield icon, green-tinted box
+
+SECTION 7 — FAQ
+[extract 4–5 real objections from the copy or derive from audience pain points]
+Q: [question]
+A: [answer]
+
+SECTION 8 — FINAL CTA
+Headline: [urgent closing headline]
+CTA Button: [CTA text]
+Guarantee reminder line below button
+
+━━━ DESIGN DIRECTION ━━━
+Style: Modern, conversion-focused sales page
+Layout: Full-width sections, alternating light and dark backgrounds
+Typography: Bold headlines (700–900 weight), comfortable body text
+Buttons: Large, high-contrast, rounded
+Mobile: Fully responsive — stack all columns on mobile
+Images: Use lifestyle/product images relevant to [product category]
+
+━━━ TECHNICAL NOTES ━━━
+- No navigation menu or footer links (distraction-free funnel)
+- Sticky header optional with CTA button
+- All CTAs scroll to or link to the pricing section
+- Page must load fast — optimize images
 
 SALES FUNNEL COPY TO ANALYZE:
 ${copy.slice(0, 6000)}`;
 
   try {
     const model = reqModel || providerCfg.defaultModel;
-    const prompt = await callAI(providerCfg, resolvedKey, model, extractPrompt, 1200);
+    const prompt = await callAI(providerCfg, resolvedKey, model, extractPrompt, 2000);
     if (!prompt || prompt.length < 100) {
       return res.status(500).json({ error: 'Failed to generate prompt' });
     }

@@ -614,7 +614,7 @@ export default function LibraryChat() {
         <div className="modal-backdrop" onClick={() => setGhlPrompt(null)}>
           <div className="modal" style={{ maxWidth: 640 }} onClick={e => e.stopPropagation()}>
             <div className="modal-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span>GoHighLevel Ask AI Prompt</span>
+              <span>AI Builder Funnel Prompt</span>
               <button className="mockup-close" style={{ position: 'static' }} onClick={() => setGhlPrompt(null)}>✕</button>
             </div>
 
@@ -628,7 +628,7 @@ export default function LibraryChat() {
             ) : (
               <>
                 <p style={{ color: 'var(--sub)', fontSize: '.85rem', marginBottom: 12 }}>
-                  Copy this prompt and paste it into the <strong>Ask AI</strong> field inside GoHighLevel to generate emails, SMS, or social content that matches your funnel.
+                  Copy this prompt and paste it into any AI website or funnel builder — <strong>Framer AI, Durable, Wix AI, Webflow AI</strong>, or similar — to recreate this exact funnel from scratch.
                 </p>
                 <textarea
                   readOnly
