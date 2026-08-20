@@ -200,21 +200,27 @@ router.get('/diagnose', async (req, res) => {
   let auth = { ok: false };
   try { auth = await locationAccess.authenticateLocation(locationId); } catch (e) { auth = { ok: false, error: e.message }; }
 
+  const hasPit = !!(pit?.subLocationApiKey && pit?.agencyApiKey);
+
   const verdict = auth.ok
-    ? 'AUTHORIZED — login/generation should work. If it fails, re-login so a fresh session token is issued.'
-    : (installs.length === 0 && !oauthDirect)
-      ? 'NO OAUTH INSTALL — the app is not OAuth-installed on any agency. Install it on the agency account (or ask me to enable a PIT fallback).'
-      : auth.transient
-        ? 'GHL UNREACHABLE — transient error while validating. Retry.'
-        : 'NOT AUTHORIZED — this location is not under any installed agency.';
+    ? `AUTHORIZED (via ${auth.via || 'unknown'}) — login/generation should work. If it fails, re-login so a fresh session token is issued.`
+    : auth.transient
+      ? 'GHL UNREACHABLE — transient error while validating. Retry.'
+      : auth.pitTried
+        ? `PIT REJECTED BY GHL (status ${auth.status || '?'}) — the stored Private Integration Tokens are invalid, expired, or lack the required scope. Re-enter valid PITs at /install?locationId=${locationId}.`
+        : (installs.length === 0 && !oauthDirect && !hasPit)
+          ? 'NO CREDENTIALS — no OAuth install and no stored PITs for this location. Set up the app (OAuth via /auth, or PITs via /install).'
+          : 'NOT AUTHORIZED — this location is not under any installed agency.';
 
   res.json({
     locationId,
     agencyOAuthInstalls:     installs.length,
     hasDirectOAuthInstall:   !!oauthDirect,
-    hasPitRecord:            !!(pit?.subLocationApiKey && pit?.agencyApiKey),
+    hasPitRecord:            hasPit,
     canMintLocationToken:    canMint,
     fullyAuthenticates:      !!auth.ok,
+    authMethod:              auth.via || null,
+    pitAttempted:            !!auth.pitTried,
     ghlValidationStatus:     auth.status || null,
     transient:               !!auth.transient,
     verdict,

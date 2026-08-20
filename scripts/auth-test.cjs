@@ -14,6 +14,14 @@ oauthStore.getAccessToken = async (lid) => (lid === 'DIRECTLOC' ? 'DIRECT_TOKEN'
 oauthStore.get            = async (lid) => (lid === 'DIRECTLOC' ? { companyId: 'C-DIRECT' } : null);
 oauthStore.findAll        = async () => [{ companyId: 'C1', access_token: 'AGENCY_TOKEN' }];
 
+// PIT-only location (no OAuth) → exercised via the PIT fallback.
+const keyStore = require('../lib/key-store');
+keyStore.get = async (lid) => {
+  if (lid === 'PITLOC')    return { subLocationApiKey: 'pit-sub',     agencyApiKey: 'pit-agency',     companyId: 'C-PIT' };
+  if (lid === 'PITBADLOC') return { subLocationApiKey: 'pit-bad-sub', agencyApiKey: 'pit-bad-agency', companyId: 'C-PIT' };
+  return null;
+};
+
 // ── Stub GHL HTTP (axios) ─────────────────────────────────────────────────────
 const axios = require('axios');
 let mintCalls = 0;
@@ -21,12 +29,16 @@ axios.post = async (url, body) => {
   if (url.includes('/oauth/locationToken')) {
     mintCalls++;
     const lid = new URLSearchParams(body).get('locationId');
-    if (lid === 'BADLOC') { const e = new Error('not under agency'); e.response = { status: 401 }; throw e; }
+    // These aren't under the agency → mint fails (PIT locations then try PIT).
+    if (lid === 'BADLOC' || lid === 'PITLOC' || lid === 'PITBADLOC') { const e = new Error('not under agency'); e.response = { status: 401 }; throw e; }
     return { data: { access_token: `LOCTOKEN_${lid}` } };
   }
   return { data: {} };
 };
-axios.get = async (url) => {
+axios.get = async (url, config) => {
+  const auth = (config && config.headers && config.headers.Authorization) || '';
+  if (auth.includes('bad')) { const e = new Error('invalid token'); e.response = { status: 401 }; throw e; } // expired/invalid PIT
+  if (url.includes('/contacts/')) return { data: { contacts: [] } }; // PIT sub-token validation
   if (url.includes('/locations/')) {
     if (url.includes('UNAUTHLOC')) { const e = new Error('forbidden'); e.response = { status: 403 }; throw e; }
     if (url.includes('FLAKYLOC'))  { const e = new Error('gateway');   e.response = { status: 500 }; throw e; }
@@ -143,6 +155,27 @@ async function run() {
   //     (the GHL-iframe auto-auth path — no manual entry).
   const silent = await req('POST', '/auth/location-login', { body: { locationId: 'GOODLOC' } });
   check('silent re-login issues a valid token', silent.status === 200 && !!session.verify(silent.json?.token));
+
+  console.log('\n=== 9. PIT fallback (no OAuth install) ===');
+  const pitLogin = await req('POST', '/auth/location-login', { body: { locationId: 'PITLOC' } });
+  check('PIT-only location authorized → 200', pitLogin.status === 200, `status=${pitLogin.status}`);
+  check('issues a usable session token', !!session.verify(pitLogin.json?.token));
+  const pitTok = pitLogin.json?.token;
+  const pitCall = await req('GET', '/api/tasks', { token: pitTok });
+  check('PIT session can call protected API', pitCall.status === 200, `status=${pitCall.status}`);
+  const pitDiag = await req('GET', '/auth/diagnose?locationId=PITLOC');
+  check('diagnose: authMethod = pit', pitDiag.json?.authMethod === 'pit', `authMethod=${pitDiag.json?.authMethod}`);
+  check('diagnose: fullyAuthenticates', pitDiag.json?.fullyAuthenticates === true);
+  // A location with neither OAuth nor PIT is still rejected.
+  const noneDiag = await req('GET', '/auth/diagnose?locationId=BADLOC');
+  check('unknown location still rejected', noneDiag.json?.fullyAuthenticates === false);
+
+  // PIT record present but GHL rejects it (expired/invalid) → clear verdict, login refused.
+  const badPitLogin = await req('POST', '/auth/location-login', { body: { locationId: 'PITBADLOC' } });
+  check('invalid PIT → login 403', badPitLogin.status === 403, `status=${badPitLogin.status}`);
+  const badPitDiag = await req('GET', '/auth/diagnose?locationId=PITBADLOC');
+  check('diagnose flags PIT attempted + rejected', badPitDiag.json?.pitAttempted === true && badPitDiag.json?.fullyAuthenticates === false, `status=${badPitDiag.json?.ghlValidationStatus}`);
+  check('verdict says PIT REJECTED', /PIT REJECTED/.test(badPitDiag.json?.verdict || ''), badPitDiag.json?.verdict);
 
   console.log(`\n=== RESULT: ${passed} passed, ${failed} failed ===`);
   process.exit(failed ? 1 : 0);
