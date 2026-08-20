@@ -160,6 +160,7 @@ export default function CopywritersChat() {
   const [mockup, setMockup] = useState(null) // null | { html, mode, loading }
   const [mockupMode, setMockupMode] = useState('ai')
   const [mockupChars, setMockupChars] = useState(0)
+  const [copyLength, setCopyLength] = useState('long') // 'short' | 'long'
   const [autoCycle, setAutoCycle] = useState(false)
   const [cycleCountdown, setCycleCountdown] = useState(0)
   const cycleTimerRef = useRef(null)
@@ -376,7 +377,7 @@ export default function CopywritersChat() {
     try {
       if (mode === 'ai') {
         const result = await api.generateMockupStream(
-          { copy: content, type, mode, provider: config?.provider, apiKey: config?.apiKey, model: config?.model },
+          { copy: content, type, mode, copyLength, provider: config?.provider, apiKey: config?.apiKey, model: config?.model },
           { onChunk: (chunk) => setMockupChars(n => n + chunk.length) }
         )
         if (result?.html) {
@@ -512,7 +513,31 @@ export default function CopywritersChat() {
           <span className="breadcrumb-sep">/</span>
           <span className="breadcrumb-current">{typeInfo.title}</span>
         </div>
-        <div className="topnav-right" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div className="topnav-right" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+
+          {/* Short / Long copy toggle */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: '.72rem', fontWeight: copyLength === 'short' ? 700 : 400, color: copyLength === 'short' ? 'var(--accent)' : 'var(--sub)', transition: 'color .15s' }}>Short</span>
+            <button
+              onClick={() => setCopyLength(l => l === 'short' ? 'long' : 'short')}
+              title={copyLength === 'long' ? 'Switch to short copy' : 'Switch to long copy'}
+              style={{
+                width: 36, height: 20, borderRadius: 10, border: 'none', cursor: 'pointer', padding: 0,
+                background: copyLength === 'long' ? 'var(--accent)' : 'var(--border)',
+                position: 'relative', transition: 'background .2s', flexShrink: 0,
+              }}
+            >
+              <span style={{
+                position: 'absolute', top: 2,
+                left: copyLength === 'long' ? 18 : 2,
+                width: 16, height: 16, borderRadius: '50%', background: '#fff',
+                transition: 'left .2s', display: 'block',
+                boxShadow: '0 1px 3px rgba(0,0,0,.2)',
+              }} />
+            </button>
+            <span style={{ fontSize: '.72rem', fontWeight: copyLength === 'long' ? 700 : 400, color: copyLength === 'long' ? 'var(--accent)' : 'var(--sub)', transition: 'color .15s' }}>Long</span>
+          </div>
+
           {voiceInfo && (
             <button
               className="voice-chip"

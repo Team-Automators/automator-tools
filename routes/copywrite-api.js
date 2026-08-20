@@ -1304,7 +1304,7 @@ ${copy.slice(0, 6000)}`;
 // ── POST /copywrite/mockup ────────────────────────────────────────────────────
 
 router.post('/mockup', async (req, res) => {
-  const { copy, type = 'sales-page', mode = 'template', provider = 'claude', apiKey, model: reqModel, seed: clientSeed } = req.body;
+  const { copy, type = 'sales-page', mode = 'template', copyLength = 'long', provider = 'claude', apiKey, model: reqModel, seed: clientSeed } = req.body;
 
   if (!copy) return res.status(400).json({ error: 'copy is required' });
 
@@ -1461,10 +1461,31 @@ TRUST BAR (if in layout): 4–5 key stats in an accent-color strip.
 PROBLEM/PAIN (if in layout): 3–4 audience frustrations as cards.
 WHO THIS IS FOR (if in layout): two-column qualifier — "For you if…" vs "Not for you if…"
 GUARANTEE (if in layout): shield icon, 30-day promise, green-tinted box.
-FAQ (if in layout): 4–5 objections with real answers. Each answer 2–3 sentences.
+FAQ (if in layout): objections with real answers.
 SCARCITY: Bold urgency section before final CTA — contrasting background, large bold text, specific availability claim. CSS only, no JS.
 FINAL CTA BAND: urgent full-width section, strong headline, primary CTA button, guarantee note.
 FOOTER: Do NOT generate a footer — it is automatically appended by the server. End with </body></html> immediately after the cta-band.
+
+━━━ COPY DEPTH: ${copyLength === 'short' ? 'SHORT-FORM (punchy & concise)' : 'LONG-FORM (rich & detailed)'} ━━━
+${copyLength === 'short' ? `Write tight, punchy, high-impact copy throughout. Strict budgets:
+• Hero: headline 6–8 words · subheadline max 15 words · 1 CTA button
+• Trust bar: 4 stats, 3–4 words each
+• Problem/pain: 3 pain points, 5–7 words per card
+• Features: 4–6 items · bold name (3–5 words) + 1 sentence only · 1 CTA at bottom
+• Social proof: 2 testimonials · each quote = 1–2 sentences · name + role only
+• FAQ: 3 questions MAX · each answer = 1 sentence only
+• Guarantee: 2–3 sentences max
+• Scarcity: 2 lines max
+• Final CTA: 1 headline + 1 button + 1 trust line
+Aim for 250–300 lines total.` : `Write thorough, persuasive, detailed copy throughout:
+• Hero: compelling multi-line headline + rich subheadline up to 30 words
+• Features: 5–7 items · each has a bold name + 2–3 sentence description
+• Social proof: 3 testimonials · each quote 3–5 sentences with specific results
+• FAQ: 5 questions · detailed 3–4 sentence answers addressing real objections
+• Guarantee: full paragraph explaining the promise and process
+• Scarcity: compelling 3–5 line urgency section with specific scarcity reason
+• Problem/pain: vivid, empathetic descriptions that agitate the pain
+Aim for 450–600 lines total — a fully fleshed-out, high-converting page.`}
 
 ━━━ COPY RULES ━━━
 • Use ONLY content from the provided marketing copy — extract real product name, prices, features, testimonials
@@ -1558,10 +1579,12 @@ ${copy.slice(0, 6000)}`;
 
     let rawHtml = '';
 
+    const maxTok = copyLength === 'short' ? 6000 : 10000;
+
     if (providerCfg.type === 'anthropic') {
       const client = new Anthropic({ apiKey: resolvedKey });
       const stream = client.messages.stream({
-        model, max_tokens: 10000,
+        model, max_tokens: maxTok,
         messages: [{ role: 'user', content: designPrompt }],
       });
       for await (const event of stream) {
@@ -1573,7 +1596,7 @@ ${copy.slice(0, 6000)}`;
     } else if (providerCfg.type === 'openai-compat') {
       const client = new OpenAI({ apiKey: resolvedKey, baseURL: providerCfg.baseUrl });
       const stream = await client.chat.completions.create({
-        model, max_tokens: 10000,
+        model, max_tokens: maxTok,
         messages: [{ role: 'user', content: designPrompt }],
         stream: true,
       });
