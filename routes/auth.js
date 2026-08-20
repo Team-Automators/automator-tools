@@ -9,6 +9,19 @@ const axios      = require('axios');
 const router     = express.Router();
 const oauthStore = require('../lib/oauth-store');
 const keyStore   = require('../lib/key-store');
+const session    = require('../lib/session');
+const locationAccess = require('../lib/location-access');
+const { readSessionToken } = require('../middleware/require-location');
+
+// Serialize the session token into an httpOnly cookie (defense-in-depth for
+// standalone/Electron use; the client also sends it as a Bearer header so the
+// app keeps working when embedded in the GHL iframe where third-party cookies
+// may be blocked). SameSite=None; Secure lets it ride inside the iframe too.
+function sessionCookie(token) {
+  const maxAge = Math.floor(session.TTL_MS / 1000);
+  return `ghl_session=${encodeURIComponent(token)}; Path=/; HttpOnly; Secure; SameSite=None; Max-Age=${maxAge}`;
+}
+const CLEAR_COOKIE = 'ghl_session=; Path=/; HttpOnly; Secure; SameSite=None; Max-Age=0';
 
 const GHL_OAUTH = 'https://marketplace.gohighlevel.com';
 const clean = (v) => (v || '').replace(/^﻿/, '').trim();
@@ -139,11 +152,53 @@ router.get('/success', (req, res) => {
 </html>`);
 });
 
-// GET /auth/logout?locationId=xxx
+// POST /auth/location-login  { locationId }
+// Verifies the location belongs to an agency that installed the app (live GHL
+// check), then issues a session token bound to that locationId.
+router.post('/location-login', async (req, res) => {
+  const locationId = (req.body?.locationId || '').trim();
+  if (!locationId) return res.status(400).json({ error: 'locationId required' });
+
+  let access;
+  try {
+    access = await locationAccess.verify(locationId);
+  } catch (err) {
+    console.error('[auth] location-login verify error:', err.message);
+    return res.status(502).json({ error: 'verification_failed', message: 'Could not verify with GHL. Try again.' });
+  }
+
+  if (!access.ok) {
+    if (access.transient) {
+      return res.status(502).json({ error: 'verification_failed', message: 'Could not reach GHL to verify. Try again.' });
+    }
+    return res.status(403).json({
+      error: 'not_authorized',
+      message: 'This Location ID is not under an agency that has installed Automator. Install the app on your agency account first.',
+    });
+  }
+
+  const token = session.sign({ lid: locationId, cid: access.companyId || '' });
+  res.setHeader('Set-Cookie', sessionCookie(token));
+  res.json({ ok: true, token, locationId, companyId: access.companyId || '' });
+});
+
+// GET /auth/session — report whether the caller holds a valid session
+router.get('/session', (req, res) => {
+  const claims = session.verify(readSessionToken(req));
+  if (!claims?.lid) return res.status(401).json({ authenticated: false });
+  res.json({ authenticated: true, locationId: claims.lid, companyId: claims.cid || '' });
+});
+
+// GET|POST /auth/logout — clear the session cookie (and optionally OAuth tokens)
 router.get('/logout', async (req, res) => {
   const { locationId } = req.query;
   if (locationId) await oauthStore.del(locationId);
+  res.setHeader('Set-Cookie', CLEAR_COOKIE);
   res.redirect('/');
+});
+router.post('/logout', (req, res) => {
+  res.setHeader('Set-Cookie', CLEAR_COOKIE);
+  res.json({ ok: true });
 });
 
 module.exports = router;

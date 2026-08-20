@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getLocationId, persistLocationId } from '../lib/api.js'
+import { setSessionToken, getSessionToken } from '../lib/session.js'
 import { PROVIDERS } from '../lib/providers.js'
 
 const AI_KEY = 'ghl_ai_config'
@@ -18,23 +19,44 @@ export default function Login() {
   const [apiKey, setApiKey]     = useState('')
   const [model, setModel]       = useState('')
   const [error, setError]       = useState('')
+  const [verifying, setVerifying] = useState(false)
 
   const selectedProv = PROVIDERS.find(p => p.id === provider) || PROVIDERS[0]
 
   // Already fully signed in — skip to dashboard
   useEffect(() => {
     const id = getLocationId()
-    if (id && readAIConfig()) navigate('/', { replace: true })
-    else if (id) { setLocationId(id); setStep(2) } // has location but no API key
+    if (id && getSessionToken() && readAIConfig()) navigate('/', { replace: true })
+    else if (id && getSessionToken()) { setLocationId(id); setStep(2) } // verified, needs API key
   }, [navigate])
 
-  function handleLocationSubmit(e) {
+  async function handleLocationSubmit(e) {
     e.preventDefault()
     const id = locationId.trim()
     if (!id) { setError('Please enter your Location ID'); return }
-    persistLocationId(id)
+
+    setVerifying(true)
     setError('')
-    setStep(2)
+    try {
+      const r = await fetch('/auth/location-login', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ locationId: id }),
+      })
+      const data = await r.json().catch(() => ({}))
+      if (!r.ok || !data.token) {
+        setError(data.message || 'This Location ID is not authorized.')
+        setVerifying(false)
+        return
+      }
+      setSessionToken(data.token)
+      persistLocationId(id)
+      setStep(2)
+    } catch {
+      setError('Could not reach the server. Please try again.')
+    } finally {
+      setVerifying(false)
+    }
   }
 
   function handleAPIKeySubmit(e) {
@@ -126,9 +148,9 @@ export default function Login() {
                 type="submit"
                 className="btn btn-primary"
                 style={{ width: '100%', marginTop: 8 }}
-                disabled={!locationId.trim()}
+                disabled={!locationId.trim() || verifying}
               >
-                Next →
+                {verifying ? 'Verifying…' : 'Next →'}
               </button>
             </form>
           </>
@@ -147,7 +169,7 @@ export default function Login() {
               {locationId && (
                 <div style={{ marginTop: 10, padding: '7px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, fontSize: '.8rem', color: 'var(--sub)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span>Location: <strong style={{ color: 'var(--text)', fontFamily: 'monospace' }}>{locationId}</strong></span>
-                  <button type="button" style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: '.8rem', padding: 0 }} onClick={() => { localStorage.removeItem('ghl_location_id'); setStep(1); setLocationId('') }}>Change</button>
+                  <button type="button" style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: '.8rem', padding: 0 }} onClick={() => { localStorage.removeItem('ghl_location_id'); setSessionToken(''); setStep(1); setLocationId('') }}>Change</button>
                 </div>
               )}
             </div>

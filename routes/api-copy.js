@@ -61,6 +61,10 @@ router.get('/copies/:id', async (req, res) => {
   try {
     const copy = await copyStore.getCopy(req.params.id);
     if (!copy) return res.status(404).json({ error: 'Not found' });
+    // Scope to the session's location — never return another tenant's copy.
+    if (req.locationId && copy.locationId !== req.locationId) {
+      return res.status(404).json({ error: 'Not found' });
+    }
     res.json(copy);
   } catch (e) {
     res.status(500).json({ error: e.message });

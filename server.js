@@ -19,6 +19,7 @@ const incomingRouter     = require('./routes/incoming');
 const clickupApiRouter   = require('./routes/clickup-api');
 const ghlProbeRouter     = require('./routes/ghl-probe');
 const workflowsRouter    = require('./routes/workflows-api');
+const requireLocation    = require('./middleware/require-location');
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -27,6 +28,12 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // ── API / webhook routes ───────────────────────────────────────────────────────
+// ── Public / server-to-server routes (no user session) ──────────────────────────
+//   /action      — called by GHL workflow actions (auth via installed PITs)
+//   /install     — GHL External Auth + browser setup wizard
+//   /verify,/test— PIT connectivity checks (auth via Bearer PIT)
+//   /auth        — OAuth + location-login (issues the session)
+//   /api/incoming— inbound webhooks (auth via per-hook token)
 app.use('/action',   actionRouter);
 app.use('/install',  installRouter);
 app.use('/verify',   verifyRouter);
@@ -34,16 +41,18 @@ app.use('/test',     testRouter);
 app.use('/contacts', contactsRouter);
 app.use('/users',    usersRouter);
 app.use('/auth',     authRouter);
-app.use('/copywrite', copywriteApi);
-app.use('/api/dashboard', dashboardApiRouter);
-app.use('/api/settings',  settingsApiRouter);
-app.use('/api/tasks',     tasksApiRouter);
-app.use('/api/hooks',     hooksApiRouter);
 app.use('/api/incoming',  incomingRouter);
-app.use('/api/clickup',   clickupApiRouter);
-app.use('/api/ghl-probe', ghlProbeRouter);
-app.use('/api/workflows', workflowsRouter);
-app.use('/api',           apiCopyRouter);
+
+// ── Tenant routes — require a valid location session (derives locationId itself) ──
+app.use('/copywrite',     requireLocation, copywriteApi);
+app.use('/api/dashboard', requireLocation, dashboardApiRouter);
+app.use('/api/settings',  requireLocation, settingsApiRouter);
+app.use('/api/tasks',     requireLocation, tasksApiRouter);
+app.use('/api/hooks',     requireLocation, hooksApiRouter);
+app.use('/api/clickup',   requireLocation, clickupApiRouter);
+app.use('/api/ghl-probe', requireLocation, ghlProbeRouter);
+app.use('/api/workflows', requireLocation, workflowsRouter);
+app.use('/api',           requireLocation, apiCopyRouter);
 
 // ── React SPA (serve built client) ────────────────────────────────────────────
 const clientDist = path.join(__dirname, 'client', 'dist');

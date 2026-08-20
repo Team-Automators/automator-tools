@@ -172,6 +172,8 @@ export default function Layout() {
                 className="user-menu-item danger"
                 onClick={() => {
                   localStorage.removeItem('ghl_ai_config')
+                  localStorage.removeItem('ghl_session')
+                  fetch('/auth/logout', { method: 'POST' }).catch(() => {})
                   window.location.href = '/login'
                 }}
               >

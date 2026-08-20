@@ -4,7 +4,7 @@ const axios        = require('axios');
 const crypto       = require('crypto');
 const Anthropic    = require('@anthropic-ai/sdk');
 const OpenAI       = require('openai');
-const sessionStore = require('../lib/ghl-session-store');
+const ghlAuth      = require('../lib/location-access');
 const keyStore     = require('../lib/key-store');
 const draftStore   = require('../lib/workflow-draft-store');
 const { PROVIDERS } = require('../lib/ai-providers');
@@ -209,60 +209,13 @@ async function callAI({ provider = 'claude', apiKey, model, system, userPrompt }
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 
-// Allow bookmarklet (running on GHL origin) to POST the session token cross-origin
-function corsSession(req, res, next) {
-  res.set({
-    'Access-Control-Allow-Origin':  '*',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
-  });
-  if (req.method === 'OPTIONS') return res.sendStatus(204);
-  next();
-}
-router.options('/session', corsSession, (_req, res) => res.sendStatus(204));
-
-// POST /api/workflows/session — store GHL user session JWT
-router.post('/session', corsSession, async (req, res) => {
-  const { locationId, token } = req.body;
-  if (!locationId || !token) return res.status(400).json({ error: 'locationId and token required' });
-
-  const clean = token.replace(/^Bearer\s+/i, '').trim();
-
-  // Validate the token actually works against GHL before storing it.
-  try {
-    await axios.get(`${BACKEND}/workflow/${locationId}`, {
-      headers: sessionHeaders(clean),
-      timeout: 10000,
-    });
-  } catch (err) {
-    const status = err.response?.status;
-    if (status === 401 || status === 403) {
-      return res.status(401).json({
-        error: 'Token rejected by GHL. Make sure you copied the Authorization header (not refresh-token) from a request to backend.leadconnectorhq.com.',
-      });
-    }
-    // 404 / 5xx / network — token might still be valid, continue storing.
-  }
-
-  await sessionStore.set(locationId, { token: clean, companyId: '' });
-  res.json({ ok: true, type: 'access', message: 'Session connected — valid 1 hour' });
-});
-
 // GET /api/workflows/session/status
+// Authentication is now automatic: if the agency has installed the app, the
+// server can mint a location token for this sub-account — no manual token
+// pasting / bookmarklet. "connected" simply reflects whether that succeeds.
 router.get('/session/status', async (req, res) => {
-  const { locationId } = req.query;
-  if (!locationId) return res.status(400).json({ connected: false });
-  const connected = await sessionStore.exists(locationId);
-  res.json({ connected });
-});
-
-// DELETE /api/workflows/session — clear stored session
-router.delete('/session', async (req, res) => {
-  const { locationId } = req.query;
-  if (!locationId) return res.status(400).json({ error: 'locationId required' });
-  const redisLib = require('../lib/redis');
-  await redisLib.del(`ghl:session:${locationId}`).catch(() => {});
-  res.json({ ok: true });
+  const token = await ghlAuth.getLocationToken(req.locationId).catch(() => null);
+  res.json({ connected: !!token });
 });
 
 // POST /api/workflows/analyze-copy — extract campaign brief from full copy conversation
@@ -362,7 +315,7 @@ router.get('/', async (req, res) => {
   const { locationId } = req.query;
   if (!locationId) return res.status(400).json({ error: 'locationId required' });
 
-  const token = await sessionStore.getToken(locationId);
+  const token = await ghlAuth.getLocationToken(locationId);
   if (!token) return res.status(401).json({ error: 'no_session' });
 
   try {
@@ -388,8 +341,9 @@ router.post('/', async (req, res) => {
   const { locationId, name, trigger, steps = [], workflowId: existingId } = req.body;
   if (!locationId || !name) return res.status(400).json({ error: 'locationId and name required' });
 
-  const token     = await sessionStore.getToken(locationId);
-  const companyId = await sessionStore.getCompanyId(locationId);
+  const auth      = await ghlAuth.getLocationAuth(locationId);
+  const token     = auth?.token;
+  const companyId = auth?.companyId || '';
   if (!token) return res.status(401).json({ error: 'no_session' });
 
   const workflowId = existingId || crypto.randomUUID();
@@ -449,6 +403,9 @@ router.get('/drafts/:id', async (req, res) => {
   try {
     const d = await draftStore.getDraft(req.params.id);
     if (!d) return res.status(404).json({ error: 'Not found' });
+    if (req.locationId && d.locationId !== req.locationId) {
+      return res.status(404).json({ error: 'Not found' });
+    }
     res.json(d);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -481,7 +438,7 @@ router.delete('/:id', async (req, res) => {
   const { id }         = req.params;
   if (!locationId) return res.status(400).json({ error: 'locationId required' });
 
-  const token = await sessionStore.getToken(locationId);
+  const token = await ghlAuth.getLocationToken(locationId);
   if (!token) return res.status(401).json({ error: 'no_session' });
 
   try {

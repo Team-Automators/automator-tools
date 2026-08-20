@@ -10,9 +10,9 @@ import Settings from './pages/Settings.jsx'
 import Tasks from './pages/Tasks.jsx'
 import Hooks from './pages/Hooks.jsx'
 import Workflows from './pages/Workflows.jsx'
-import Capture from './pages/Capture.jsx'
 import Login from './pages/Login.jsx'
 import { getLocationId } from './lib/api.js'
+import { getSessionToken } from './lib/session.js'
 
 function hasAIConfig() {
   try { return !!JSON.parse(localStorage.getItem('ghl_ai_config'))?.apiKey } catch { return false }
@@ -26,8 +26,9 @@ function CopywritersChatKeyed() {
 }
 
 function RequireLocation({ children }) {
-  if (!getLocationId()) return <Navigate to="/login" replace />
-  if (!hasAIConfig())   return <Navigate to="/login" replace />
+  if (!getLocationId())    return <Navigate to="/login" replace />
+  if (!getSessionToken())  return <Navigate to="/login" replace />
+  if (!hasAIConfig())      return <Navigate to="/login" replace />
   return children
 }
 
@@ -35,7 +36,6 @@ export default function App() {
   return (
     <Routes>
       <Route path="login" element={<Login />} />
-      <Route path="capture" element={<Capture />} />
       <Route element={<RequireLocation><Layout /></RequireLocation>}>
         <Route index element={<Dashboard />} />
         <Route path="dashboard" element={<Dashboard />} />
