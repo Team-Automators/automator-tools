@@ -256,6 +256,54 @@ function hide() { const el = document.getElementById('msg'); el.style.display = 
 </html>`);
 });
 
+// PUT /install — browser setup wizard. Verifies BOTH PITs live against GHL,
+// then stores them. (The wizard form posts here; previously there was no
+// handler, so Save silently 404'd.)
+router.put('/', async (req, res) => {
+  const { locationId, subLocationApiKey, agencyApiKey } = req.body || {};
+  if (!locationId || !subLocationApiKey || !agencyApiKey) {
+    return res.status(400).json({ success: false, error: 'locationId, subLocationApiKey, and agencyApiKey are all required.' });
+  }
+
+  // 1. Verify the Origin (sub-location) PIT — must read contacts for this location.
+  try {
+    await verifySubLocationKey(subLocationApiKey, locationId);
+  } catch (err) {
+    const msg = err.response?.data?.message || err.message;
+    return res.json({ success: false, error: `Origin PIT rejected by GHL: ${msg}` });
+  }
+
+  // 2. Verify the HIPPA/Agency PIT (agency-level → /users/me returns 404).
+  try {
+    await verifyAgencyKey(agencyApiKey);
+  } catch (err) {
+    const msg = err.response?.data?.message || err.message;
+    return res.json({ success: false, error: `HIPPA/Agency PIT rejected by GHL: ${msg}` });
+  }
+
+  // 3. Both valid — store.
+  try {
+    await keyStore.set(locationId, subLocationApiKey, agencyApiKey);
+  } catch (err) {
+    console.error('[install PUT] store failed:', err.message);
+    return res.json({ success: false, error: 'Verified, but failed to store keys. Please try again.' });
+  }
+
+  // 4. Best-effort Team menu (non-fatal).
+  try { await upsertTeamMenu(agencyApiKey, locationId); } catch (err) {
+    console.warn('[install PUT] Team menu skipped:', err.response?.data || err.message);
+  }
+
+  res.json({
+    success: true,
+    endpoints: {
+      'create-location': { ready: true, note: 'Agency PIT verified' },
+      'create-user':     { ready: true, note: 'Agency PIT verified' },
+      'update-contact':  { ready: true, note: 'Origin PIT verified' },
+    },
+  });
+});
+
 // POST /install/debug — see exactly what GHL sends
 router.post('/debug', (req, res) => {
   console.log('[install/debug]', JSON.stringify({ headers: req.headers, body: req.body }));
