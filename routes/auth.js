@@ -227,6 +227,65 @@ router.get('/diagnose', async (req, res) => {
   });
 });
 
+// GET /auth/env-check?locationId=xxx[&key=DIAG_KEY]
+// Reports (from inside the deployment, where creds live) whether the required
+// env vars are set and what Redis actually holds for a location. No secret
+// values are returned — only booleans + the public redirect URI.
+router.get('/env-check', async (req, res) => {
+  // Optional lock: if DIAG_KEY is set, require it. Otherwise open (booleans only).
+  if (process.env.DIAG_KEY && req.query.key !== process.env.DIAG_KEY) {
+    return res.status(403).json({ error: 'forbidden — pass ?key=<DIAG_KEY>' });
+  }
+
+  const has = (v) => !!(process.env[v] && String(process.env[v]).trim());
+  const envPresent = {
+    GHL_CLIENT_ID:            has('GHL_CLIENT_ID'),
+    GHL_CLIENT_SECRET:        has('GHL_CLIENT_SECRET'),
+    GHL_REDIRECT_URI:         has('GHL_REDIRECT_URI'),
+    GHL_VERSION_ID:           has('GHL_VERSION_ID'),
+    UPSTASH_REDIS_REST_URL:   has('UPSTASH_REDIS_REST_URL'),
+    UPSTASH_REDIS_REST_TOKEN: has('UPSTASH_REDIS_REST_TOKEN'),
+    SESSION_SECRET:           has('SESSION_SECRET'),
+    VERCEL:                   has('VERCEL'),
+  };
+
+  // Redis connectivity + what's stored for this location (existence only).
+  let redisConnected = false;
+  let oauthInstallCount = null;
+  const forLocation = {};
+  const locationId = (req.query.locationId || '').trim();
+  try {
+    const redis = require('../lib/redis');
+    const installs = await oauthStore.findAll();      // exercises a real scan/read
+    oauthInstallCount = installs.length;
+    redisConnected = true;
+    if (locationId) {
+      const [oauthTok, pit, aicfg, locTok] = await Promise.all([
+        redis.get(`ghl:tokens:${locationId}`).catch(() => null),
+        redis.get(`ghl:keys:${locationId}`).catch(() => null),
+        redis.get(`aiconfig:${locationId}`).catch(() => null),
+        redis.get(`ghl:loctoken:${locationId}`).catch(() => null),
+      ]);
+      forLocation.hasOAuthToken     = !!(oauthTok && oauthTok.access_token);
+      forLocation.hasRefreshToken   = !!(oauthTok && oauthTok.refresh_token);
+      forLocation.hasPitRecord      = !!(pit && pit.subLocationApiKey && pit.agencyApiKey);
+      forLocation.hasAiConfig       = !!aicfg;
+      forLocation.hasCachedLocToken = !!locTok;
+    }
+  } catch (e) {
+    forLocation.error = e.message;
+  }
+
+  res.json({
+    envPresent,
+    ghlRedirectUri: process.env.GHL_REDIRECT_URI || null, // public callback URL — compare to marketplace config
+    redisConnected,
+    oauthInstallCount,
+    locationId: locationId || null,
+    forLocation,
+  });
+});
+
 // GET /auth/session — report whether the caller holds a valid session
 router.get('/session', (req, res) => {
   const claims = session.verify(readSessionToken(req));
