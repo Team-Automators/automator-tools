@@ -45,6 +45,18 @@ export const api = {
     return r.json()
   },
 
+  async updateCustomer(id, { name, email } = {}) {
+    const body = { locationId: getLocationId() }
+    if (name !== undefined) body.name = name
+    if (email !== undefined) body.email = email
+    const r = await fetch(`/api/customers/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    return r.json()
+  },
+
   async deleteCustomer(id) {
     const url = withLocationId(new URL(`/api/customers/${id}`, window.location.origin))
     const r = await fetch(url.toString(), { method: 'DELETE' })

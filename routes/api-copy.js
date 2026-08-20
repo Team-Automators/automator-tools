@@ -26,6 +26,20 @@ router.post('/customers', async (req, res) => {
   }
 });
 
+// PUT /api/customers/:id — rename a folder (and optionally its email)
+router.put('/customers/:id', async (req, res) => {
+  const { locationId, name, email } = req.body;
+  if (!locationId) return res.status(400).json({ error: 'locationId required' });
+  if (name !== undefined && !String(name).trim()) return res.status(400).json({ error: 'name cannot be empty' });
+  try {
+    const cust = await copyStore.updateCustomer(locationId, req.params.id, { name, email });
+    if (!cust) return res.status(404).json({ error: 'Customer not found' });
+    res.json(cust);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // DELETE /api/customers/:id?locationId=
 router.delete('/customers/:id', async (req, res) => {
   const { locationId } = req.query;
