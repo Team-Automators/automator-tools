@@ -1462,7 +1462,7 @@ TRUST BAR (if in layout): 4–5 key stats in an accent-color strip.
 PROBLEM/PAIN (if in layout): 3–4 audience frustrations as cards.
 WHO THIS IS FOR (if in layout): two-column qualifier — "For you if…" vs "Not for you if…"
 GUARANTEE (if in layout): shield icon, 30-day promise, green-tinted box.
-FAQ (if in layout): 4–5 objections, left accent border on each. Keep each answer to 2–3 sentences maximum — brevity is critical so the page has room for scarcity and footer.
+FAQ (if in layout): 3–4 objections max, left accent border on each. Keep each answer to 1–2 sentences ONLY — brevity is critical so the page finishes within token budget.
 SCARCITY: High-urgency section just before the final CTA. Use a bold warning/alert box — contrasting background (red, orange, or dark accent), large bold text declaring limited availability ("Only [X] spots remaining", "Price increases [day]", or "This offer closes soon"). Include a static urgency bar or bordered callout. No countdown JS — CSS only. Text must be specific and believable from the copy, not generic.
 FINAL CTA BAND: urgent, full-width, strong headline, primary CTA, guarantee note.
 FOOTER: Do NOT generate a footer — it is automatically appended by the server after generation. End your output with the closing </body></html> tags immediately after the cta-band.
@@ -1480,15 +1480,15 @@ FOOTER: Do NOT generate a footer — it is automatically appended by the server 
 • System fonts: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif
 • Fully mobile responsive: @media (max-width: 768px)
 • Pure HTML/CSS — no JavaScript
-• Aim for 500–600 lines — enough to include every section including scarcity and footer
+• Aim for 300–350 lines MAXIMUM — this is a hard budget, every section must be concise
 • CTA buttons: NEVER full-width. Always display:inline-block with auto width, centered with text-align:center on the parent. Max-width 360px if needed.
 • Features/What You Get section: list ALL features first, then ONE CTA button at the very bottom. NEVER insert CTA buttons between feature items — no "scroll CTAs" mid-list.
-• Social proof testimonials: each testimonial MUST be a fully self-contained card — quote text AND author name/title/avatar together inside the same box. NEVER split the quote and author into separate columns or rows with large gaps between them. Author info sits directly below the quote inside the same card.
+• Social proof testimonials: each testimonial MUST be a fully self-contained card — quote text AND author name/title/avatar together inside the same box. NEVER split the quote and author into separate columns or rows with large gaps between them. Author info sits directly below the quote inside the same card. Keep each testimonial quote to 2 sentences max — brevity preserves the budget.
 
 OUTPUT: Return ONLY the HTML document. No preamble, no markdown fences.
 
 ━━━ MARKETING COPY ━━━
-${copy.slice(0, 5000)}`;
+${copy.slice(0, 4000)}`;
 
   try {
     const model = reqModel || providerCfg.defaultModel;
@@ -1549,7 +1549,14 @@ ${copy.slice(0, 5000)}`;
     } else if (/<\/html>/i.test(rawHtml)) {
       rawHtml = rawHtml.replace(/<\/html>/i, footerHtml + '\n</body>\n</html>');
     } else {
-      rawHtml += footerHtml + '\n</body>\n</html>';
+      // AI was truncated mid-element — find the last COMPLETE </section> so the footer
+      // doesn't get injected inside an unclosed card or div
+      const lastSection = rawHtml.lastIndexOf('</section>');
+      if (lastSection !== -1) {
+        rawHtml = rawHtml.slice(0, lastSection + '</section>'.length) + '\n' + footerHtml + '\n</body>\n</html>';
+      } else {
+        rawHtml += footerHtml + '\n</body>\n</html>';
+      }
     }
 
     console.log(`[mockup] SUCCESS: serving AI HTML (${rawHtml.length} chars)`);
