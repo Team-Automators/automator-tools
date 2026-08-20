@@ -152,6 +152,8 @@ export default function LibraryChat() {
   // Mockup state
   const [mockup, setMockup] = useState(null)
   const [mockupMode, setMockupMode] = useState('ai')
+  const [mockupChars, setMockupChars] = useState(0)
+  const [copyLength, setCopyLength] = useState('long')
   const [autoCycle, setAutoCycle] = useState(false)
   const [cycleCountdown, setCycleCountdown] = useState(0)
   const cycleTimerRef = useRef(null)
@@ -247,20 +249,29 @@ export default function LibraryChat() {
 
   async function handleMockup(content, mode) {
     setMockupMode(mode)
+    setMockupChars(0)
     setMockup({ loading: true, mode, html: null, error: null })
     try {
-      const result = await api.generateMockup({
-        copy: content,
-        type: copy?.type || 'general',
-        mode,
-        provider: config?.provider,
-        apiKey:   config?.apiKey,
-        model:    config?.model,
-      })
-      if (result.html) {
-        setMockup({ html: result.html, mode, loading: false, error: null })
+      if (mode === 'ai') {
+        const result = await api.generateMockupStream(
+          { copy: content, type: copy?.type || 'general', mode, copyLength, provider: config?.provider, apiKey: config?.apiKey, model: config?.model },
+          { onChunk: (chunk) => setMockupChars(n => n + chunk.length) }
+        )
+        if (result?.html) {
+          setMockup({ html: result.html, mode, loading: false, error: null })
+        } else {
+          setMockup({ html: null, mode, loading: false, error: 'No HTML returned' })
+        }
       } else {
-        setMockup({ html: null, mode, loading: false, error: result.error || 'No HTML returned' })
+        const result = await api.generateMockup({
+          copy: content, type: copy?.type || 'general', mode, copyLength,
+          provider: config?.provider, apiKey: config?.apiKey, model: config?.model,
+        })
+        if (result.html) {
+          setMockup({ html: result.html, mode, loading: false, error: null })
+        } else {
+          setMockup({ html: null, mode, loading: false, error: result.error || 'No HTML returned' })
+        }
       }
     } catch (e) {
       setMockup({ html: null, mode, loading: false, error: e.message || 'Request failed' })
@@ -469,7 +480,31 @@ export default function LibraryChat() {
             {copy?.title || 'Untitled'}
           </span>
         </div>
-        <div className="topnav-right" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div className="topnav-right" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+
+          {/* Short / Long copy toggle */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: '.72rem', fontWeight: copyLength === 'short' ? 700 : 400, color: copyLength === 'short' ? 'var(--accent)' : 'var(--sub)', transition: 'color .15s' }}>Short</span>
+            <button
+              onClick={() => setCopyLength(l => l === 'short' ? 'long' : 'short')}
+              title={copyLength === 'long' ? 'Switch to short copy' : 'Switch to long copy'}
+              style={{
+                width: 36, height: 20, borderRadius: 10, border: 'none', cursor: 'pointer', padding: 0,
+                background: copyLength === 'long' ? 'var(--accent)' : 'var(--border)',
+                position: 'relative', transition: 'background .2s', flexShrink: 0,
+              }}
+            >
+              <span style={{
+                position: 'absolute', top: 2,
+                left: copyLength === 'long' ? 18 : 2,
+                width: 16, height: 16, borderRadius: '50%', background: '#fff',
+                transition: 'left .2s', display: 'block',
+                boxShadow: '0 1px 3px rgba(0,0,0,.2)',
+              }} />
+            </button>
+            <span style={{ fontSize: '.72rem', fontWeight: copyLength === 'long' ? 700 : 400, color: copyLength === 'long' ? 'var(--accent)' : 'var(--sub)', transition: 'color .15s' }}>Long</span>
+          </div>
+
           {saveStatus && (
             <span className={`save-status ${saveStatus}`}>
               {saveStatus === 'saving' ? 'Saving…' : '✓ Saved'}
@@ -637,7 +672,12 @@ export default function LibraryChat() {
               {mockup.loading ? (
                 <div className="mockup-loading">
                   <div className="typing-dots"><span/><span/><span/></div>
-                  <p>Generating AI design… this may take up to 60s</p>
+                  <p>Generating AI design…</p>
+                  {mockupChars > 0 && (
+                    <p style={{ fontSize: '.75rem', color: 'var(--sub)', marginTop: 6 }}>
+                      {mockupChars.toLocaleString()} characters generated
+                    </p>
+                  )}
                 </div>
               ) : mockup.error ? (
                 <div className="mockup-loading">
