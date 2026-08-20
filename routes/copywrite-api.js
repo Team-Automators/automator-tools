@@ -1427,65 +1427,54 @@ router.post('/mockup', async (req, res) => {
   const imgSeed = clientSeed ? String(clientSeed).slice(-6) : Math.random().toString(36).slice(2, 8);
   const genId   = clientSeed || Date.now();
 
-  const designPrompt = `You are an elite conversion-focused web designer. Generation ID: ${genId} — produce a completely unique page. Do NOT default to a generic sales page template.
+  const designPrompt = `You are an elite conversion-focused web designer. Generation ID: ${genId} — produce a completely unique, COMPLETE page. Every section must finish — do NOT stop mid-section.
 
-YOUR TASK: Read the marketing copy below, then build a complete HTML sales funnel page using EXACTLY the structural patterns specified. Each section must be built as described — not as a generic version.
+YOUR TASK: Read the copy below, then build a COMPLETE short-form HTML sales funnel using the structural patterns specified. Short-form = punchy, concise, high-impact. No long paragraphs.
 
 ━━━ AESTHETIC: ${style.name} ━━━
 ${style.aesthetic}
-
 Typography: ${style.typeTreatment}
 Button style: ${style.buttonStyle}
 
 ━━━ COLOR SYSTEM ━━━
-Page bg: ${style.palette.bg} | Accent: ${style.palette.accent} | Card bg: ${style.palette.card}
-Body text: ${style.palette.text} | Muted text: ${style.palette.muted} | Borders: ${style.palette.border}
+bg:${style.palette.bg} | accent:${style.palette.accent} | card:${style.palette.card} | text:${style.palette.text} | muted:${style.palette.muted} | border:${style.palette.border}
 Hero gradient: ${style.hero}
 
 ━━━ SECTION ORDER ━━━
-Build in this exact sequence: ${layout}
+${layout}
 
-━━━ STRUCTURAL PATTERNS (build each section EXACTLY as described) ━━━
-
+━━━ SECTION PATTERNS ━━━
 HERO — ${style.structure.hero}
-
-FEATURES/WHAT YOU GET — ${style.structure.features}
-
+FEATURES — ${style.structure.features}
 SOCIAL PROOF — ${style.structure.proof}
+PRICING — ${style.structure.pricing} (urgency strip top, ✓ items with crossed-out values, "Total Value: $X,XXX", "Only $XXX")
+TRANSITIONS — ${style.structure.dividers}
 
-PRICING/VALUE STACK — ${style.structure.pricing}
-Standard content: urgency strip at top, each item with crossed-out value, "Total Value: $X,XXX", "Only $XXX" in large text.
+━━━ SHORT-FORM COPY BUDGETS (STRICT — do not exceed) ━━━
+• HERO: headline max 8 words · subheadline max 15 words · 1 CTA button
+• TRUST BAR: 4 stats, 3–4 words each
+• PROBLEM/PAIN: 3 pain points, 4–6 words each, card layout
+• FEATURES: 4–6 items MAX · each = bold name (3–5 words) + 1 short sentence · 1 CTA at bottom only
+• SOCIAL PROOF: 2 testimonials MAX · each quote = 1–2 sentences · name + role only (no lengthy bios)
+• WHO IS IT FOR: 3 bullets each side, 1 line each
+• PRICING: 4–6 value items · 1 total line · 1 price line
+• GUARANTEE: 2–3 sentences max
+• FAQ: 3 questions MAX · each answer = 1 sentence only
+• SCARCITY: bold urgency box · 2–3 lines · specific (spots/deadline) · CSS only no JS
+• FINAL CTA: 1 headline (max 8 words) + 1 button + 1 trust line
 
-SECTION TRANSITIONS — ${style.structure.dividers}
+━━━ TECHNICAL RULES ━━━
+• Single <!DOCTYPE html>…</html> · all CSS in <style> · system fonts · no JS
+• Mobile responsive: @media(max-width:768px)
+• CTA buttons: NEVER full-width · display:inline-block · centered via text-align:center on parent
+• Testimonials: quote + author inside the SAME card — never split
+• Features: ALL items listed FIRST, then ONE CTA at the very bottom — no mid-list CTAs
+• FOOTER: Do NOT generate a footer — server appends it. Close with </body></html> after cta-band.
+• Image seed: ${imgSeed} (hero: ${imgSeed}H · avatars: ${imgSeed}T1 ${imgSeed}T2)
+• CSS: write compact shorthand rules — keep the style block under 100 lines
+• TARGET: 250–300 lines total. Every section MUST be included and COMPLETE.
 
-TRUST BAR (if in layout): 4–5 key stats in an accent-color strip.
-PROBLEM/PAIN (if in layout): 3–4 audience frustrations as cards.
-WHO THIS IS FOR (if in layout): two-column qualifier — "For you if…" vs "Not for you if…"
-GUARANTEE (if in layout): shield icon, 30-day promise, green-tinted box.
-FAQ (if in layout): 3–4 objections max, left accent border on each. Keep each answer to 1–2 sentences ONLY — brevity is critical so the page finishes within token budget.
-SCARCITY: High-urgency section just before the final CTA. Use a bold warning/alert box — contrasting background (red, orange, or dark accent), large bold text declaring limited availability ("Only [X] spots remaining", "Price increases [day]", or "This offer closes soon"). Include a static urgency bar or bordered callout. No countdown JS — CSS only. Text must be specific and believable from the copy, not generic.
-FINAL CTA BAND: urgent, full-width, strong headline, primary CTA, guarantee note.
-FOOTER: Do NOT generate a footer — it is automatically appended by the server after generation. End your output with the closing </body></html> tags immediately after the cta-band.
-
-━━━ COPY RULES ━━━
-• Use ONLY content from the provided marketing copy
-• Extract real product name, prices, features, testimonials
-• If testimonials absent, write 3 realistic ones that fit the product
-• No [brackets], no placeholders — finished real copy only
-• Image seed for picsum.photos: ${imgSeed} (use ${imgSeed}H for hero, ${imgSeed}T1/${imgSeed}T2/${imgSeed}T3 for avatars)
-
-━━━ TECHNICAL ━━━
-• Single complete <!DOCTYPE html><html>…</html> document
-• All CSS in one <style> tag — no external resources
-• System fonts: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif
-• Fully mobile responsive: @media (max-width: 768px)
-• Pure HTML/CSS — no JavaScript
-• Aim for 300–350 lines MAXIMUM — this is a hard budget, every section must be concise
-• CTA buttons: NEVER full-width. Always display:inline-block with auto width, centered with text-align:center on the parent. Max-width 360px if needed.
-• Features/What You Get section: list ALL features first, then ONE CTA button at the very bottom. NEVER insert CTA buttons between feature items — no "scroll CTAs" mid-list.
-• Social proof testimonials: each testimonial MUST be a fully self-contained card — quote text AND author name/title/avatar together inside the same box. NEVER split the quote and author into separate columns or rows with large gaps between them. Author info sits directly below the quote inside the same card. Keep each testimonial quote to 2 sentences max — brevity preserves the budget.
-
-OUTPUT: Return ONLY the HTML document. No preamble, no markdown fences.
+OUTPUT: HTML only — no preamble, no markdown fences. Start with <!DOCTYPE html>.
 
 ━━━ MARKETING COPY ━━━
 ${copy.slice(0, 4000)}`;
