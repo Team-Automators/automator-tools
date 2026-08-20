@@ -286,6 +286,48 @@ router.get('/env-check', async (req, res) => {
   });
 });
 
+// GET /auth/redis-dump[?key=DIAG_KEY]
+// Full inventory of what's stored in Redis, grouped by namespace. Counts are
+// always shown; the actual IDs are included only when a valid key is passed
+// (DIAG_KEY, SESSION_SECRET, or GHL_CLIENT_SECRET). No secret values returned.
+router.get('/redis-dump', async (req, res) => {
+  const provided = req.query.key || req.headers['x-diag-key'] || '';
+  const gate     = clean(process.env.DIAG_KEY) || clean(process.env.SESSION_SECRET) || clean(process.env.GHL_CLIENT_SECRET);
+  const authed   = !!gate && provided === gate;
+
+  const patterns = [
+    'ghl:tokens:*',    // OAuth installs
+    'ghl:keys:*',      // PIT records
+    'ghl:loctoken:*',  // cached location tokens
+    'aiconfig:*',      // AI provider config + ClickUp key
+    'locinfo2:*',      // cached location info
+    'hooks:*', 'hook_token:*',
+    'cust:*', 'copyidx:*', 'copy:*',
+    'wf:drafts:idx:*', 'wf:draft:*',
+  ];
+
+  const redis = require('../lib/redis');
+  const namespaces = {};
+  for (const pattern of patterns) {
+    const prefix = pattern.replace('*', '');
+    let cursor = 0;
+    const keys = [];
+    try {
+      do {
+        const [next, batch] = await redis.scan(cursor, { match: pattern, count: 200 });
+        cursor = Number(next);
+        keys.push(...(batch || []));
+      } while (cursor !== 0 && keys.length < 1000);
+      namespaces[prefix] = { count: keys.length };
+      if (authed) namespaces[prefix].ids = keys.map(k => k.replace(prefix, '')).slice(0, 100);
+    } catch (e) {
+      namespaces[prefix] = { error: e.message };
+    }
+  }
+
+  res.json({ authed, hint: authed ? 'IDs included' : 'pass ?key=<GHL_CLIENT_SECRET or SESSION_SECRET/DIAG_KEY> to see IDs', namespaces });
+});
+
 // GET /auth/session — report whether the caller holds a valid session
 router.get('/session', (req, res) => {
   const claims = session.verify(readSessionToken(req));
