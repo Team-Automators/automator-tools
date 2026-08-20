@@ -45,7 +45,7 @@ router.get('/', (req, res) => {
 // Records the outcome of the most recent OAuth callback so we can inspect it
 // via GET /auth/last-callback (1h TTL). No secret values are stored.
 async function recordCallback(rec) {
-  try { require('../lib/redis').set('ghl:lastcallback', { at: Date.now(), ...rec }, { ex: 3600 }); }
+  try { await require('../lib/redis').set('ghl:lastcallback', { at: Date.now(), ...rec }, { ex: 3600 }); }
   catch {}
 }
 
@@ -351,6 +351,17 @@ router.get('/redis-dump', async (req, res) => {
   }
 
   res.json({ authed, hint: authed ? 'IDs included' : 'pass ?key=<GHL_CLIENT_SECRET or SESSION_SECRET/DIAG_KEY> to see IDs', namespaces });
+});
+
+// GET /auth/last-install — inspect the most recent External Auth POST from GHL
+// (field names + masked value shapes). Used to match /install to GHL's payload.
+router.get('/last-install', async (req, res) => {
+  try {
+    const rec = await require('../lib/redis').get('ghl:lastinstall');
+    res.json(rec || { note: 'No External Auth POST recorded yet. If install fails before this fills, GHL may not be reaching POST /install at all.' });
+  } catch (e) {
+    res.json({ error: e.message });
+  }
 });
 
 // GET /auth/session — report whether the caller holds a valid session

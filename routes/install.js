@@ -10,10 +10,13 @@
 // Check registration:  GET  /install/:locationId
 // Remove registration: DELETE /install/:locationId
 
-const express   = require('express');
-const axios     = require('axios');
-const router    = express.Router();
-const keyStore  = require('../lib/key-store');
+const express    = require('express');
+const axios      = require('axios');
+const router     = express.Router();
+const keyStore   = require('../lib/key-store');
+const oauthStore = require('../lib/oauth-store');
+
+const clean = (v) => (v || '').replace(/^﻿/, '').trim();
 
 const GHL_BASE    = 'https://services.leadconnectorhq.com';
 const API_VERSION = '2021-07-28';
@@ -81,6 +84,52 @@ async function verifyAgencyKey(apiKey) {
 // GET /install — web setup wizard (browser) or JSON status (API/GHL server call)
 router.get('/', async (req, res) => {
   const { locationId } = req.query;
+
+  // ── OAuth callback landing here ─────────────────────────────────────────────
+  // The GHL app's Redirect URL points at /install, so after "Allow" GHL sends
+  // ?code=... here. Complete the OAuth token exchange (same as /auth/callback)
+  // and store the tokens, then continue to the integration page.
+  if (req.query.code) {
+    const code = req.query.code;
+    try {
+      const { data } = await axios.post(`${GHL_BASE}/oauth/token`,
+        new URLSearchParams({
+          client_id:     clean(process.env.GHL_CLIENT_ID),
+          client_secret: clean(process.env.GHL_CLIENT_SECRET),
+          grant_type:    'authorization_code',
+          code,
+          redirect_uri:  clean(process.env.GHL_REDIRECT_URI),
+        }).toString(),
+        { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+      );
+
+      const loc       = locationId || data.locationId || data.location_id;
+      const companyId = data.companyId || data.company_id;
+      const storeKey  = loc || companyId;
+
+      // Diagnostic breadcrumb (readable at /auth/last-callback), no secrets.
+      try { await require('../lib/redis').set('ghl:lastcallback', { at: Date.now(), stage: 'install_oauth', via: '/install', success: !!storeKey, storeKey: storeKey || null, hasAccess: !!data.access_token, hasRefresh: !!data.refresh_token }, { ex: 3600 }); } catch {}
+
+      if (!storeKey) {
+        return res.status(400).send(`OAuth succeeded but no locationId/companyId returned.<br><pre>${JSON.stringify(data, null, 2)}</pre>`);
+      }
+
+      await oauthStore.set(storeKey, { ...data, locationId: loc || null, companyId, expires_at: Date.now() + (data.expires_in || 86400) * 1000 });
+      console.log('[install GET] OAuth tokens stored for:', storeKey);
+
+      const clientId  = clean(process.env.GHL_CLIENT_ID).split('-')[0];
+      const versionId = clean(process.env.GHL_VERSION_ID);
+      const dest      = loc || companyId;
+      return res.redirect(
+        `https://app.automator.ai/v2/location/${dest}/integration/${clientId}/versions/${versionId}?app_from=installedApps&view=agency`
+      );
+    } catch (err) {
+      const msg = err.response?.data?.message || err.response?.data?.error_description || err.message;
+      try { await require('../lib/redis').set('ghl:lastcallback', { at: Date.now(), stage: 'install_oauth_error', via: '/install', success: false, status: err.response?.status || 0, error: err.response?.data || err.message }, { ex: 3600 }); } catch {}
+      console.error('[install GET] OAuth exchange failed:', JSON.stringify(err.response?.data || err.message));
+      return res.status(500).send(`OAuth exchange failed: ${msg}<br><pre>${JSON.stringify(err.response?.data, null, 2)}</pre>`);
+    }
+  }
 
   // If called by GHL server (not a browser), return JSON
   console.log('=== [install GET] FULL PAYLOAD ===');
@@ -322,6 +371,22 @@ router.post('/', async (req, res) => {
   console.log('[install POST] BODY:', JSON.stringify(req.body, null, 2));
   console.log('[install POST] QUERY:', JSON.stringify(req.query, null, 2));
   console.log('=== [install POST] END PAYLOAD ===');
+
+  // Diagnostic breadcrumb — capture EXACTLY what GHL's External Auth sends, so we
+  // can match field names. Values are masked (type + length only, no secrets).
+  try {
+    const shape = (obj) => Object.fromEntries(Object.entries(obj || {}).map(
+      ([k, v]) => [k, typeof v === 'string' ? `str(${v.length})` : Array.isArray(v) ? `array(${v.length})` : typeof v]
+    ));
+    await require('../lib/redis').set('ghl:lastinstall', {
+      at:          Date.now(),
+      contentType: req.headers['content-type'] || null,
+      userAgent:   req.headers['user-agent'] || null,
+      queryKeys:   Object.keys(req.query || {}),
+      bodyShape:   shape(req.body),
+      queryShape:  shape(req.query),
+    }, { ex: 3600 });
+  } catch {}
 
   const toStr      = (v) => Array.isArray(v) ? v[0] : (typeof v === 'string' ? v : null);
   const locationId        = toStr(merged.locationId || merged.location_id);
