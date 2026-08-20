@@ -42,11 +42,23 @@ router.get('/', (req, res) => {
   res.redirect(`${GHL_OAUTH}/v2/oauth/chooselocation?${params}`);
 });
 
+// Records the outcome of the most recent OAuth callback so we can inspect it
+// via GET /auth/last-callback (1h TTL). No secret values are stored.
+async function recordCallback(rec) {
+  try { require('../lib/redis').set('ghl:lastcallback', { at: Date.now(), ...rec }, { ex: 3600 }); }
+  catch {}
+}
+
 // GET /auth/callback — GHL redirects here after user approves
 router.get('/callback', async (req, res) => {
   const { code, locationId } = req.query;
 
-  if (!code) return res.status(400).send('Missing authorization code.');
+  if (!code) {
+    await recordCallback({ stage: 'no_code', hasCode: false, locationId: locationId || null, query: Object.keys(req.query) });
+    return res.status(400).send('Missing authorization code.');
+  }
+
+  await recordCallback({ stage: 'received', hasCode: true, locationId: locationId || null });
 
   try {
     const { data } = await axios.post(`${GHL_API}/oauth/token`,
@@ -67,11 +79,13 @@ router.get('/callback', async (req, res) => {
     const storeKey = loc || companyId;
 
     if (!storeKey) {
+      await recordCallback({ stage: 'no_store_key', success: false, tokenKeys: Object.keys(data || {}) });
       return res.status(400).send(`OAuth succeeded but no locationId or companyId returned.<br><pre>${JSON.stringify(data, null, 2)}</pre>`);
     }
 
     const tokens = { ...data, locationId: loc || null, companyId, expires_at: Date.now() + (data.expires_in || 86400) * 1000 };
     await oauthStore.set(storeKey, tokens);
+    await recordCallback({ stage: 'stored', success: true, storeKey, locationId: loc || null, companyId: companyId || null, hasAccess: !!data.access_token, hasRefresh: !!data.refresh_token });
 
     // Redirect directly to GHL integration page after OAuth
     const clientId  = clean(process.env.GHL_CLIENT_ID).split('-')[0];
@@ -82,8 +96,19 @@ router.get('/callback', async (req, res) => {
     );
   } catch (err) {
     const msg = err.response?.data?.message || err.response?.data?.error_description || err.message;
+    await recordCallback({ stage: 'exchange_error', success: false, status: err.response?.status || 0, error: err.response?.data || err.message });
     console.error('[auth] OAuth callback error:', JSON.stringify(err.response?.data || err.message));
     res.status(500).send(`Authentication failed: ${msg}<br><pre>${JSON.stringify(err.response?.data, null, 2)}</pre>`);
+  }
+});
+
+// GET /auth/last-callback — inspect the most recent OAuth callback attempt.
+router.get('/last-callback', async (req, res) => {
+  try {
+    const rec = await require('../lib/redis').get('ghl:lastcallback');
+    res.json(rec || { note: 'No callback recorded. GHL has not redirected to /auth/callback yet — meaning the authorize was not completed, or the app’s Redirect URL does not point here.' });
+  } catch (e) {
+    res.json({ error: e.message });
   }
 });
 
