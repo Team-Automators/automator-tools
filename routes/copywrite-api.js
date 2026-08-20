@@ -1070,6 +1070,16 @@ router.post('/analyze-voice', async (req, res) => {
     return res.json({ ok: true, skipped: true, reason: 'Save at least 2 copies first' });
   }
 
+  // Staleness guard — the profile is derived from saved copies, so it only needs
+  // re-analysis when a copy was added or edited. This lets the client call
+  // analyze-voice on every new conversation for free when nothing has changed.
+  const latestCopyAt = idx[0]?.updatedAt || idx[0]?.createdAt || 0;
+  const force = req.body.force === true || req.query.force === 'true';
+  const existing = await brandVoiceStore.getVoice(locationId).catch(() => null);
+  if (!force && existing?.profile && existing.analyzedCount === idx.length && existing.latestCopyAt === latestCopyAt) {
+    return res.json({ ok: true, fresh: true, profile: existing.profile, sampleCount: existing.sampleCount });
+  }
+
   const sampleIds = idx.slice(0, 15).map(i => i.id);
   const copies = (await Promise.all(
     sampleIds.map(id => copyStore.getCopy(id).catch(() => null))
@@ -1095,8 +1105,10 @@ ${samples.join('\n\n---\n\n')}`;
     if (profile) {
       await brandVoiceStore.setVoice(locationId, {
         profile,
-        sampleCount: samples.length,
-        updatedAt: Date.now(),
+        sampleCount:   samples.length,
+        analyzedCount: idx.length,   // staleness key — # of saved copies at analysis
+        latestCopyAt,                // staleness key — newest copy's timestamp
+        updatedAt:     Date.now(),
       });
     }
 

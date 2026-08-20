@@ -236,14 +236,22 @@ export default function CopywritersChat() {
     try { localStorage.setItem(`cwc_fb_${type}`, JSON.stringify(feedbackMap)) } catch {}
   }, [feedbackMap, type])
 
-  // Load brand voice status on mount
+  // Load brand voice status on mount, then auto-refresh it so a NEW conversation
+  // always adapts to the latest learning. The server skips the AI call when
+  // nothing changed (staleness guard), so this is free when there's no new copy.
   useEffect(() => {
     if (!locationId) return
     api.getBrandVoice().then(data => {
       if (data?.voice?.profile) setVoiceInfo(data.voice)
       else setVoiceInfo(false)
     }).catch(() => setVoiceInfo(false))
-  }, [locationId])
+
+    if (config) {
+      api.analyzeVoice({ provider: config.provider, apiKey: config.apiKey, model: config.model })
+        .then(r => { if (r?.profile) setVoiceInfo({ profile: r.profile, sampleCount: r.sampleCount, updatedAt: Date.now() }) })
+        .catch(() => {})
+    }
+  }, [locationId, config])
 
   async function send() {
     const text = input.trim()
