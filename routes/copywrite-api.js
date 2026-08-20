@@ -1312,7 +1312,7 @@ router.post('/mockup', async (req, res) => {
     return res.json({ ok: true, html: buildTemplateHTML(copy, type), mode: 'template' });
   }
 
-  // AI mode — Claude reads the copy and designs a fully custom HTML page from scratch
+  // AI mode — streams SSE so Vercel 120s timeout never fires
   const resolvedKey = apiKey || (provider === 'claude' ? process.env.ANTHROPIC_API_KEY : null);
   if (!resolvedKey) return res.status(400).json({ error: 'No API key configured' });
 
@@ -1427,9 +1427,9 @@ router.post('/mockup', async (req, res) => {
   const imgSeed = clientSeed ? String(clientSeed).slice(-6) : Math.random().toString(36).slice(2, 8);
   const genId   = clientSeed || Date.now();
 
-  const designPrompt = `You are an elite conversion-focused web designer. Generation ID: ${genId} — produce a completely unique, COMPLETE page. Every section must finish — do NOT stop mid-section.
+  const designPrompt = `You are an elite conversion-focused web designer. Generation ID: ${genId} — produce a completely unique page.
 
-YOUR TASK: Read the copy below, then build a COMPLETE short-form HTML sales funnel using the structural patterns specified. Short-form = punchy, concise, high-impact. No long paragraphs.
+YOUR TASK: Read the marketing copy below and build a COMPLETE, fully-rendered HTML sales funnel page. Every section in the layout must be present and fully written — do NOT truncate or stop early.
 
 ━━━ AESTHETIC: ${style.name} ━━━
 ${style.aesthetic}
@@ -1437,83 +1437,85 @@ Typography: ${style.typeTreatment}
 Button style: ${style.buttonStyle}
 
 ━━━ COLOR SYSTEM ━━━
-bg:${style.palette.bg} | accent:${style.palette.accent} | card:${style.palette.card} | text:${style.palette.text} | muted:${style.palette.muted} | border:${style.palette.border}
+Page bg: ${style.palette.bg} | Accent: ${style.palette.accent} | Card bg: ${style.palette.card}
+Body text: ${style.palette.text} | Muted text: ${style.palette.muted} | Borders: ${style.palette.border}
 Hero gradient: ${style.hero}
 
 ━━━ SECTION ORDER ━━━
-${layout}
+Build in this exact sequence: ${layout}
 
-━━━ SECTION PATTERNS ━━━
+━━━ STRUCTURAL PATTERNS (build each section EXACTLY as described) ━━━
+
 HERO — ${style.structure.hero}
-FEATURES — ${style.structure.features}
+
+FEATURES/WHAT YOU GET — ${style.structure.features}
+
 SOCIAL PROOF — ${style.structure.proof}
-PRICING — ${style.structure.pricing} (urgency strip top, ✓ items with crossed-out values, "Total Value: $X,XXX", "Only $XXX")
-TRANSITIONS — ${style.structure.dividers}
 
-━━━ SHORT-FORM COPY BUDGETS (STRICT — do not exceed) ━━━
-• HERO: headline max 8 words · subheadline max 15 words · 1 CTA button
-• TRUST BAR: 4 stats, 3–4 words each
-• PROBLEM/PAIN: 3 pain points, 4–6 words each, card layout
-• FEATURES: 4–6 items MAX · each = bold name (3–5 words) + 1 short sentence · 1 CTA at bottom only
-• SOCIAL PROOF: 2 testimonials MAX · each quote = 1–2 sentences · name + role only (no lengthy bios)
-• WHO IS IT FOR: 3 bullets each side, 1 line each
-• PRICING: 4–6 value items · 1 total line · 1 price line
-• GUARANTEE: 2–3 sentences max
-• FAQ: 3 questions MAX · each answer = 1 sentence only
-• SCARCITY: bold urgency box · 2–3 lines · specific (spots/deadline) · CSS only no JS
-• FINAL CTA: 1 headline (max 8 words) + 1 button + 1 trust line
+PRICING/VALUE STACK — ${style.structure.pricing}
+Standard content: urgency strip at top, each item with crossed-out value, "Total Value: $X,XXX", "Only $XXX" in large text.
 
-━━━ TECHNICAL RULES ━━━
-• Single <!DOCTYPE html>…</html> · all CSS in <style> · system fonts · no JS
-• Mobile responsive: @media(max-width:768px)
-• CTA buttons: NEVER full-width · display:inline-block · centered via text-align:center on parent
-• Testimonials: quote + author inside the SAME card — never split
-• Features: ALL items listed FIRST, then ONE CTA at the very bottom — no mid-list CTAs
-• FOOTER: Do NOT generate a footer — server appends it. Close with </body></html> after cta-band.
-• Image seed: ${imgSeed} (hero: ${imgSeed}H · avatars: ${imgSeed}T1 ${imgSeed}T2)
-• CSS: write compact shorthand rules — keep the style block under 100 lines
-• TARGET: 250–300 lines total. Every section MUST be included and COMPLETE.
+SECTION TRANSITIONS — ${style.structure.dividers}
 
-OUTPUT: HTML only — no preamble, no markdown fences. Start with <!DOCTYPE html>.
+TRUST BAR (if in layout): 4–5 key stats in an accent-color strip.
+PROBLEM/PAIN (if in layout): 3–4 audience frustrations as cards.
+WHO THIS IS FOR (if in layout): two-column qualifier — "For you if…" vs "Not for you if…"
+GUARANTEE (if in layout): shield icon, 30-day promise, green-tinted box.
+FAQ (if in layout): 4–5 objections with real answers. Each answer 2–3 sentences.
+SCARCITY: Bold urgency section before final CTA — contrasting background, large bold text, specific availability claim. CSS only, no JS.
+FINAL CTA BAND: urgent full-width section, strong headline, primary CTA button, guarantee note.
+FOOTER: Do NOT generate a footer — it is automatically appended by the server. End with </body></html> immediately after the cta-band.
+
+━━━ COPY RULES ━━━
+• Use ONLY content from the provided marketing copy — extract real product name, prices, features, testimonials
+• If testimonials are absent, write 3 realistic ones that fit the product
+• No [brackets], no placeholders — finished copy only
+• Image seed for picsum.photos: ${imgSeed} (use ${imgSeed}H for hero, ${imgSeed}T1/${imgSeed}T2/${imgSeed}T3 for avatars)
+
+━━━ TECHNICAL ━━━
+• Single complete <!DOCTYPE html><html>…</html> document
+• All CSS in one <style> tag — no external resources
+• System fonts: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif
+• Fully mobile responsive: @media (max-width: 768px)
+• Pure HTML/CSS — no JavaScript
+• CTA buttons: NEVER full-width. Always display:inline-block with auto width, text-align:center on parent. Max-width 360px.
+• Features section: list ALL features first, then ONE CTA button at the very bottom — never mid-list.
+• Testimonials: quote text AND author name/role/avatar inside the SAME card — never split.
+
+OUTPUT: Return ONLY the HTML document. No preamble, no markdown fences. Start with <!DOCTYPE html>.
 
 ━━━ MARKETING COPY ━━━
-${copy.slice(0, 4000)}`;
+${copy.slice(0, 6000)}`;
 
-  try {
-    const model = reqModel || providerCfg.defaultModel;
-    console.log(`[mockup] calling AI provider=${provider} model=${model} style="${style.name}" layout="${layout.slice(0,60)}"`);
+  // Switch to SSE streaming so the Vercel 120s timeout never fires —
+  // the connection stays alive the entire generation
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
 
-    let rawHtml = await callAI(providerCfg, resolvedKey, model, designPrompt, 7000);
+  const sendEvent = (obj) => res.write(`data: ${JSON.stringify(obj)}\n\n`);
 
-    console.log(`[mockup] raw response length=${rawHtml?.length ?? 0} first200="${(rawHtml || '').slice(0, 200).replace(/\n/g, '\\n')}"`);
+  function processAndSend(rawHtml) {
+    rawHtml = (rawHtml || '')
+      .replace(/^```[\w]*\s*/i, '').replace(/\s*```\s*$/i, '').trim();
 
-    rawHtml = rawHtml || '';
-
-    // Strip markdown fences (all variations)
-    rawHtml = rawHtml
-      .replace(/^```[\w]*\s*/i, '')
-      .replace(/\s*```\s*$/i, '')
-      .trim();
-
-    // Extract the HTML document even if the model added preamble text
     const doctypeMatch = rawHtml.match(/<!DOCTYPE[\s\S]*/i);
     const htmlTagMatch = rawHtml.match(/<html[\s\S]*/i);
     if (doctypeMatch) rawHtml = doctypeMatch[0];
     else if (htmlTagMatch) rawHtml = htmlTagMatch[0];
 
-    // Trim anything after </html>
     const closeMatch = rawHtml.match(/[\s\S]*<\/html>/i);
     if (closeMatch) rawHtml = closeMatch[0];
 
-    console.log(`[mockup] extracted HTML length=${rawHtml.length} hasDoctype=${rawHtml.toLowerCase().startsWith('<!doctype')} hasHtmlTag=${rawHtml.toLowerCase().includes('<html')}`);
-
     if (!rawHtml || rawHtml.length < 500) {
-      console.error(`[mockup] FAIL: response too short (${rawHtml.length} chars), falling back to template`);
-      return res.json({ ok: true, html: buildTemplateHTML(copy, type), mode: 'template', fallback: true });
+      console.warn(`[mockup] response too short (${rawHtml.length} chars), falling back to template`);
+      sendEvent({ done: true, html: buildTemplateHTML(copy, type), mode: 'template', fallback: true });
+      res.write('data: [DONE]\n\n');
+      res.end();
+      return;
     }
 
-    // Always strip any incomplete AI footer and inject our own guaranteed footer
-    // Also force body scrollable in case AI set overflow:hidden
     const accent = style.palette.accent || '#3B82F6';
     const footerHtml = `
 <style>html,body{overflow:auto!important;height:auto!important;min-height:unset!important;}</style>
@@ -1529,17 +1531,13 @@ ${copy.slice(0, 4000)}`;
   </div>
 </footer>`;
 
-    // Remove any AI-generated footer first (complete or partial) to avoid duplicates
     rawHtml = rawHtml.replace(/<footer[\s\S]*?<\/footer>/gi, '');
 
-    // Now inject our footer — handle truncated HTML (no closing tags), normal HTML, or anything in between
     if (/<\/body>/i.test(rawHtml)) {
       rawHtml = rawHtml.replace(/<\/body>/i, footerHtml + '\n</body>');
     } else if (/<\/html>/i.test(rawHtml)) {
       rawHtml = rawHtml.replace(/<\/html>/i, footerHtml + '\n</body>\n</html>');
     } else {
-      // AI was truncated mid-element — find the last COMPLETE </section> so the footer
-      // doesn't get injected inside an unclosed card or div
       const lastSection = rawHtml.lastIndexOf('</section>');
       if (lastSection !== -1) {
         rawHtml = rawHtml.slice(0, lastSection + '</section>'.length) + '\n' + footerHtml + '\n</body>\n</html>';
@@ -1548,17 +1546,56 @@ ${copy.slice(0, 4000)}`;
       }
     }
 
-    console.log(`[mockup] SUCCESS: serving AI HTML (${rawHtml.length} chars)`);
-    res.json({ ok: true, html: rawHtml, mode: 'ai' });
+    console.log(`[mockup] SUCCESS: ${rawHtml.length} chars`);
+    sendEvent({ done: true, html: rawHtml, mode: 'ai' });
+    res.write('data: [DONE]\n\n');
+    res.end();
+  }
+
+  try {
+    const model = reqModel || providerCfg.defaultModel;
+    console.log(`[mockup] streaming AI provider=${provider} model=${model} style="${style.name}" layout="${layout.slice(0,60)}"`);
+
+    let rawHtml = '';
+
+    if (providerCfg.type === 'anthropic') {
+      const client = new Anthropic({ apiKey: resolvedKey });
+      const stream = client.messages.stream({
+        model, max_tokens: 10000,
+        messages: [{ role: 'user', content: designPrompt }],
+      });
+      for await (const event of stream) {
+        if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
+          rawHtml += event.delta.text;
+          sendEvent({ chunk: event.delta.text });
+        }
+      }
+    } else if (providerCfg.type === 'openai-compat') {
+      const client = new OpenAI({ apiKey: resolvedKey, baseURL: providerCfg.baseUrl });
+      const stream = await client.chat.completions.create({
+        model, max_tokens: 10000,
+        messages: [{ role: 'user', content: designPrompt }],
+        stream: true,
+      });
+      for await (const chunk of stream) {
+        const text = chunk.choices[0]?.delta?.content || '';
+        if (text) { rawHtml += text; sendEvent({ chunk: text }); }
+      }
+    } else {
+      // Gemini / Cohere: heartbeat keeps SSE alive while callAI does the work
+      const heartbeat = setInterval(() => res.write(': heartbeat\n\n'), 5000);
+      try { rawHtml = await callAI(providerCfg, resolvedKey, model, designPrompt, 8000); }
+      finally { clearInterval(heartbeat); }
+    }
+
+    processAndSend(rawHtml);
   } catch (err) {
     console.error(`[mockup] EXCEPTION: ${err.name}: ${err.message}`);
-    if (err.status) console.error(`[mockup] HTTP status: ${err.status} body: ${JSON.stringify(err.error || err.body || '')}`);
-    console.error(`[mockup] stack: ${err.stack}`);
     try {
-      return res.json({ ok: true, html: buildTemplateHTML(copy, type), mode: 'template', fallback: true });
-    } catch {
-      res.status(500).json({ error: err.message });
-    }
+      sendEvent({ done: true, html: buildTemplateHTML(copy, type), mode: 'template', fallback: true });
+      res.write('data: [DONE]\n\n');
+    } catch {}
+    res.end();
   }
 });
 

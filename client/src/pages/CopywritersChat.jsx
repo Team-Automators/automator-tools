@@ -159,6 +159,7 @@ export default function CopywritersChat() {
   // Mockup state
   const [mockup, setMockup] = useState(null) // null | { html, mode, loading }
   const [mockupMode, setMockupMode] = useState('ai')
+  const [mockupChars, setMockupChars] = useState(0)
   const [autoCycle, setAutoCycle] = useState(false)
   const [cycleCountdown, setCycleCountdown] = useState(0)
   const cycleTimerRef = useRef(null)
@@ -370,18 +371,29 @@ export default function CopywritersChat() {
 
   async function handleMockup(content, mode) {
     setMockupMode(mode)
+    setMockupChars(0)
     setMockup({ loading: true, mode, html: null, error: null })
     try {
-      const result = await api.generateMockup({
-        copy: content, type, mode,
-        provider: config?.provider,
-        apiKey:   config?.apiKey,
-        model:    config?.model,
-      })
-      if (result.html) {
-        setMockup({ html: result.html, mode, loading: false, error: null })
+      if (mode === 'ai') {
+        const result = await api.generateMockupStream(
+          { copy: content, type, mode, provider: config?.provider, apiKey: config?.apiKey, model: config?.model },
+          { onChunk: (chunk) => setMockupChars(n => n + chunk.length) }
+        )
+        if (result?.html) {
+          setMockup({ html: result.html, mode, loading: false, error: null })
+        } else {
+          setMockup({ html: null, mode, loading: false, error: 'No HTML returned' })
+        }
       } else {
-        setMockup({ html: null, mode, loading: false, error: result.error || 'No HTML returned' })
+        const result = await api.generateMockup({
+          copy: content, type, mode,
+          provider: config?.provider, apiKey: config?.apiKey, model: config?.model,
+        })
+        if (result.html) {
+          setMockup({ html: result.html, mode, loading: false, error: null })
+        } else {
+          setMockup({ html: null, mode, loading: false, error: result.error || 'No HTML returned' })
+        }
       }
     } catch (e) {
       setMockup({ html: null, mode, loading: false, error: e.message || 'Request failed' })
@@ -680,7 +692,12 @@ export default function CopywritersChat() {
               {mockup.loading ? (
                 <div className="mockup-loading">
                   <div className="typing-dots"><span/><span/><span/></div>
-                  <p>Generating AI design… this may take up to 60s</p>
+                  <p>Generating AI design…</p>
+                  {mockupChars > 0 && (
+                    <p style={{ fontSize: '.75rem', color: 'var(--sub)', marginTop: 6 }}>
+                      {mockupChars.toLocaleString()} characters generated
+                    </p>
+                  )}
                 </div>
               ) : mockup.error ? (
                 <div className="mockup-loading">
