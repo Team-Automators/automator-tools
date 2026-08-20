@@ -28,6 +28,7 @@ export default function Login() {
     const id = getLocationId()
     if (id && getSessionToken() && readAIConfig()) navigate('/', { replace: true })
     else if (id && getSessionToken()) { setLocationId(id); setStep(2) } // verified, needs API key
+    else if (id) setLocationId(id) // prefill known location (e.g. from GHL iframe URL)
   }, [navigate])
 
   async function handleLocationSubmit(e) {

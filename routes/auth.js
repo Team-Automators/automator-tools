@@ -182,6 +182,45 @@ router.post('/location-login', async (req, res) => {
   res.json({ ok: true, token, locationId, companyId: access.companyId || '' });
 });
 
+// GET /auth/diagnose?locationId=xxx — public auth diagnostic (no secrets).
+// Explains WHY a location can or cannot authenticate.
+router.get('/diagnose', async (req, res) => {
+  const locationId = (req.query.locationId || '').trim();
+  if (!locationId) return res.status(400).json({ error: 'locationId query param required' });
+
+  const [oauthDirect, installs, pit] = await Promise.all([
+    oauthStore.get(locationId).catch(() => null),
+    oauthStore.findAll().catch(() => []),
+    keyStore.get(locationId).catch(() => null),
+  ]);
+
+  let canMint = false;
+  try { canMint = !!(await locationAccess.getLocationToken(locationId)); } catch {}
+
+  let auth = { ok: false };
+  try { auth = await locationAccess.authenticateLocation(locationId); } catch (e) { auth = { ok: false, error: e.message }; }
+
+  const verdict = auth.ok
+    ? 'AUTHORIZED — login/generation should work. If it fails, re-login so a fresh session token is issued.'
+    : (installs.length === 0 && !oauthDirect)
+      ? 'NO OAUTH INSTALL — the app is not OAuth-installed on any agency. Install it on the agency account (or ask me to enable a PIT fallback).'
+      : auth.transient
+        ? 'GHL UNREACHABLE — transient error while validating. Retry.'
+        : 'NOT AUTHORIZED — this location is not under any installed agency.';
+
+  res.json({
+    locationId,
+    agencyOAuthInstalls:     installs.length,
+    hasDirectOAuthInstall:   !!oauthDirect,
+    hasPitRecord:            !!(pit?.subLocationApiKey && pit?.agencyApiKey),
+    canMintLocationToken:    canMint,
+    fullyAuthenticates:      !!auth.ok,
+    ghlValidationStatus:     auth.status || null,
+    transient:               !!auth.transient,
+    verdict,
+  });
+});
+
 // GET /auth/session — report whether the caller holds a valid session
 router.get('/session', (req, res) => {
   const claims = session.verify(readSessionToken(req));
