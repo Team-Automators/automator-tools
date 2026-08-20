@@ -1466,15 +1466,14 @@ SCARCITY: Bold urgency section before final CTA — contrasting background, larg
 FINAL CTA BAND: urgent full-width section, strong headline, primary CTA button, guarantee note.
 FOOTER: Do NOT generate a footer — it is automatically appended by the server. End with </body></html> immediately after the cta-band.
 
-━━━ COPY DEPTH: ${copyLength === 'short' ? 'SHORT-FORM — STRICT 4-SECTION PAGE' : 'LONG-FORM (rich & detailed)'} ━━━
-${copyLength === 'short' ? `MANDATORY: Build ONLY these 4 sections — nothing else:
-1. HERO: 6–8 word headline · 1 sentence subheadline · 1 CTA button
-2. FEATURES: 4 items max · bold name (3–4 words) + 1 short sentence each · 1 CTA button at bottom
-3. SOCIAL PROOF: 2 testimonials only · 1–2 sentence quote · name + role
-4. FINAL CTA BAND: 1 bold headline + 1 button + 1 trust line
-
-DO NOT include: trust bar, problem/pain, FAQ, guarantee, scarcity, who-this-is-for, pricing/value stack, or ANY other sections.
-Total page: 80–120 lines of HTML only. Be extremely concise.` : `Write thorough, persuasive, detailed copy throughout:
+━━━ COPY DEPTH: ${copyLength === 'short' ? 'SHORT-FORM (same structure as long — just concise text)' : 'LONG-FORM (rich & detailed)'} ━━━
+${copyLength === 'short' ? `Build the SAME sections in the SAME order as the SECTION ORDER above — do NOT drop or skip any section. Keep the full page structure (hero, features, social proof, and every other section in the layout: trust bar, problem/pain, who-this-is-for, pricing/value stack, guarantee, FAQ, scarcity, final CTA). The ONLY difference from a long page is the amount of text per section — keep every section tight, punchy, and scannable:
+• Hero: 6–10 word headline + ONE short subheadline (≤15 words) + 1 CTA button
+• Features: same count as the layout calls for, each = bold 2–4 word name + ONE short sentence (no multi-sentence descriptions)
+• Social proof: 2–3 testimonials, ONE short sentence each + name/role
+• Problem/pain, who-this-is-for, guarantee, FAQ, pricing, scarcity (whichever are in the layout): KEEP the section, but 1–2 lines only — a short headline plus a sentence or two, never paragraphs
+• Final CTA band: 1 bold headline + 1 button + 1 trust line
+Same visual structure and section count as a long page — just far less copy in each. Aim for ~150–220 lines of HTML.` : `Write thorough, persuasive, detailed copy throughout:
 • Hero: compelling multi-line headline + rich subheadline up to 30 words
 • Features: 5–7 items · each has a bold name + 2–3 sentence description
 • Social proof: 3 testimonials · each quote 3–5 sentences with specific results
@@ -1576,7 +1575,7 @@ ${copy.slice(0, 6000)}`;
 
     let rawHtml = '';
 
-    const maxTok = copyLength === 'short' ? 3000 : 10000;
+    const maxTok = copyLength === 'short' ? 6500 : 10000;
 
     if (providerCfg.type === 'anthropic') {
       const client = new Anthropic({ apiKey: resolvedKey });
