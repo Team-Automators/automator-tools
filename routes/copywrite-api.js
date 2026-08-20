@@ -1466,18 +1466,15 @@ SCARCITY: Bold urgency section before final CTA — contrasting background, larg
 FINAL CTA BAND: urgent full-width section, strong headline, primary CTA button, guarantee note.
 FOOTER: Do NOT generate a footer — it is automatically appended by the server. End with </body></html> immediately after the cta-band.
 
-━━━ COPY DEPTH: ${copyLength === 'short' ? 'SHORT-FORM (punchy & concise)' : 'LONG-FORM (rich & detailed)'} ━━━
-${copyLength === 'short' ? `Write tight, punchy, high-impact copy throughout. Strict budgets:
-• Hero: headline 6–8 words · subheadline max 15 words · 1 CTA button
-• Trust bar: 4 stats, 3–4 words each
-• Problem/pain: 3 pain points, 5–7 words per card
-• Features: 4–6 items · bold name (3–5 words) + 1 sentence only · 1 CTA at bottom
-• Social proof: 2 testimonials · each quote = 1–2 sentences · name + role only
-• FAQ: 3 questions MAX · each answer = 1 sentence only
-• Guarantee: 2–3 sentences max
-• Scarcity: 2 lines max
-• Final CTA: 1 headline + 1 button + 1 trust line
-Aim for 250–300 lines total.` : `Write thorough, persuasive, detailed copy throughout:
+━━━ COPY DEPTH: ${copyLength === 'short' ? 'SHORT-FORM — STRICT 4-SECTION PAGE' : 'LONG-FORM (rich & detailed)'} ━━━
+${copyLength === 'short' ? `MANDATORY: Build ONLY these 4 sections — nothing else:
+1. HERO: 6–8 word headline · 1 sentence subheadline · 1 CTA button
+2. FEATURES: 4 items max · bold name (3–4 words) + 1 short sentence each · 1 CTA button at bottom
+3. SOCIAL PROOF: 2 testimonials only · 1–2 sentence quote · name + role
+4. FINAL CTA BAND: 1 bold headline + 1 button + 1 trust line
+
+DO NOT include: trust bar, problem/pain, FAQ, guarantee, scarcity, who-this-is-for, pricing/value stack, or ANY other sections.
+Total page: 80–120 lines of HTML only. Be extremely concise.` : `Write thorough, persuasive, detailed copy throughout:
 • Hero: compelling multi-line headline + rich subheadline up to 30 words
 • Features: 5–7 items · each has a bold name + 2–3 sentence description
 • Social proof: 3 testimonials · each quote 3–5 sentences with specific results
@@ -1579,7 +1576,7 @@ ${copy.slice(0, 6000)}`;
 
     let rawHtml = '';
 
-    const maxTok = copyLength === 'short' ? 6000 : 10000;
+    const maxTok = copyLength === 'short' ? 3000 : 10000;
 
     if (providerCfg.type === 'anthropic') {
       const client = new Anthropic({ apiKey: resolvedKey });
