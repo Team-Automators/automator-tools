@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { api, getLocationId } from '../lib/api.js'
 import { useAIConfig } from '../hooks/useAIConfig.js'
 import { TYPES, TYPE_ORDER } from '../lib/types.js'
+import { confirmToast, notifySuccess } from '../lib/toast.jsx'
 
 const PAGE_SIZE = 5
 
@@ -65,6 +66,18 @@ export default function Dashboard() {
 
   function setPage(type, page) {
     setPages(prev => ({ ...prev, [type]: page }))
+  }
+
+  async function deleteCopy(e, copyId) {
+    e.stopPropagation()
+    if (!(await confirmToast('Move this conversation to Archive? You can restore it later.', { confirmText: 'Archive', danger: false }))) return
+    setData(prev => prev ? {
+      ...prev,
+      recentCopies: (prev.recentCopies || []).filter(c => c.id !== copyId),
+      totalCopies: Math.max(0, (prev.totalCopies ?? 1) - 1),
+    } : prev)
+    await api.deleteCopy(copyId).catch(() => {})   // soft-delete → archived
+    notifySuccess('Moved to Archive')
   }
 
   if (loading) {
@@ -214,7 +227,19 @@ export default function Dashboard() {
                               <div className="recent-preview">{copy.preview}</div>
                             )}
                           </div>
-                          <div className="recent-meta">{relTime(copy.updatedAt)}</div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                            <div className="recent-meta">{relTime(copy.updatedAt)}</div>
+                            <button
+                              className="btn btn-ghost btn-sm"
+                              style={{ color: 'var(--danger)', padding: '4px 6px', minHeight: 'auto' }}
+                              onClick={e => deleteCopy(e, copy.id)}
+                              title="Archive"
+                            >
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="14" height="14">
+                                <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                              </svg>
+                            </button>
+                          </div>
                         </div>
                       )
                     })}
