@@ -13,6 +13,17 @@ const STATUS_OPTS = [
 ]
 const STATUS_META = Object.fromEntries(STATUS_OPTS.map(s => [s.value, s]))
 
+function mockupEstimate(mode, type, copyLength) {
+  if (mode !== 'ai') return null
+  let base = type === 'webinar' ? 45 : 30
+  if (copyLength === 'short') base = Math.round(base * 0.65)
+  return { low: Math.max(8, Math.round(base * 0.6)), high: Math.round(base * 1.6) }
+}
+function mockupTargetChars(type, copyLength) {
+  if (copyLength === 'short') return 8000
+  return type === 'webinar' ? 20000 : 14000
+}
+
 function useAutoResize(ref) {
   return function resize() {
     if (!ref.current) return
@@ -161,6 +172,7 @@ export default function LibraryChat() {
   const [mockup, setMockup] = useState(null)
   const [mockupMode, setMockupMode] = useState('ai')
   const [mockupChars, setMockupChars] = useState(0)
+  const [mockupElapsed, setMockupElapsed] = useState(0)
   const [copyLength, setCopyLength] = useState('long')
   const [autoCycle, setAutoCycle] = useState(false)
   const [cycleCountdown, setCycleCountdown] = useState(0)
@@ -218,6 +230,14 @@ export default function LibraryChat() {
       clearInterval(countdownRef.current)
     }
   }, [autoCycle, mockup?.html, mockup?.loading])
+
+  useEffect(() => {
+    if (!mockup?.loading) return
+    setMockupElapsed(0)
+    const started = Date.now()
+    const iv = setInterval(() => setMockupElapsed(Math.floor((Date.now() - started) / 1000)), 500)
+    return () => clearInterval(iv)
+  }, [mockup?.loading])
 
   useEffect(() => {
     if (!mockup) {
@@ -701,12 +721,34 @@ export default function LibraryChat() {
               {mockup.loading ? (
                 <div className="mockup-loading">
                   <div className="typing-dots"><span/><span/><span/></div>
-                  <p>Generating AI design…</p>
-                  {mockupChars > 0 && (
-                    <p style={{ fontSize: '.75rem', color: 'var(--sub)', marginTop: 6 }}>
-                      {mockupChars.toLocaleString()} characters generated
-                    </p>
-                  )}
+                  <p>Generating {mockup.mode === 'ai' ? 'AI design' : 'design'}…</p>
+                  {(() => {
+                    const t = copy?.type || 'general'
+                    const est = mockupEstimate(mockup.mode, t, copyLength)
+                    if (!est) return null
+                    const target = mockupTargetChars(t, copyLength)
+                    const pct = Math.min(96, Math.max(mockupChars > 0 ? 5 : 0, Math.round((mockupChars / target) * 100)))
+                    return (
+                      <div style={{ width: 260, marginTop: 8 }}>
+                        <p style={{ fontSize: '.78rem', color: 'var(--sub)', textAlign: 'center', marginBottom: 8 }}>
+                          Usually ~{est.low}–{est.high}s · <strong style={{ color: 'var(--text)' }}>{mockupElapsed}s</strong> elapsed
+                        </p>
+                        <div style={{ height: 6, background: 'var(--border)', borderRadius: 99, overflow: 'hidden' }}>
+                          <div style={{ height: '100%', width: `${pct}%`, background: 'var(--accent)', borderRadius: 99, transition: 'width .4s ease' }} />
+                        </div>
+                        {mockupChars > 0 && (
+                          <p style={{ fontSize: '.72rem', color: 'var(--sub)', textAlign: 'center', marginTop: 6 }}>
+                            {mockupChars.toLocaleString()} characters
+                          </p>
+                        )}
+                        {mockupElapsed > est.high && (
+                          <p style={{ fontSize: '.72rem', color: 'var(--sub)', textAlign: 'center', marginTop: 4 }}>
+                            Taking longer than usual — almost there…
+                          </p>
+                        )}
+                      </div>
+                    )
+                  })()}
                 </div>
               ) : mockup.error ? (
                 <div className="mockup-loading">
