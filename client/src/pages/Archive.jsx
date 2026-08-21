@@ -16,14 +16,48 @@ export default function Archive() {
   const [items, setItems]     = useState([])
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId]   = useState(null)
+  const [selected, setSelected] = useState(() => new Set())
 
   async function load() {
     setLoading(true)
     const list = await api.getArchivedCopies()
     setItems(Array.isArray(list) ? list : [])
+    setSelected(new Set())
     setLoading(false)
   }
   useEffect(() => { load() }, [])
+
+  const allSelected = items.length > 0 && selected.size === items.length
+
+  function toggle(id) {
+    setSelected(prev => {
+      const n = new Set(prev)
+      n.has(id) ? n.delete(id) : n.add(id)
+      return n
+    })
+  }
+  function toggleAll() {
+    setSelected(allSelected ? new Set() : new Set(items.map(i => i.id)))
+  }
+
+  async function bulkRestore() {
+    const ids = [...selected]
+    if (!ids.length) return
+    setItems(prev => prev.filter(i => !selected.has(i.id)))
+    setSelected(new Set())
+    await Promise.all(ids.map(id => api.setCopyStatus(id, 'in-progress').catch(() => {})))
+    notifySuccess(`Restored ${ids.length} conversation${ids.length !== 1 ? 's' : ''}`)
+  }
+
+  async function bulkDelete() {
+    const ids = [...selected]
+    if (!ids.length) return
+    if (!(await confirmToast(`Permanently delete ${ids.length} conversation${ids.length !== 1 ? 's' : ''}? This cannot be undone.`, { confirmText: 'Delete' }))) return
+    setItems(prev => prev.filter(i => !selected.has(i.id)))
+    setSelected(new Set())
+    await Promise.all(ids.map(id => api.purgeCopy(id).catch(() => {})))
+    notifySuccess(`Deleted ${ids.length} conversation${ids.length !== 1 ? 's' : ''}`)
+  }
 
   function openCopy(item) {
     const cust = item.customerId || '_unsorted'
@@ -79,14 +113,35 @@ export default function Archive() {
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {/* Bulk toolbar */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '4px 4px 8px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '.8rem', color: 'var(--sub)', cursor: 'pointer' }}>
+                <input type="checkbox" checked={allSelected} onChange={toggleAll} />
+                {selected.size > 0 ? `${selected.size} selected` : 'Select all'}
+              </label>
+              {selected.size > 0 && (
+                <div style={{ display: 'flex', gap: 8, marginLeft: 'auto' }}>
+                  <button className="btn btn-secondary btn-sm" onClick={bulkRestore}>Restore selected</button>
+                  <button className="btn btn-ghost btn-sm" style={{ color: 'var(--danger)' }} onClick={bulkDelete}>Delete selected</button>
+                </div>
+              )}
+            </div>
+
             {items.map(item => (
               <div
                 key={item.id}
                 className="card"
-                style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, cursor: 'pointer' }}
+                style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, cursor: 'pointer', borderColor: selected.has(item.id) ? 'var(--accent)' : undefined }}
                 onClick={() => openCopy(item)}
               >
-                <div style={{ minWidth: 0 }}>
+                <input
+                  type="checkbox"
+                  checked={selected.has(item.id)}
+                  onClick={e => e.stopPropagation()}
+                  onChange={() => toggle(item.id)}
+                  style={{ flexShrink: 0 }}
+                />
+                <div style={{ minWidth: 0, flex: 1 }}>
                   <div style={{ fontWeight: 700, fontSize: '.9375rem', color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {item.title || 'Untitled conversation'}
                   </div>
