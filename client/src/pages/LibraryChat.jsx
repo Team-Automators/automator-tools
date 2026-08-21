@@ -5,6 +5,13 @@ import { TYPES } from '../lib/types.js'
 import { PROVIDERS } from '../lib/providers.js'
 import { useAIConfig } from '../hooks/useAIConfig.js'
 
+const STATUS_OPTS = [
+  { value: 'draft',       label: 'Draft',       color: '#64748B', bg: 'rgba(100,116,139,.14)' },
+  { value: 'in-progress', label: 'In Progress', color: '#2563EB', bg: 'rgba(37,99,235,.14)' },
+  { value: 'completed',   label: 'Completed',   color: '#16A34A', bg: 'rgba(22,163,74,.14)' },
+]
+const STATUS_META = Object.fromEntries(STATUS_OPTS.map(s => [s.value, s]))
+
 function useAutoResize(ref) {
   return function resize() {
     if (!ref.current) return
@@ -481,6 +488,27 @@ export default function LibraryChat() {
           </span>
         </div>
         <div className="topnav-right" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+
+          {/* Status picker */}
+          <select
+            className="form-input form-select"
+            value={STATUS_META[copy?.status] ? copy.status : 'in-progress'}
+            onChange={e => {
+              const status = e.target.value
+              setCopy(c => c ? { ...c, status } : c)
+              api.setCopyStatus(copyId, status).catch(() => {})
+            }}
+            title="Status"
+            style={{
+              width: 'auto', minHeight: 'auto', padding: '4px 24px 4px 10px',
+              fontSize: '.72rem', fontWeight: 700,
+              color: (STATUS_META[copy?.status] || STATUS_META['in-progress']).color,
+              background: (STATUS_META[copy?.status] || STATUS_META['in-progress']).bg,
+              border: 'none', borderRadius: 99,
+            }}
+          >
+            {STATUS_OPTS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+          </select>
 
           {/* Short / Long copy toggle */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>

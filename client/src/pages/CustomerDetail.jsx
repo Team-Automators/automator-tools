@@ -46,6 +46,8 @@ export default function CustomerDetail() {
   const [renaming, setRenaming]   = useState(false)
   const [renameVal, setRenameVal] = useState('')
 
+  const [statusFilter, setStatusFilter] = useState('all')
+
   async function load() {
     if (isUnsorted) {
       const [allCopies, custs] = await Promise.all([api.getCopies(), api.getCustomers()])
@@ -152,9 +154,19 @@ export default function CustomerDetail() {
     load()
   }
 
-  // Group copies by type
+  // Status filter, then group by type
+  const visibleCopies = statusFilter === 'all'
+    ? copies
+    : copies.filter(c => (c.status || 'in-progress') === statusFilter)
+
+  const statusCounts = copies.reduce((m, c) => {
+    const s = STATUS_META[c.status] ? c.status : 'in-progress'
+    m[s] = (m[s] || 0) + 1
+    return m
+  }, {})
+
   const grouped = {}
-  copies.forEach(c => {
+  visibleCopies.forEach(c => {
     const t = c.type || 'general'
     if (!grouped[t]) grouped[t] = []
     grouped[t].push(c)
@@ -224,6 +236,30 @@ export default function CustomerDetail() {
             <div className="page-sub">{copies.length} saved copy piece{copies.length !== 1 ? 's' : ''}</div>
           </div>
         </div>
+
+        {/* Status filter */}
+        {copies.length > 0 && (
+          <div style={{ display: 'flex', gap: 8, marginBottom: 18, flexWrap: 'wrap' }}>
+            {[{ value: 'all', label: 'All', color: 'var(--text)', bg: 'var(--surface)' }, ...STATUS_OPTS].map(f => {
+              const active = statusFilter === f.value
+              const count = f.value === 'all' ? copies.length : (statusCounts[f.value] || 0)
+              return (
+                <button
+                  key={f.value}
+                  onClick={() => setStatusFilter(f.value)}
+                  style={{
+                    fontSize: '.75rem', fontWeight: 700, padding: '5px 12px', borderRadius: 99, cursor: 'pointer',
+                    border: active ? `1px solid ${f.color}` : '1px solid var(--border)',
+                    color: active ? f.color : 'var(--sub)',
+                    background: active ? f.bg : 'transparent',
+                  }}
+                >
+                  {f.label} {count > 0 && <span style={{ opacity: .7 }}>({count})</span>}
+                </button>
+              )
+            })}
+          </div>
+        )}
 
         {/* Tasks linked to this customer */}
         {tasks.length > 0 && (
@@ -312,6 +348,11 @@ export default function CustomerDetail() {
             <button className="btn btn-primary mt-2" onClick={() => goCopywriters('email')}>
               Open Copywriters
             </button>
+          </div>
+        ) : visibleCopies.length === 0 ? (
+          <div className="empty-state">
+            <div className="empty-sub">No conversations with “{STATUS_META[statusFilter]?.label || statusFilter}” status.</div>
+            <button className="btn btn-secondary mt-2" onClick={() => setStatusFilter('all')}>Show all</button>
           </div>
         ) : (
           TYPE_ORDER.filter(t => grouped[t]).map(typeKey => {

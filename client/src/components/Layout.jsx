@@ -3,6 +3,15 @@ import { useState, useRef, useEffect } from 'react'
 import { useLocationId } from '../hooks/useLocationId.js'
 import { useAIConfig } from '../hooks/useAIConfig.js'
 import { getLocationId } from '../lib/api.js'
+import { getSessionClaims } from '../lib/session.js'
+
+function userInitials(name, email) {
+  const src = (name || email || '').trim()
+  if (!src) return 'ME'
+  const parts = src.split(/\s+/)
+  if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+  return src.slice(0, 2).toUpperCase()
+}
 
 const NAV_ITEMS = [
   {
@@ -119,7 +128,9 @@ export default function Layout() {
   }, [])
 
   const locationId = getLocationId()
-  const initials = locationId ? locationId.slice(0, 2).toUpperCase() : 'GL'
+  const user = getSessionClaims()
+  const userName = user?.name || user?.email || ''
+  const initials = user ? userInitials(user.name, user.email) : (locationId ? locationId.slice(0, 2).toUpperCase() : 'GL')
 
   function isActive(item) {
     const path = window.location.pathname
@@ -170,7 +181,12 @@ export default function Layout() {
           <div className="sb-user" onClick={() => setMenuOpen(v => !v)}>
             <div className="sb-avatar"><span>{initials}</span></div>
             <div className="sb-user-info">
-              <div className="sb-user-name">{locationName || 'My Location'}</div>
+              <div className="sb-user-name">{userName || locationName || 'My Location'}</div>
+              {userName && (
+                <div style={{ fontSize: '.72rem', color: 'var(--sub)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {locationName || 'Location'}
+                </div>
+              )}
             </div>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="2">
               <circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/>
