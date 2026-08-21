@@ -32,7 +32,7 @@ function mockupTargetChars(type, copyLength) {
 function webinarLandingContent(messages) {
   const assistants = (messages || []).filter(m => m.role === 'assistant' && m.content)
   const re = /reserve|what\s*you'?ll\s*learn|free to attend|save (my|your) (seat|spot)|register (now|free)|100% free/i
-  const landing = assistants.find(m => re.test(m.content))
+  const landing = [...assistants].reverse().find(m => re.test(m.content)) // latest landing-page reply
   return landing?.content || assistants[assistants.length >= 2 ? 1 : 0]?.content || ''
 }
 

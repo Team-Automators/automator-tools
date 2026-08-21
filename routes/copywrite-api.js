@@ -1437,10 +1437,11 @@ router.post('/mockup', async (req, res) => {
     'hero → problem-pain → features-what-you-get → social-proof → guarantee → pricing-value-stack → faq → scarcity → cta-band',
   ];
 
-  // Webinar funnels are a registration/opt-in page (with a form), not a sales page.
+  // Webinar funnels are a lean registration/opt-in page (with a form) — keep it
+  // short so the preview generates quickly.
   const WEBINAR_LAYOUTS = [
-    'hero-with-registration-form → what-you-will-learn → presenter-bio → who-this-is-for → social-proof → agenda → scarcity-countdown → final-cta-with-form',
-    'hero-with-registration-form → problem-pain → what-you-will-learn → presenter-bio → social-proof → scarcity-countdown → final-cta-with-form',
+    'hero-with-registration-form → what-you-will-learn → presenter-bio → social-proof → final-cta-with-form',
+    'hero-with-registration-form → what-you-will-learn → social-proof → final-cta-with-form',
   ];
 
   const isWebinar = type === 'webinar';
