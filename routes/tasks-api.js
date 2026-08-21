@@ -49,14 +49,11 @@ router.put('/:id', async (req, res) => {
     if (task.customerId && fields.stage !== undefined) {
       fireHooks(locationId, task, null).catch(() => {});
     }
-    // Push stage change comment to ClickUp
+    // Announce the stage change to ClickUp — DON'T re-post the last note here,
+    // or a note already pushed under its old stage gets duplicated under the new
+    // one. Notes are pushed once, with their own current stage, on note-add.
     if (task.clickupTaskId && fields.stage !== undefined) {
-      const label = stageLabel(task.stage);
-      const lastNote = Array.isArray(task.notes) && task.notes.length
-        ? task.notes[task.notes.length - 1].text
-        : '';
-      const body = lastNote ? `${label}: ${lastNote}` : `${label}: Stage updated`;
-      pushToClickUp(locationId, task.clickupTaskId, body).catch(() => {});
+      pushToClickUp(locationId, task.clickupTaskId, `Stage changed to ${stageLabel(task.stage)}`).catch(() => {});
     }
   } catch (e) {
     res.status(500).json({ error: e.message });
