@@ -11,12 +11,38 @@ function initials(name) {
     : name.slice(0, 2).toUpperCase()
 }
 
+const STATUS_META = {
+  'draft':       { label: 'Draft',       color: '#64748B', bg: 'rgba(100,116,139,.14)' },
+  'in-progress': { label: 'In Progress', color: '#2563EB', bg: 'rgba(37,99,235,.14)' },
+  'completed':   { label: 'Completed',   color: '#16A34A', bg: 'rgba(22,163,74,.14)' },
+}
+const STATUS_ORDER = ['in-progress', 'completed', 'draft']
+
+// Small colored status pills for a folder tile's { status: count } map.
+function StatusPills({ counts }) {
+  const entries = STATUS_ORDER.filter(s => counts?.[s])
+  if (!entries.length) return null
+  return (
+    <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 8 }}>
+      {entries.map(s => (
+        <span key={s} style={{
+          fontSize: '.65rem', fontWeight: 700, padding: '2px 7px', borderRadius: 99,
+          color: STATUS_META[s].color, background: STATUS_META[s].bg,
+        }}>
+          {counts[s]} {STATUS_META[s].label}
+        </span>
+      ))}
+    </div>
+  )
+}
+
 export default function Library() {
   const navigate = useNavigate()
   const locationId = getLocationId()
 
   const [customers, setCustomers] = useState([])
   const [counts, setCounts] = useState({})
+  const [statusMap, setStatusMap] = useState({})   // customerId -> { status: count }
   const [unsortedCount, setUnsortedCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -45,15 +71,18 @@ export default function Library() {
     setCustomers(Array.isArray(custs) ? custs : [])
 
     const cmap = {}
+    const smap = {}
     let unsorted = 0
     ;(Array.isArray(copies) ? copies : []).forEach(c => {
-      if (!c.customerId || c.customerId === '_unsorted') {
-        unsorted++
-      } else {
-        cmap[c.customerId] = (cmap[c.customerId] || 0) + 1
-      }
+      const cid = (!c.customerId || c.customerId === '_unsorted') ? '_unsorted' : c.customerId
+      if (cid === '_unsorted') unsorted++
+      else cmap[cid] = (cmap[cid] || 0) + 1
+      const s = STATUS_META[c.status] ? c.status : 'in-progress'
+      smap[cid] = smap[cid] || {}
+      smap[cid][s] = (smap[cid][s] || 0) + 1
     })
     setCounts(cmap)
+    setStatusMap(smap)
     setUnsortedCount(unsorted)
 
     const taskList = Array.isArray(tasks) ? tasks : []
@@ -226,6 +255,7 @@ export default function Library() {
                 <div className="customer-avatar" style={{ fontSize: '1.25rem' }}>📂</div>
                 <div className="customer-name">Unsorted</div>
                 <div className="customer-meta">{unsortedCount} saved copy piece{unsortedCount !== 1 ? 's' : ''}</div>
+                <StatusPills counts={statusMap['_unsorted']} />
               </div>
             )}
 
@@ -281,6 +311,7 @@ export default function Library() {
                 )}
                 {c.email && <div className="customer-meta">{c.email}</div>}
                 <div className="customer-meta">{counts[c.id] || 0} copy piece{counts[c.id] !== 1 ? 's' : ''}</div>
+                <StatusPills counts={statusMap[c.id]} />
                 {taskCounts[c.id] > 0 && (
                   <button
                     className="lib-task-badge"
