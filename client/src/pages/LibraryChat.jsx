@@ -21,7 +21,15 @@ function mockupEstimate(mode, type, copyLength) {
 }
 function mockupTargetChars(type, copyLength) {
   if (copyLength === 'short') return 8000
-  return type === 'webinar' ? 20000 : 14000
+  return 14000
+}
+
+// The landing-page reply in a webinar conversation (not the intake/emails/pitch/offer).
+function webinarLandingContent(messages) {
+  const assistants = (messages || []).filter(m => m.role === 'assistant' && m.content)
+  const re = /reserve|what\s*you'?ll\s*learn|free to attend|save (my|your) (seat|spot)|register (now|free)|100% free/i
+  const landing = assistants.find(m => re.test(m.content))
+  return landing?.content || assistants[assistants.length >= 2 ? 1 : 0]?.content || ''
 }
 
 function useAutoResize(ref) {
@@ -276,6 +284,10 @@ export default function LibraryChat() {
   }
 
   async function handleMockup(content, mode) {
+    if ((copy?.type || '') === 'webinar') {
+      const landing = webinarLandingContent(messages)
+      if (landing) content = landing
+    }
     setMockupMode(mode)
     setMockupChars(0)
     setMockup({ loading: true, mode, html: null, error: null })

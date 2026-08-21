@@ -1618,9 +1618,7 @@ ${copy.slice(0, 6000)}`;
 
     let rawHtml = '';
 
-    // Webinar pages carry a form (twice) + countdown, so they need more headroom
-    // to finish rendering before the token cap truncates them.
-    const maxTok = copyLength === 'short' ? 6500 : (isWebinar ? 12000 : 10000);
+    const maxTok = copyLength === 'short' ? 6500 : 10000;
 
     if (providerCfg.type === 'anthropic') {
       const client = new Anthropic({ apiKey: resolvedKey });
