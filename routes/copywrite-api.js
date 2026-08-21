@@ -1595,16 +1595,22 @@ ${copy.slice(0, 6000)}`;
 
     rawHtml = rawHtml.replace(/<footer[\s\S]*?<\/footer>/gi, '');
 
+    // Escape any dangling open containers so the footer lands at the body level
+    // (a bottom bar), not nested inside an unclosed div/section. Extra unmatched
+    // closing tags are ignored by the browser, so this is safe for valid pages.
+    // The overflow style is repeated here (body-level, after the escapes, so it
+    // can't leak as text) in case the <head> injection missed.
+    const footerBlock = '</div></div></div></div></div></section>\n' + overflowStyle + '\n' + footerHtml;
+
     if (/<\/body>/i.test(rawHtml)) {
-      rawHtml = rawHtml.replace(/<\/body>/i, footerHtml + '\n</body>');
+      rawHtml = rawHtml.replace(/<\/body>/i, footerBlock + '\n</body>');
     } else if (/<\/html>/i.test(rawHtml)) {
-      rawHtml = rawHtml.replace(/<\/html>/i, footerHtml + '\n</body>\n</html>');
+      rawHtml = rawHtml.replace(/<\/html>/i, footerBlock + '\n</body>\n</html>');
     } else {
-      // Truncated output — drop any trailing incomplete tag so the footer can't
-      // get absorbed/mis-parsed, then close the document.
-      const lastClose = Math.max(rawHtml.lastIndexOf('</section>'), rawHtml.lastIndexOf('</div>'));
+      // Truncated output — drop any trailing incomplete tag, then close cleanly.
+      const lastClose = Math.max(rawHtml.lastIndexOf('</section>'), rawHtml.lastIndexOf('</div>'), rawHtml.lastIndexOf('</p>'));
       if (lastClose !== -1) rawHtml = rawHtml.slice(0, rawHtml.indexOf('>', lastClose) + 1);
-      rawHtml += footerHtml + '\n</body>\n</html>';
+      rawHtml += footerBlock + '\n</body>\n</html>';
     }
 
     console.log(`[mockup] SUCCESS: ${rawHtml.length} chars`);
