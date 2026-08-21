@@ -1529,7 +1529,8 @@ Aim for 450–600 lines total — a fully fleshed-out, high-converting page.`}
 
 ━━━ TECHNICAL ━━━
 • Single complete <!DOCTYPE html><html>…</html> document
-• All CSS in one <style> tag — no external resources
+• Put ALL CSS in ONE <style> tag using reusable CLASSES. Do NOT put style="…" inline on elements — inline styles bloat the output and cause the page to get CUT OFF before it finishes. Define classes once, reuse them.
+• KEEP THE MARKUP LEAN and COMPLETE the entire page through to the end — every section must be present. Concise HTML so the whole page fits; never stop early.
 • System fonts: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif
 • Fully mobile responsive: @media (max-width: 768px)
 • Pure HTML/CSS — no JavaScript
@@ -1625,7 +1626,7 @@ ${copy.slice(0, 6000)}`;
 
     let rawHtml = '';
 
-    const maxTok = copyLength === 'short' ? 6500 : 10000;
+    const maxTok = copyLength === 'short' ? 6500 : (isWebinar ? 14000 : 10000);
 
     if (providerCfg.type === 'anthropic') {
       const client = new Anthropic({ apiKey: resolvedKey });
