@@ -1065,7 +1065,9 @@ router.post('/analyze-voice', async (req, res) => {
   const providerCfg = PROVIDER_MAP[provider];
   if (!providerCfg) return res.status(400).json({ error: `Unknown provider: ${provider}` });
 
-  const idx = await copyStore.getCopyIndex(locationId).catch(() => []);
+  // Don't train brand voice on archived copies.
+  const idx = (await copyStore.getCopyIndex(locationId).catch(() => []))
+    .filter(c => (c.status || 'in-progress') !== 'archived');
   if (idx.length < 2) {
     return res.json({ ok: true, skipped: true, reason: 'Save at least 2 copies first' });
   }

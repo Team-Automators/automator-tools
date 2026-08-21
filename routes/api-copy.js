@@ -4,6 +4,16 @@ const copyStore  = require('../lib/copy-store');
 const tasksStore = require('../lib/tasks-store');
 const hooksStore = require('../lib/hooks-store');
 
+// Load a copy the caller is allowed to touch: same location AND (owned by the
+// caller OR legacy with no owner). Returns null otherwise → callers 404.
+async function ownedCopy(copyId, req) {
+  const copy = await copyStore.getCopy(copyId);
+  if (!copy) return null;
+  if (req.locationId && copy.locationId !== req.locationId) return null;
+  if (copy.ownerUserId && req.userId && copy.ownerUserId !== req.userId) return null;
+  return copy;
+}
+
 // GET /api/customers?locationId=
 router.get('/customers', async (req, res) => {
   const { locationId } = req.query;
@@ -55,7 +65,11 @@ router.delete('/customers/:id', async (req, res) => {
   const { locationId } = req.query;
   if (!locationId) return res.status(400).json({ error: 'locationId required' });
   try {
-    await copyStore.deleteCustomer(locationId, req.params.id);
+    await copyStore.deleteCustomer(locationId, req.params.id);   // copies → Unsorted
+    await Promise.all([
+      tasksStore.detachCustomer(locationId, req.params.id).catch(() => {}),
+      hooksStore.detachCustomer(locationId, req.params.id).catch(() => {}),
+    ]);
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -93,12 +107,8 @@ router.get('/copies', async (req, res) => {
 // GET /api/copies/:id
 router.get('/copies/:id', async (req, res) => {
   try {
-    const copy = await copyStore.getCopy(req.params.id);
+    const copy = await ownedCopy(req.params.id, req);   // location + owner scoped
     if (!copy) return res.status(404).json({ error: 'Not found' });
-    // Scope to the session's location — never return another tenant's copy.
-    if (req.locationId && copy.locationId !== req.locationId) {
-      return res.status(404).json({ error: 'Not found' });
-    }
     res.json(copy);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -131,6 +141,7 @@ router.put('/copies/:id/status', async (req, res) => {
     return res.status(400).json({ error: `status must be one of: ${copyStore.STATUSES.join(', ')}` });
   }
   try {
+    if (!(await ownedCopy(req.params.id, req))) return res.status(404).json({ error: 'Not found' });
     const copy = await copyStore.updateStatus(req.params.id, locationId, status);
     if (!copy) return res.status(404).json({ error: 'Not found' });
     res.json(copy);
@@ -146,6 +157,7 @@ router.put('/copies/:id', async (req, res) => {
     return res.status(400).json({ error: 'locationId and messages required' });
   }
   try {
+    if (!(await ownedCopy(req.params.id, req))) return res.status(404).json({ error: 'Not found' });
     const opts = {};
     if (customerId   !== undefined) opts.customerId   = customerId;
     if (customerName !== undefined) opts.customerName = customerName;
@@ -164,6 +176,7 @@ router.delete('/copies/:id', async (req, res) => {
   const { locationId, permanent } = req.query;
   if (!locationId) return res.status(400).json({ error: 'locationId required' });
   try {
+    if (!(await ownedCopy(req.params.id, req))) return res.status(404).json({ error: 'Not found' });
     if (permanent === 'true') {
       await copyStore.deleteCopy(req.params.id, locationId);
       return res.json({ ok: true, permanent: true });
