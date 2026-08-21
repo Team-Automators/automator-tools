@@ -1571,8 +1571,15 @@ ${copy.slice(0, 6000)}`;
     }
 
     const accent = style.palette.accent || '#3B82F6';
+
+    // Overflow fix goes in <head> — a <style> injected in the body leaks as
+    // visible CSS text when the AI output is truncated. Head is generated first
+    // and is essentially always complete, so this is reliable.
+    const overflowStyle = '<style>html,body{overflow:auto!important;height:auto!important;min-height:unset!important;}</style>';
+    if (/<\/head>/i.test(rawHtml))      rawHtml = rawHtml.replace(/<\/head>/i, overflowStyle + '</head>');
+    else if (/<head[^>]*>/i.test(rawHtml)) rawHtml = rawHtml.replace(/(<head[^>]*>)/i, `$1${overflowStyle}`);
+
     const footerHtml = `
-<style>html,body{overflow:auto!important;height:auto!important;min-height:unset!important;}</style>
 <footer style="background:#0F172A;padding:48px 24px;text-align:center;border-top:3px solid ${accent};margin-top:0;">
   <div style="max-width:900px;margin:0 auto;">
     <div style="font-size:1.1rem;font-weight:800;color:#F1F5F9;margin-bottom:6px;letter-spacing:-.01em;">© ${new Date().getFullYear()} · All Rights Reserved</div>
@@ -1592,12 +1599,11 @@ ${copy.slice(0, 6000)}`;
     } else if (/<\/html>/i.test(rawHtml)) {
       rawHtml = rawHtml.replace(/<\/html>/i, footerHtml + '\n</body>\n</html>');
     } else {
-      const lastSection = rawHtml.lastIndexOf('</section>');
-      if (lastSection !== -1) {
-        rawHtml = rawHtml.slice(0, lastSection + '</section>'.length) + '\n' + footerHtml + '\n</body>\n</html>';
-      } else {
-        rawHtml += footerHtml + '\n</body>\n</html>';
-      }
+      // Truncated output — drop any trailing incomplete tag so the footer can't
+      // get absorbed/mis-parsed, then close the document.
+      const lastClose = Math.max(rawHtml.lastIndexOf('</section>'), rawHtml.lastIndexOf('</div>'));
+      if (lastClose !== -1) rawHtml = rawHtml.slice(0, rawHtml.indexOf('>', lastClose) + 1);
+      rawHtml += footerHtml + '\n</body>\n</html>';
     }
 
     console.log(`[mockup] SUCCESS: ${rawHtml.length} chars`);
@@ -1612,7 +1618,9 @@ ${copy.slice(0, 6000)}`;
 
     let rawHtml = '';
 
-    const maxTok = copyLength === 'short' ? 6500 : 10000;
+    // Webinar pages carry a form (twice) + countdown, so they need more headroom
+    // to finish rendering before the token cap truncates them.
+    const maxTok = copyLength === 'short' ? 6500 : (isWebinar ? 12000 : 10000);
 
     if (providerCfg.type === 'anthropic') {
       const client = new Anthropic({ apiKey: resolvedKey });
