@@ -1437,8 +1437,17 @@ router.post('/mockup', async (req, res) => {
     'hero → problem-pain → features-what-you-get → social-proof → guarantee → pricing-value-stack → faq → scarcity → cta-band',
   ];
 
-  const style   = STYLES[Math.floor(Math.random() * STYLES.length)];
-  const layout  = LAYOUTS[Math.floor(Math.random() * LAYOUTS.length)];
+  // Webinar funnels are a registration/opt-in page (with a form), not a sales page.
+  const WEBINAR_LAYOUTS = [
+    'hero-with-registration-form → what-you-will-learn → presenter-bio → who-this-is-for → social-proof → agenda → scarcity-countdown → final-cta-with-form',
+    'hero-with-registration-form → problem-pain → what-you-will-learn → presenter-bio → social-proof → scarcity-countdown → final-cta-with-form',
+  ];
+
+  const isWebinar = type === 'webinar';
+  const style  = STYLES[Math.floor(Math.random() * STYLES.length)];
+  const layout = isWebinar
+    ? WEBINAR_LAYOUTS[Math.floor(Math.random() * WEBINAR_LAYOUTS.length)]
+    : LAYOUTS[Math.floor(Math.random() * LAYOUTS.length)];
   const imgSeed = clientSeed ? String(clientSeed).slice(-6) : Math.random().toString(36).slice(2, 8);
   const genId   = clientSeed || Date.now();
 
@@ -1458,6 +1467,19 @@ Hero gradient: ${style.hero}
 
 ━━━ SECTION ORDER ━━━
 Build in this exact sequence: ${layout}
+${isWebinar ? `
+━━━ WEBINAR REGISTRATION FUNNEL — REGISTRATION FORM REQUIRED ━━━
+This is a WEBINAR REGISTRATION page (opt-in funnel), NOT a sales page. Build it accordingly:
+• HERO: transformation headline + subheadline, then the webinar DATE & TIME shown prominently, then a REGISTRATION FORM placed directly in the hero — a clean card (max-width 440px) containing a "First Name" text input and an "Email Address" input stacked vertically, and a large full-width submit button using the accent color (e.g. "Reserve My Free Spot"). Add a small "100% free · limited seats" reassurance under the button.
+• Include a COUNTDOWN / urgency element near the form (CSS only — static numbers styled as DD : HH : MM : SS boxes). No JavaScript.
+• WHAT YOU'LL LEARN: 3–5 curiosity bullets ("Secret #1: …"), each as its own row with a check/number marker.
+• PRESENTER BIO: presenter photo (https://picsum.photos/seed/${imgSeed}P/300/300), name, and a short authority paragraph.
+• AGENDA (if in layout): 3–4 timestamped points of what happens on the webinar.
+• Repeat the SAME registration form in the FINAL CTA section.
+• Do NOT include pricing or a value stack — a webinar registration is FREE. Where a sales page would show pricing, instead reassure "It's 100% free to attend — just save your seat."
+• Style the form inputs cleanly: full width inside the card, padding ~12px, 1px borders, rounded 8px, readable labels/placeholders. The form is VISUAL ONLY — no JavaScript, no real submission, no action attribute needed.
+FORM BUTTON EXCEPTION: the registration form's submit button SHOULD be full-width inside its form card (this overrides the general 'CTA buttons never full-width' rule, which still applies to non-form buttons).
+` : ''}
 
 ━━━ STRUCTURAL PATTERNS (build each section EXACTLY as described) ━━━
 
