@@ -77,6 +77,15 @@ export const api = {
     return this.getCopies('', 0, 'archived')
   },
 
+  async claimLegacyData() {
+    const r = await fetch('/api/settings/claim-legacy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ locationId: getLocationId() }),
+    })
+    return r.json()
+  },
+
   async setCopyStatus(id, status) {
     const r = await fetch(`/api/copies/${id}/status`, {
       method: 'PUT',

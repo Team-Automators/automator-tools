@@ -596,6 +596,31 @@ export default function Settings() {
             </a>
           )}
         </div>
+
+        {/* Legacy data migration */}
+        <div className="settings-section">
+          <h2>Claim Existing Data</h2>
+          <div className="text-sub text-sm" style={{ lineHeight: 1.6, marginBottom: 10 }}>
+            One-time: assign all pre-existing conversations, tasks, and hooks on this
+            location that don’t yet have an owner <strong>to you</strong>. After this,
+            only you will see them. This can’t be undone.
+          </div>
+          <button
+            className="btn btn-secondary"
+            onClick={async () => {
+              if (!(await confirmToast('Claim all currently-shared conversations, tasks, and hooks on this location as yours?', { confirmText: 'Claim', danger: false }))) return
+              const r = await api.claimLegacyData().catch(() => null)
+              if (r?.ok) {
+                const { copies = 0, tasks = 0, hooks = 0 } = r.claimed || {}
+                notifySuccess(`Claimed ${copies} conversations, ${tasks} tasks, ${hooks} hooks`)
+              } else {
+                notifySuccess('Nothing to claim (or you must sign in with your email first)')
+              }
+            }}
+          >
+            Claim existing data
+          </button>
+        </div>
       </div>
     </>
   )
