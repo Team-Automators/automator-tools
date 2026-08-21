@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useAIConfig } from '../hooks/useAIConfig.js'
 import { PROVIDERS } from '../lib/providers.js'
 import { apiFetch, getLocationId, api } from '../lib/api.js'
+import { confirmToast, notifySuccess } from '../lib/toast.jsx'
 
 // ── ClickUp workspace browser ─────────────────────────────────────────────────
 
@@ -121,7 +122,7 @@ function ClickUpSection({ locationId }) {
   }
 
   async function disconnect() {
-    if (!confirm('Remove the saved ClickUp API key?')) return
+    if (!(await confirmToast('Remove the saved ClickUp API key?', { confirmText: 'Remove' }))) return
     await fetch('/api/settings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -461,9 +462,10 @@ export default function Settings() {
   }
 
   async function handleClear() {
-    if (!confirm('Disconnect and remove the saved API key?')) return
+    if (!(await confirmToast('Disconnect and remove the saved API key?', { confirmText: 'Disconnect' }))) return
     await clearConfig()
     setApiKey(''); setModel(''); setProvider('')
+    notifySuccess('API key removed')
   }
 
   if (loading) {

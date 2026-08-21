@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, getLocationId } from '../lib/api.js'
+import { confirmToast, notifySuccess } from '../lib/toast.jsx'
 
 function fmtDate(ts) {
   if (!ts) return ''
@@ -37,15 +38,17 @@ export default function Archive() {
     await api.setCopyStatus(id, 'in-progress').catch(() => {})
     setItems(prev => prev.filter(i => i.id !== id))
     setBusyId(null)
+    notifySuccess('Restored to In Progress')
   }
 
   async function purge(e, id) {
     e.stopPropagation()
-    if (!confirm('Permanently delete this conversation? This cannot be undone.')) return
+    if (!(await confirmToast('Permanently delete this conversation? This cannot be undone.', { confirmText: 'Delete' }))) return
     setBusyId(id)
     await api.purgeCopy(id).catch(() => {})
     setItems(prev => prev.filter(i => i.id !== id))
     setBusyId(null)
+    notifySuccess('Deleted permanently')
   }
 
   return (

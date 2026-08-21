@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Routes, Route, Navigate, useParams } from 'react-router-dom'
+import { ToastContainer } from 'react-toastify'
 import Layout from './components/Layout.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import CopywritersList from './pages/CopywritersList.jsx'
@@ -92,7 +93,9 @@ export default function App() {
   }
 
   return (
-    <Routes>
+    <>
+      <ToastContainer position="bottom-right" autoClose={3000} newestOnTop theme="colored" pauseOnFocusLoss={false} />
+      <Routes>
       <Route path="login" element={<Login />} />
       <Route element={<RequireLocation><Layout /></RequireLocation>}>
         <Route index element={<Dashboard />} />
@@ -110,5 +113,6 @@ export default function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
+    </>
   )
 }

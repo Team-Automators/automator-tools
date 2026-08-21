@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { api, getLocationId } from '../lib/api.js'
 import { TYPES, TYPE_ORDER } from '../lib/types.js'
 import { TaskModal, TaskDetail, stageOf } from '../components/TaskModals.jsx'
+import { confirmToast, notifySuccess } from '../lib/toast.jsx'
 
 function relTime(ts) {
   if (!ts) return ''
@@ -100,9 +101,10 @@ export default function CustomerDetail() {
 
   async function deleteCopy(e, copyId) {
     e.stopPropagation()
-    if (!confirm('Move this conversation to Archive? You can restore it later.')) return
+    if (!(await confirmToast('Move this conversation to Archive? You can restore it later.', { confirmText: 'Archive', danger: false }))) return
     setCopies(prev => prev.filter(c => c.id !== copyId))   // optimistic — leaves the live view
     await api.deleteCopy(copyId).catch(() => load())        // soft-delete → archived
+    notifySuccess('Moved to Archive')
   }
 
   async function changeStatus(e, copyId, status) {

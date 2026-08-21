@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import App from './App.jsx'
 import { installAuthFetch } from './lib/session.js'
+import 'react-toastify/dist/ReactToastify.css'
 import './index.css'
 
 // Attach the session token to every same-origin request (must run before any fetch).

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, getLocationId } from '../lib/api.js'
 import { TaskModal, TaskDetail, stageOf } from '../components/TaskModals.jsx'
+import { confirmToast, notifySuccess } from '../lib/toast.jsx'
 
 function initials(name) {
   if (!name) return '?'
@@ -117,9 +118,10 @@ export default function Library() {
 
   async function deleteCustomer(e, id) {
     e.stopPropagation()
-    if (!confirm('Delete this customer and remove them from all copies?')) return
+    if (!(await confirmToast('Delete this customer and remove them from all copies?', { confirmText: 'Delete' }))) return
     await api.deleteCustomer(id)
     load()
+    notifySuccess('Customer deleted')
   }
 
   function startRename(e, c) {

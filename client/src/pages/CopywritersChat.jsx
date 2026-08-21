@@ -4,6 +4,7 @@ import { TYPES } from '../lib/types.js'
 import { PROVIDERS } from '../lib/providers.js'
 import { useAIConfig } from '../hooks/useAIConfig.js'
 import { api, getLocationId } from '../lib/api.js'
+import { confirmToast, notifySuccess } from '../lib/toast.jsx'
 
 function useAutoResize(ref) {
   function resize() {
@@ -577,9 +578,9 @@ export default function CopywritersChat() {
             <button
               className="btn btn-ghost btn-sm"
               style={{ marginLeft: 'auto', fontSize: '.75rem' }}
-              onClick={() => {
-                if (!confirm('Clear the trained brand voice?')) return
-                api.clearBrandVoice().then(() => { setVoiceInfo(false); setShowVoiceDetail(false) }).catch(() => {})
+              onClick={async () => {
+                if (!(await confirmToast('Clear the trained brand voice?', { confirmText: 'Clear' }))) return
+                api.clearBrandVoice().then(() => { setVoiceInfo(false); setShowVoiceDetail(false); notifySuccess('Brand voice cleared') }).catch(() => {})
               }}
             >
               Clear
