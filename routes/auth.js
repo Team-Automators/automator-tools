@@ -11,6 +11,8 @@ const oauthStore = require('../lib/oauth-store');
 const keyStore   = require('../lib/key-store');
 const session    = require('../lib/session');
 const locationAccess = require('../lib/location-access');
+const ghlUsers   = require('../lib/ghl-users');
+const requireLocation = require('../middleware/require-location');
 const { readSessionToken } = require('../middleware/require-location');
 
 // Serialize the session token into an httpOnly cookie (defense-in-depth for
@@ -207,6 +209,39 @@ router.post('/location-login', async (req, res) => {
   res.json({ ok: true, token, locationId, companyId: access.companyId || '' });
 });
 
+// POST /auth/user-login  { email }
+// Verifies the email is a real GHL user on the session's location, then issues
+// a session that also carries the user identity (uid/email) for per-user scoping.
+router.post('/user-login', requireLocation, async (req, res) => {
+  const email = (req.body?.email || '').trim();
+  if (!email) return res.status(400).json({ error: 'email required' });
+
+  let result;
+  try {
+    result = await ghlUsers.findUserByEmail(req.locationId, email);
+  } catch (err) {
+    console.error('[auth] user-login lookup error:', err.message);
+    return res.status(502).json({ error: 'lookup_failed', message: 'Could not verify with GHL. Try again.' });
+  }
+
+  if (!result.ok) {
+    if (result.reason === 'users_unavailable') {
+      return res.status(502).json({ error: 'users_unavailable', message: 'Could not reach GHL to verify users. Try again.' });
+    }
+    return res.status(403).json({ error: 'not_a_user', message: 'That email is not a user on this location.' });
+  }
+
+  const token = session.sign({
+    lid:   req.locationId,
+    cid:   req.companyId || '',
+    uid:   result.user.id,
+    email: result.user.email,
+    name:  result.user.name,
+  });
+  res.setHeader('Set-Cookie', sessionCookie(token));
+  res.json({ ok: true, token, user: result.user });
+});
+
 // GET /auth/diagnose?locationId=xxx — public auth diagnostic (no secrets).
 // Explains WHY a location can or cannot authenticate.
 router.get('/diagnose', async (req, res) => {
@@ -368,7 +403,14 @@ router.get('/last-install', async (req, res) => {
 router.get('/session', (req, res) => {
   const claims = session.verify(readSessionToken(req));
   if (!claims?.lid) return res.status(401).json({ authenticated: false });
-  res.json({ authenticated: true, locationId: claims.lid, companyId: claims.cid || '' });
+  res.json({
+    authenticated: true,
+    locationId: claims.lid,
+    companyId:  claims.cid || '',
+    userId:     claims.uid || null,
+    email:      claims.email || null,
+    name:       claims.name || null,
+  });
 });
 
 // GET|POST /auth/logout — clear the session cookie (and optionally OAuth tokens)

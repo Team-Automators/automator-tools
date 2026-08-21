@@ -20,6 +20,18 @@ export function clearSessionToken() {
   setSessionToken('')
 }
 
+// Decode the (signed, not encrypted) session payload for UI gating only.
+// The server always re-verifies — never trust this for authorization.
+export function getSessionClaims() {
+  const t = getSessionToken()
+  if (!t || t.indexOf('.') < 1) return null
+  try {
+    let b = t.slice(0, t.indexOf('.')).replace(/-/g, '+').replace(/_/g, '/')
+    while (b.length % 4) b += '='
+    return JSON.parse(atob(b))
+  } catch { return null }
+}
+
 // The location context we can silently re-authenticate against.
 function currentLocationId() {
   try {

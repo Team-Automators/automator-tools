@@ -37,6 +37,8 @@ function requireLocation(req, res, next) {
 
   req.locationId = claims.lid;
   req.companyId  = claims.cid || '';
+  req.userId     = claims.uid || null;   // set once the user verifies their email
+  req.userEmail  = claims.email || null;
 
   // Force the trusted locationId onto the request so downstream handlers that
   // read req.query.locationId / req.body.locationId cannot be spoofed.

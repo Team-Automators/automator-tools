@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getLocationId, persistLocationId } from '../lib/api.js'
-import { setSessionToken, getSessionToken } from '../lib/session.js'
+import { setSessionToken, getSessionToken, getSessionClaims } from '../lib/session.js'
 import { PROVIDERS } from '../lib/providers.js'
 
 const AI_KEY = 'ghl_ai_config'
@@ -13,8 +13,9 @@ function readAIConfig() {
 export default function Login() {
   const navigate = useNavigate()
 
-  const [step, setStep]         = useState(1)       // 1 = location id, 2 = api key
+  const [step, setStep]         = useState(1)       // 1 = location, 2 = email, 3 = api key
   const [locationId, setLocationId] = useState('')
+  const [email, setEmail]       = useState('')
   const [provider, setProvider] = useState(PROVIDERS[0].id)
   const [apiKey, setApiKey]     = useState('')
   const [model, setModel]       = useState('')
@@ -23,13 +24,43 @@ export default function Login() {
 
   const selectedProv = PROVIDERS.find(p => p.id === provider) || PROVIDERS[0]
 
-  // Already fully signed in — skip to dashboard
+  // Resume at the right step based on what's already established.
   useEffect(() => {
     const id = getLocationId()
-    if (id && getSessionToken() && readAIConfig()) navigate('/', { replace: true })
-    else if (id && getSessionToken()) { setLocationId(id); setStep(2) } // verified, needs API key
-    else if (id) setLocationId(id) // prefill known location (e.g. from GHL iframe URL)
+    const hasLocation = id && getSessionToken()
+    const hasUser = !!getSessionClaims()?.uid
+    if (hasLocation && hasUser && readAIConfig()) navigate('/', { replace: true })
+    else if (hasLocation && hasUser) { setLocationId(id); setStep(3) } // needs API key
+    else if (hasLocation)            { setLocationId(id); setStep(2) } // needs email
+    else if (id) setLocationId(id) // prefill known location (e.g. from GHL URL)
   }, [navigate])
+
+  async function handleEmailSubmit(e) {
+    e.preventDefault()
+    const addr = email.trim()
+    if (!addr) { setError('Please enter your email'); return }
+    setVerifying(true)
+    setError('')
+    try {
+      const r = await fetch('/auth/user-login', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ email: addr }),
+      })
+      const data = await r.json().catch(() => ({}))
+      if (!r.ok || !data.token) {
+        setError(data.message || 'That email is not a user on this location.')
+        setVerifying(false)
+        return
+      }
+      setSessionToken(data.token)
+      setStep(3)
+    } catch {
+      setError('Could not reach the server. Please try again.')
+    } finally {
+      setVerifying(false)
+    }
+  }
 
   async function handleLocationSubmit(e) {
     e.preventDefault()
@@ -52,7 +83,7 @@ export default function Login() {
       }
       setSessionToken(data.token)
       persistLocationId(id)
-      setStep(2)
+      setStep(2)  // → email verification
     } catch {
       setError('Could not reach the server. Please try again.')
     } finally {
@@ -104,7 +135,7 @@ export default function Login() {
 
           {/* Step indicator */}
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
-            {[1, 2].map(s => (
+            {[1, 2, 3].map(s => (
               <div key={s} style={{
                 width: 8, height: 8, borderRadius: '50%',
                 background: s === step ? 'var(--accent)' : 'var(--border)',
@@ -119,7 +150,7 @@ export default function Login() {
           <>
             <div style={{ marginBottom: 24 }}>
               <div style={{ fontWeight: 700, fontSize: '1.125rem', color: 'var(--text)', marginBottom: 6 }}>
-                Step 1 of 2 — Location ID
+                Step 1 of 3 — Location ID
               </div>
               <div style={{ fontSize: '.875rem', color: 'var(--sub)' }}>
                 Enter the GHL Location ID for your sub-account
@@ -157,12 +188,62 @@ export default function Login() {
           </>
         )}
 
-        {/* ── Step 2: API Key ── */}
+        {/* ── Step 2: Email identity ── */}
         {step === 2 && (
           <>
             <div style={{ marginBottom: 24 }}>
               <div style={{ fontWeight: 700, fontSize: '1.125rem', color: 'var(--text)', marginBottom: 6 }}>
-                Step 2 of 2 — AI Provider
+                Step 2 of 3 — Your Email
+              </div>
+              <div style={{ fontSize: '.875rem', color: 'var(--sub)' }}>
+                Enter the email of your GHL account on this location — used to keep your work private to you
+              </div>
+            </div>
+
+            <form onSubmit={handleEmailSubmit}>
+              <div className="form-group">
+                <label className="form-label">Email</label>
+                <input
+                  className="form-input"
+                  type="email"
+                  value={email}
+                  onChange={e => { setEmail(e.target.value); setError('') }}
+                  placeholder="you@company.com"
+                  autoComplete="email"
+                  autoFocus
+                />
+                {error && <div style={{ fontSize: '.8125rem', color: 'var(--danger)', marginTop: 6 }}>{error}</div>}
+                <div className="text-xs text-sub mt-1">
+                  Must match a user on this GHL location.
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                className="btn btn-primary"
+                style={{ width: '100%', marginTop: 8 }}
+                disabled={!email.trim() || verifying}
+              >
+                {verifying ? 'Verifying…' : 'Next →'}
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                style={{ width: '100%', marginTop: 8 }}
+                onClick={() => { setStep(1); setError('') }}
+              >
+                ← Back
+              </button>
+            </form>
+          </>
+        )}
+
+        {/* ── Step 3: API Key ── */}
+        {step === 3 && (
+          <>
+            <div style={{ marginBottom: 24 }}>
+              <div style={{ fontWeight: 700, fontSize: '1.125rem', color: 'var(--text)', marginBottom: 6 }}>
+                Step 3 of 3 — AI Provider
               </div>
               <div style={{ fontSize: '.875rem', color: 'var(--sub)' }}>
                 Enter your own API key — this stays on this device only
@@ -232,7 +313,7 @@ export default function Login() {
                 type="button"
                 className="btn btn-ghost"
                 style={{ width: '100%', marginTop: 8 }}
-                onClick={() => { setStep(1); setError('') }}
+                onClick={() => { setStep(2); setError('') }}
               >
                 ← Back
               </button>

@@ -14,6 +14,12 @@ oauthStore.getAccessToken = async (lid) => (lid === 'DIRECTLOC' ? 'DIRECT_TOKEN'
 oauthStore.get            = async (lid) => (lid === 'DIRECTLOC' ? { companyId: 'C-DIRECT' } : null);
 oauthStore.findAll        = async () => [{ companyId: 'C1', access_token: 'AGENCY_TOKEN' }];
 
+// Stub GHL user lookup for user-login tests.
+const ghlUsers = require('../lib/ghl-users');
+ghlUsers.findUserByEmail = async (lid, email) => email === 'real@x.com'
+  ? { ok: true, user: { id: 'U1', email: 'real@x.com', name: 'Real User' } }
+  : { ok: false, reason: 'not_found' };
+
 // PIT-only location (no OAuth) → exercised via the PIT fallback.
 const keyStore = require('../lib/key-store');
 keyStore.get = async (lid) => {
@@ -176,6 +182,22 @@ async function run() {
   const badPitDiag = await req('GET', '/auth/diagnose?locationId=PITBADLOC');
   check('diagnose flags PIT attempted + rejected', badPitDiag.json?.pitAttempted === true && badPitDiag.json?.fullyAuthenticates === false, `status=${badPitDiag.json?.ghlValidationStatus}`);
   check('verdict says PIT REJECTED', /PIT REJECTED/.test(badPitDiag.json?.verdict || ''), badPitDiag.json?.verdict);
+
+  console.log('\n=== 10. Verified-email user identity ===');
+  const loc = await req('POST', '/auth/location-login', { body: { locationId: 'GOODLOC' } });
+  const locTok = loc.json?.token;
+  const noEmail = await req('POST', '/auth/user-login', { token: locTok, body: {} });
+  check('missing email → 400', noEmail.status === 400);
+  const badEmail = await req('POST', '/auth/user-login', { token: locTok, body: { email: 'nobody@x.com' } });
+  check('non-GHL email → 403', badEmail.status === 403, `err=${badEmail.json?.error}`);
+  const userGood = await req('POST', '/auth/user-login', { token: locTok, body: { email: 'real@x.com' } });
+  check('real GHL user → 200 + token', userGood.status === 200 && !!userGood.json?.token, `status=${userGood.status}`);
+  const claims = session.verify(userGood.json?.token);
+  check('session carries uid + email', claims?.uid === 'U1' && claims?.email === 'real@x.com');
+  const meAuthed = await req('GET', '/auth/session', { token: userGood.json?.token });
+  check('/auth/session reports the user', meAuthed.json?.userId === 'U1' && meAuthed.json?.email === 'real@x.com');
+  const anonUser = await req('POST', '/auth/user-login', { body: { email: 'real@x.com' } });
+  check('user-login without location session → 401', anonUser.status === 401);
 
   console.log(`\n=== RESULT: ${passed} passed, ${failed} failed ===`);
   process.exit(failed ? 1 : 0);

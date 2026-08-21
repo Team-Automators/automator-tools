@@ -13,7 +13,7 @@ import Hooks from './pages/Hooks.jsx'
 import Workflows from './pages/Workflows.jsx'
 import Login from './pages/Login.jsx'
 import { getLocationId, persistLocationId } from './lib/api.js'
-import { getSessionToken, setSessionToken } from './lib/session.js'
+import { getSessionToken, setSessionToken, getSessionClaims } from './lib/session.js'
 
 function hasAIConfig() {
   try { return !!JSON.parse(localStorage.getItem('ghl_ai_config'))?.apiKey } catch { return false }
@@ -64,9 +64,10 @@ function CopywritersChatKeyed() {
 }
 
 function RequireLocation({ children }) {
-  if (!getLocationId())    return <Navigate to="/login" replace />
-  if (!getSessionToken())  return <Navigate to="/login" replace />
-  if (!hasAIConfig())      return <Navigate to="/login" replace />
+  if (!getLocationId())          return <Navigate to="/login" replace />
+  if (!getSessionToken())        return <Navigate to="/login" replace />
+  if (!getSessionClaims()?.uid)  return <Navigate to="/login" replace />  // needs verified user
+  if (!hasAIConfig())            return <Navigate to="/login" replace />
   return children
 }
 
