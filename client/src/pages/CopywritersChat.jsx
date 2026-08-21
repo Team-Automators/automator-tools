@@ -220,6 +220,13 @@ export default function CopywritersChat() {
   const bottomRef = useRef(null)
   const textareaRef = useRef(null)
   const readerRef = useRef(null)
+  const stoppedRef = useRef(false)
+
+  // Stop an in-progress generation (keeps whatever streamed so far).
+  function stopStreaming() {
+    stoppedRef.current = true
+    try { readerRef.current?.cancel() } catch {}
+  }
   const resize = useAutoResize(textareaRef)
 
   useEffect(() => {
@@ -312,6 +319,26 @@ export default function CopywritersChat() {
     setStreaming(true)
     setShowDots(true)
     setStreamText('')
+    stoppedRef.current = false
+
+    let accumulated = ''
+    let committed = false
+    const commit = (content) => {
+      if (committed || !content) return
+      committed = true
+      const finalMsgs = [...allMsgs, { role: 'assistant', content }]
+      setMessages(finalMsgs)
+      api.saveSession(type, finalMsgs)
+      try { localStorage.setItem(`cwc_msgs_${type}`, JSON.stringify(finalMsgs)) } catch {}
+      const autoTitle = `${typeInfo.title} — ${new Date().toLocaleDateString()}`
+      const autoPreview = content.slice(0, 120)
+      if (!autoSavedCopyId.current) {
+        api.saveCopy({ customerId: '_unsorted', customerName: '', type, messages: finalMsgs, title: autoTitle, preview: autoPreview })
+          .then(saved => { if (saved?.id) autoSavedCopyId.current = saved.id }).catch(() => {})
+      } else {
+        api.updateCopy(autoSavedCopyId.current, { messages: finalMsgs }).catch(() => {})
+      }
+    }
 
     // Sanitize messages before sending: remove error messages and fix role sequences
     function sanitize(msgs) {
@@ -354,7 +381,6 @@ export default function CopywritersChat() {
       const reader = resp.body.getReader()
       readerRef.current = reader
       const decoder = new TextDecoder()
-      let accumulated = ''
       let errorText = ''
       let firstToken = true
 
@@ -380,30 +406,18 @@ export default function CopywritersChat() {
         }
       }
 
-      const content = accumulated || (errorText ? `Error: ${errorText}` : '')
-      if (content) {
-        const finalMsgs = [...allMsgs, { role: 'assistant', content }]
-        setMessages(finalMsgs)
-        api.saveSession(type, finalMsgs)
-        try { localStorage.setItem(`cwc_msgs_${type}`, JSON.stringify(finalMsgs)) } catch {}
-
-        // Auto-save to Library so it appears in Dashboard activities
-        const autoTitle = `${typeInfo.title} — ${new Date().toLocaleDateString()}`
-        const autoPreview = content.slice(0, 120)
-        if (!autoSavedCopyId.current) {
-          api.saveCopy({ customerId: '_unsorted', customerName: '', type, messages: finalMsgs, title: autoTitle, preview: autoPreview })
-            .then(saved => { if (saved?.id) autoSavedCopyId.current = saved.id })
-            .catch(() => {})
-        } else {
-          api.updateCopy(autoSavedCopyId.current, { messages: finalMsgs }).catch(() => {})
-        }
-      }
+      commit(accumulated || (errorText ? `Error: ${errorText}` : ''))
     } catch (e) {
-      // Show error as a toast/note — do NOT save to messages history so it can't corrupt future requests
-      setToast(e?.message || 'Something went wrong. Check your AI settings and try again.')
-      setTimeout(() => setToast(null), 6000)
-      // Remove the user message we optimistically added so they can retry
-      setMessages(prev => prev.slice(0, -1))
+      if (stoppedRef.current) {
+        // User stopped — keep whatever streamed so far (like Claude).
+        commit(accumulated)
+        if (!accumulated) setMessages(prev => prev.slice(0, -1))
+      } else {
+        // Real error — toast it and drop the optimistic user message so it can't corrupt future requests.
+        setToast(e?.message || 'Something went wrong. Check your AI settings and try again.')
+        setTimeout(() => setToast(null), 6000)
+        setMessages(prev => prev.slice(0, -1))
+      }
     } finally {
       setStreamText('')
       setShowDots(false)
@@ -721,11 +735,17 @@ export default function CopywritersChat() {
               onKeyDown={handleKey}
               disabled={streaming}
             />
-            <button className="send-btn" onClick={send} disabled={streaming || !input.trim()}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
-                <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
-              </svg>
-            </button>
+            {streaming ? (
+              <button className="send-btn" onClick={stopStreaming} title="Stop generating" aria-label="Stop">
+                <svg viewBox="0 0 24 24" width="16" height="16"><rect x="6" y="6" width="12" height="12" rx="2.5" fill="currentColor"/></svg>
+              </button>
+            ) : (
+              <button className="send-btn" onClick={send} disabled={!input.trim()} aria-label="Send">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
+                  <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                </svg>
+              </button>
+            )}
           </div>
           <div className="chat-provider-bar">
             {config ? (

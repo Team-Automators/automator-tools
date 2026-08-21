@@ -197,6 +197,13 @@ export default function LibraryChat() {
 
   const bottomRef = useRef(null)
   const textareaRef = useRef(null)
+  const readerRef = useRef(null)
+  const stoppedRef = useRef(false)
+
+  function stopStreaming() {
+    stoppedRef.current = true
+    try { readerRef.current?.cancel() } catch {}
+  }
   const resize = useAutoResize(textareaRef)
 
   useEffect(() => {
@@ -366,6 +373,17 @@ export default function LibraryChat() {
     setStreaming(true)
     setShowDots(true)
     setStreamText('')
+    stoppedRef.current = false
+
+    let accumulated = ''
+    let committed = false
+    const commit = async (content) => {
+      if (committed || !content) return
+      committed = true
+      const finalMsgs = [...allMsgs, { role: 'assistant', content }]
+      setMessages(finalMsgs)
+      await autoSave(finalMsgs)
+    }
 
     function sanitize(msgs) {
       const cleaned = msgs
@@ -403,8 +421,8 @@ export default function LibraryChat() {
       }
 
       const reader = resp.body.getReader()
+      readerRef.current = reader
       const decoder = new TextDecoder()
-      let accumulated = ''
       let errorText = ''
       let firstToken = true
 
@@ -435,17 +453,18 @@ export default function LibraryChat() {
         return
       }
 
-      if (!accumulated) return
-
-      const aiMsg = { role: 'assistant', content: accumulated }
-      const finalMsgs = [...allMsgs, aiMsg]
-      setMessages(finalMsgs)
-      await autoSave(finalMsgs)
+      await commit(accumulated)
     } catch (e) {
-      setSaveStatus(e?.message || 'Something went wrong. Check your AI settings.')
-      setTimeout(() => setSaveStatus(''), 6000)
-      setMessages(prev => prev.slice(0, -1))
+      if (stoppedRef.current) {
+        await commit(accumulated)              // keep partial output on stop
+        if (!accumulated) setMessages(prev => prev.slice(0, -1))
+      } else {
+        setSaveStatus(e?.message || 'Something went wrong. Check your AI settings.')
+        setTimeout(() => setSaveStatus(''), 6000)
+        setMessages(prev => prev.slice(0, -1))
+      }
     } finally {
+      readerRef.current = null
       setStreamText('')
       setShowDots(false)
       setStreaming(false)
@@ -665,11 +684,17 @@ export default function LibraryChat() {
               onKeyDown={handleKey}
               disabled={streaming}
             />
-            <button className="send-btn" onClick={send} disabled={streaming || !input.trim()}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
-                <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
-              </svg>
-            </button>
+            {streaming ? (
+              <button className="send-btn" onClick={stopStreaming} title="Stop generating" aria-label="Stop">
+                <svg viewBox="0 0 24 24" width="16" height="16"><rect x="6" y="6" width="12" height="12" rx="2.5" fill="currentColor"/></svg>
+              </button>
+            ) : (
+              <button className="send-btn" onClick={send} disabled={!input.trim()} aria-label="Send">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
+                  <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                </svg>
+              </button>
+            )}
           </div>
           <div className="chat-provider-bar">
             {config ? (
