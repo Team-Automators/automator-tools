@@ -1,6 +1,8 @@
-const express   = require('express');
-const router    = express.Router();
-const copyStore = require('../lib/copy-store');
+const express    = require('express');
+const router     = express.Router();
+const copyStore  = require('../lib/copy-store');
+const tasksStore = require('../lib/tasks-store');
+const hooksStore = require('../lib/hooks-store');
 
 // GET /api/customers?locationId=
 router.get('/customers', async (req, res) => {
@@ -34,6 +36,14 @@ router.put('/customers/:id', async (req, res) => {
   try {
     const cust = await copyStore.updateCustomer(locationId, req.params.id, { name, email });
     if (!cust) return res.status(404).json({ error: 'Customer not found' });
+    // Sync the rename across the whole system — tasks and hooks reference the
+    // customer name too. copyStore.updateCustomer already handled copies.
+    if (name !== undefined && cust.name) {
+      await Promise.all([
+        tasksStore.renameCustomer(locationId, req.params.id, cust.name).catch(() => {}),
+        hooksStore.renameCustomer(locationId, req.params.id, cust.name).catch(() => {}),
+      ]);
+    }
     res.json(cust);
   } catch (e) {
     res.status(500).json({ error: e.message });

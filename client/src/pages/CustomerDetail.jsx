@@ -35,6 +35,9 @@ export default function CustomerDetail() {
   const [movingCopyId, setMovingCopyId] = useState(null)
   const [moveToCustId, setMoveToCustId] = useState('')
 
+  const [renaming, setRenaming]   = useState(false)
+  const [renameVal, setRenameVal] = useState('')
+
   async function load() {
     if (isUnsorted) {
       const [allCopies, custs] = await Promise.all([api.getCopies(), api.getCustomers()])
@@ -90,6 +93,20 @@ export default function CustomerDetail() {
     if (!confirm('Delete this copy permanently?')) return
     await api.deleteCopy(copyId)
     load()
+  }
+
+  function startRename() {
+    setRenameVal(customer?.name || '')
+    setRenaming(true)
+  }
+
+  async function saveRename() {
+    const name = renameVal.trim()
+    if (!name || name === customer?.name) { setRenaming(false); return }
+    setCustomer(c => c ? { ...c, name } : c)   // optimistic
+    setRenaming(false)
+    const res = await api.updateCustomer(customerId, { name }).catch(() => null)
+    if (!res || res.error) load()               // revert/sync on failure
   }
 
   async function handleTaskSave(fields) {
@@ -161,7 +178,34 @@ export default function CustomerDetail() {
       <div className="content">
         <div className="page-header">
           <div>
-            <div className="page-title">{customerName}</div>
+            {renaming ? (
+              <input
+                className="form-input"
+                style={{ fontSize: '1.1rem', fontWeight: 700, maxWidth: 380 }}
+                value={renameVal}
+                autoFocus
+                onChange={e => setRenameVal(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') saveRename(); else if (e.key === 'Escape') setRenaming(false) }}
+                onBlur={saveRename}
+              />
+            ) : (
+              <div className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                {customerName}
+                {!isUnsorted && (
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    style={{ padding: '4px 6px', minHeight: 'auto', color: 'var(--sub)' }}
+                    onClick={startRename}
+                    title="Rename folder"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
+                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                    </svg>
+                  </button>
+                )}
+              </div>
+            )}
             {customer?.email && <div className="page-sub">{customer.email}</div>}
             <div className="page-sub">{copies.length} saved copy piece{copies.length !== 1 ? 's' : ''}</div>
           </div>
