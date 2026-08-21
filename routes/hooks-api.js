@@ -3,6 +3,14 @@ const axios   = require('axios');
 const router  = express.Router();
 const store   = require('../lib/hooks-store');
 
+// A hook the caller owns (or a legacy hook with no owner). Null otherwise.
+async function ownedHook(locationId, hookId, req) {
+  const h = (await store.getAll(locationId)).find(x => x.id === hookId);
+  if (!h) return null;
+  if (h.ownerUserId && req.userId && h.ownerUserId !== req.userId) return null;
+  return h;
+}
+
 router.get('/', async (req, res) => {
   const { locationId } = req.query;
   if (!locationId) return res.json([]);
@@ -18,7 +26,7 @@ router.get('/', async (req, res) => {
       }
     }
     if (dirty) await store.saveAll(locationId, hooks);
-    res.json(hooks);
+    res.json(hooks.filter(h => !h.ownerUserId || h.ownerUserId === req.userId));
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -28,7 +36,7 @@ router.post('/', async (req, res) => {
   const { locationId, name, destinationUrl, customerId, customerName } = req.body;
   if (!locationId) return res.status(400).json({ error: 'locationId required' });
   try {
-    res.json(await store.create(locationId, { name, destinationUrl, customerId, customerName }));
+    res.json(await store.create(locationId, { name, destinationUrl, customerId, customerName, ownerUserId: req.userId || '' }));
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -38,6 +46,7 @@ router.put('/:id', async (req, res) => {
   const { locationId, ...fields } = req.body;
   if (!locationId) return res.status(400).json({ error: 'locationId required' });
   try {
+    if (!(await ownedHook(locationId, req.params.id, req))) return res.status(404).json({ error: 'Hook not found' });
     const hook = await store.update(locationId, req.params.id, fields);
     if (!hook) return res.status(404).json({ error: 'Hook not found' });
     res.json(hook);
@@ -50,6 +59,7 @@ router.delete('/:id', async (req, res) => {
   const { locationId } = req.query;
   if (!locationId) return res.status(400).json({ error: 'locationId required' });
   try {
+    if (!(await ownedHook(locationId, req.params.id, req))) return res.status(404).json({ error: 'Hook not found' });
     await store.remove(locationId, req.params.id);
     res.json({ ok: true });
   } catch (e) {
@@ -62,8 +72,7 @@ router.post('/:id/test', async (req, res) => {
   const { locationId } = req.body;
   if (!locationId) return res.status(400).json({ error: 'locationId required' });
   try {
-    const hooks = await store.getAll(locationId);
-    const hook  = hooks.find(h => h.id === req.params.id);
+    const hook = await ownedHook(locationId, req.params.id, req);
     if (!hook) return res.status(404).json({ error: 'Hook not found' });
     if (!hook.destinationUrl) return res.status(400).json({ error: 'No destination URL configured' });
 

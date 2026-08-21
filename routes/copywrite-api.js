@@ -1022,8 +1022,8 @@ router.get('/brand-voice', async (req, res) => {
   const locationId = req.query.locationId;
   if (!locationId) return res.status(400).json({ error: 'locationId required' });
   const [voice, feedback] = await Promise.all([
-    brandVoiceStore.getVoice(locationId).catch(() => null),
-    brandVoiceStore.getFeedback(locationId).catch(() => []),
+    brandVoiceStore.getVoice(locationId, req.userId).catch(() => null),
+    brandVoiceStore.getFeedback(locationId, req.userId).catch(() => []),
   ]);
   res.json({ voice, feedback });
 });
@@ -1034,8 +1034,8 @@ router.delete('/brand-voice', async (req, res) => {
   const locationId = req.query.locationId || req.body.locationId;
   if (!locationId) return res.status(400).json({ error: 'locationId required' });
   await Promise.all([
-    brandVoiceStore.clearVoice(locationId).catch(() => {}),
-    brandVoiceStore.clearFeedback(locationId).catch(() => {}),
+    brandVoiceStore.clearVoice(locationId, req.userId).catch(() => {}),
+    brandVoiceStore.clearFeedback(locationId, req.userId).catch(() => {}),
   ]);
   res.json({ ok: true });
 });
@@ -1047,7 +1047,7 @@ router.post('/feedback', async (req, res) => {
   if (!locationId || !text || !sentiment) {
     return res.status(400).json({ error: 'locationId, text, sentiment required' });
   }
-  await brandVoiceStore.addFeedback(locationId, { type, text, sentiment }).catch(() => {});
+  await brandVoiceStore.addFeedback(locationId, req.userId, { type, text, sentiment }).catch(() => {});
   res.json({ ok: true });
 });
 
@@ -1065,8 +1065,9 @@ router.post('/analyze-voice', async (req, res) => {
   const providerCfg = PROVIDER_MAP[provider];
   if (!providerCfg) return res.status(400).json({ error: `Unknown provider: ${provider}` });
 
-  // Don't train brand voice on archived copies.
+  // Per-user brand voice: train only on this user's own, non-archived copies.
   const idx = (await copyStore.getCopyIndex(locationId).catch(() => []))
+    .filter(c => !c.ownerUserId || c.ownerUserId === req.userId)
     .filter(c => (c.status || 'in-progress') !== 'archived');
   if (idx.length < 2) {
     return res.json({ ok: true, skipped: true, reason: 'Save at least 2 copies first' });
@@ -1077,7 +1078,7 @@ router.post('/analyze-voice', async (req, res) => {
   // analyze-voice on every new conversation for free when nothing has changed.
   const latestCopyAt = idx[0]?.updatedAt || idx[0]?.createdAt || 0;
   const force = req.body.force === true || req.query.force === 'true';
-  const existing = await brandVoiceStore.getVoice(locationId).catch(() => null);
+  const existing = await brandVoiceStore.getVoice(locationId, req.userId).catch(() => null);
   if (!force && existing?.profile && existing.analyzedCount === idx.length && existing.latestCopyAt === latestCopyAt) {
     return res.json({ ok: true, fresh: true, profile: existing.profile, sampleCount: existing.sampleCount });
   }
@@ -1105,7 +1106,7 @@ ${samples.join('\n\n---\n\n')}`;
     const profile = await callAI(providerCfg, resolvedKey, model, prompt);
 
     if (profile) {
-      await brandVoiceStore.setVoice(locationId, {
+      await brandVoiceStore.setVoice(locationId, req.userId, {
         profile,
         sampleCount:   samples.length,
         analyzedCount: idx.length,   // staleness key — # of saved copies at analysis
@@ -1659,8 +1660,8 @@ router.post('/', async (req, res) => {
   if (locationId) {
     try {
       const [voice, feedback] = await Promise.all([
-        brandVoiceStore.getVoice(locationId),
-        brandVoiceStore.getFeedback(locationId),
+        brandVoiceStore.getVoice(locationId, req.userId),
+        brandVoiceStore.getFeedback(locationId, req.userId),
       ]);
 
       const additions = [];
@@ -1726,7 +1727,7 @@ router.get('/session', async (req, res) => {
   const locationId = req.query.locationId || 'default';
   const { type = 'general' } = req.query;
   try {
-    const messages = await brandVoiceStore.getSession(locationId, type);
+    const messages = await brandVoiceStore.getSession(locationId, req.userId, type);
     res.json({ messages });
   } catch {
     res.json({ messages: [] });
@@ -1738,7 +1739,7 @@ router.get('/session', async (req, res) => {
 router.post('/session', async (req, res) => {
   const { locationId = 'default', type = 'general', messages = [] } = req.body;
   try {
-    await brandVoiceStore.setSession(locationId, type, messages);
+    await brandVoiceStore.setSession(locationId, req.userId, type, messages);
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: 'Save failed' });

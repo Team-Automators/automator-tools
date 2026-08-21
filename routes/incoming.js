@@ -47,6 +47,7 @@ router.post('/:token', async (req, res) => {
       const customerId   = hook.customerId   || '';
       const task = await tasksStore.create(locationId, {
         title, stage, customerId, customerName,
+        ownerUserId: hook.ownerUserId || '',   // webhook task belongs to the hook's owner
       }).catch(() => null);
       if (task && mapped.task_note) {
         await tasksStore.addNote(locationId, task.id, mapped.task_note).catch(() => null);

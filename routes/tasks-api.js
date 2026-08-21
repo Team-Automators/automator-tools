@@ -9,11 +9,20 @@ const CU_BASE = 'https://api.clickup.com/api/v2';
 const STAGE_LABELS = { urgent: 'Urgent', 'in-progress': 'In Progress', blocked: 'Blocked', 'for-later': 'For Later', done: 'Done' };
 function stageLabel(id) { return STAGE_LABELS[id] || id; }
 
+// A task the caller owns (or a legacy/system task with no owner). Null otherwise.
+async function ownedTask(locationId, taskId, req) {
+  const t = (await store.getAll(locationId)).find(x => x.id === taskId);
+  if (!t) return null;
+  if (t.ownerUserId && req.userId && t.ownerUserId !== req.userId) return null;
+  return t;
+}
+
 router.get('/', async (req, res) => {
   const { locationId } = req.query;
   if (!locationId) return res.json([]);
   try {
-    res.json(await store.getAll(locationId));
+    const all = await store.getAll(locationId);
+    res.json(all.filter(t => !t.ownerUserId || t.ownerUserId === req.userId));
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -23,7 +32,7 @@ router.post('/', async (req, res) => {
   const { locationId, title, customerId, customerName, stage } = req.body;
   if (!locationId || !title) return res.status(400).json({ error: 'locationId and title required' });
   try {
-    res.json(await store.create(locationId, { title, customerId, customerName, stage }));
+    res.json(await store.create(locationId, { title, customerId, customerName, stage, ownerUserId: req.userId || '' }));
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -33,6 +42,7 @@ router.put('/:id', async (req, res) => {
   const { locationId, ...fields } = req.body;
   if (!locationId) return res.status(400).json({ error: 'locationId required' });
   try {
+    if (!(await ownedTask(locationId, req.params.id, req))) return res.status(404).json({ error: 'Task not found' });
     const task = await store.update(locationId, req.params.id, fields);
     if (!task) return res.status(404).json({ error: 'Task not found' });
     res.json(task);
@@ -60,6 +70,7 @@ router.post('/:id/notes', async (req, res) => {
   if (!locationId) return res.status(400).json({ error: 'locationId required' });
   if (!text || !text.trim()) return res.status(400).json({ error: 'text required' });
   try {
+    if (!(await ownedTask(locationId, req.params.id, req))) return res.status(404).json({ error: 'Task not found' });
     const result = await store.addNote(locationId, req.params.id, text);
     if (!result) return res.status(404).json({ error: 'Task not found' });
 
@@ -86,6 +97,7 @@ router.delete('/:id/notes/:noteId', async (req, res) => {
   const { locationId } = req.query;
   if (!locationId) return res.status(400).json({ error: 'locationId required' });
   try {
+    if (!(await ownedTask(locationId, req.params.id, req))) return res.status(404).json({ error: 'Task not found' });
     const task = await store.deleteNote(locationId, req.params.id, req.params.noteId);
     if (!task) return res.status(404).json({ error: 'Task not found' });
     res.json(task);
@@ -98,6 +110,7 @@ router.delete('/:id', async (req, res) => {
   const { locationId } = req.query;
   if (!locationId) return res.status(400).json({ error: 'locationId required' });
   try {
+    if (!(await ownedTask(locationId, req.params.id, req))) return res.status(404).json({ error: 'Task not found' });
     await store.remove(locationId, req.params.id);
     res.json({ ok: true });
   } catch (e) {
