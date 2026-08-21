@@ -63,12 +63,34 @@ export const api = {
     return r.json()
   },
 
-  async getCopies(customerId = '', limit = 0) {
+  async getCopies(customerId = '', limit = 0, status = '') {
     const url = withLocationId(new URL('/api/copies', window.location.origin))
     if (customerId) url.searchParams.set('customerId', customerId)
     if (limit) url.searchParams.set('limit', String(limit))
+    if (status) url.searchParams.set('status', status)
     const r = await fetch(url.toString())
     if (!r.ok) return []
+    return r.json()
+  },
+
+  async getArchivedCopies() {
+    return this.getCopies('', 0, 'archived')
+  },
+
+  async setCopyStatus(id, status) {
+    const r = await fetch(`/api/copies/${id}/status`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ locationId: getLocationId(), status }),
+    })
+    return r.json()
+  },
+
+  // Permanently delete (from Archive). Regular deleteCopy now soft-deletes (archives).
+  async purgeCopy(id) {
+    const url = withLocationId(new URL(`/api/copies/${id}`, window.location.origin))
+    url.searchParams.set('permanent', 'true')
+    const r = await fetch(url.toString(), { method: 'DELETE' })
     return r.json()
   },
 

@@ -11,6 +11,7 @@ import Settings from './pages/Settings.jsx'
 import Tasks from './pages/Tasks.jsx'
 import Hooks from './pages/Hooks.jsx'
 import Workflows from './pages/Workflows.jsx'
+import Archive from './pages/Archive.jsx'
 import Login from './pages/Login.jsx'
 import { getLocationId, persistLocationId } from './lib/api.js'
 import { getSessionToken, setSessionToken, getSessionClaims } from './lib/session.js'
@@ -104,6 +105,7 @@ export default function App() {
         <Route path="tasks" element={<Tasks />} />
         <Route path="hooks" element={<Hooks />} />
         <Route path="workflows" element={<Workflows />} />
+        <Route path="archive" element={<Archive />} />
         <Route path="settings" element={<Settings />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

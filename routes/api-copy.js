@@ -62,17 +62,27 @@ router.delete('/customers/:id', async (req, res) => {
   }
 });
 
-// GET /api/copies?locationId=&customerId=&limit=
+// GET /api/copies?locationId=&customerId=&limit=&status=
+// Per-user: returns the caller's own copies (+ legacy copies with no owner).
+// Hides archived by default; pass ?status=archived for the Archive view.
 router.get('/copies', async (req, res) => {
-  const { locationId, customerId, limit } = req.query;
+  const { locationId, customerId, limit, status } = req.query;
+  const uid = req.userId;
   if (!locationId) return res.status(400).json({ error: 'locationId required' });
   try {
-    let copies;
-    if (customerId) {
-      copies = await copyStore.getCustomerCopies(locationId, customerId);
+    let copies = customerId
+      ? await copyStore.getCustomerCopies(locationId, customerId)
+      : await copyStore.getCopyIndex(locationId);
+
+    // Per-user scope: caller's copies + legacy copies (no owner) stay visible.
+    copies = copies.filter(c => !c.ownerUserId || c.ownerUserId === uid);
+
+    if (status) {
+      copies = copies.filter(c => (c.status || 'in-progress') === status);
     } else {
-      copies = await copyStore.getCopyIndex(locationId);
+      copies = copies.filter(c => (c.status || 'in-progress') !== 'archived');
     }
+
     if (limit) copies = copies.slice(0, parseInt(limit, 10));
     res.json(copies);
   } catch (e) {
@@ -102,7 +112,27 @@ router.post('/copies', async (req, res) => {
     return res.status(400).json({ error: 'locationId, type, and messages are required' });
   }
   try {
-    const copy = await copyStore.saveCopy(locationId, { customerId, customerName, type, messages, title, preview });
+    const copy = await copyStore.saveCopy(locationId, {
+      customerId, customerName, type, messages, title, preview,
+      ownerUserId: req.userId || '',           // stamp the owner
+      status: req.body.status || 'in-progress',
+    });
+    res.json(copy);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// PUT /api/copies/:id/status — set the conversation status
+router.put('/copies/:id/status', async (req, res) => {
+  const { locationId, status } = req.body;
+  if (!locationId) return res.status(400).json({ error: 'locationId required' });
+  if (!copyStore.STATUSES.includes(status)) {
+    return res.status(400).json({ error: `status must be one of: ${copyStore.STATUSES.join(', ')}` });
+  }
+  try {
+    const copy = await copyStore.updateStatus(req.params.id, locationId, status);
+    if (!copy) return res.status(404).json({ error: 'Not found' });
     res.json(copy);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -127,13 +157,20 @@ router.put('/copies/:id', async (req, res) => {
   }
 });
 
-// DELETE /api/copies/:id?locationId=
+// DELETE /api/copies/:id?locationId=[&permanent=true]
+// Default = soft-delete → moves to Archive (status: archived).
+// ?permanent=true = hard delete (used from the Archive view).
 router.delete('/copies/:id', async (req, res) => {
-  const { locationId } = req.query;
+  const { locationId, permanent } = req.query;
   if (!locationId) return res.status(400).json({ error: 'locationId required' });
   try {
-    await copyStore.deleteCopy(req.params.id, locationId);
-    res.json({ ok: true });
+    if (permanent === 'true') {
+      await copyStore.deleteCopy(req.params.id, locationId);
+      return res.json({ ok: true, permanent: true });
+    }
+    const copy = await copyStore.updateStatus(req.params.id, locationId, 'archived');
+    if (!copy) return res.status(404).json({ error: 'Not found' });
+    res.json({ ok: true, archived: true });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

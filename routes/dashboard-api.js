@@ -43,7 +43,11 @@ router.get('/', async (req, res) => {
     }
   }
 
-  const idx = Array.isArray(copyIdx) ? copyIdx : [];
+  // Per-user + hide archived (mirror /api/copies). Legacy copies (no owner) stay visible.
+  const uid = req.userId;
+  const idx = (Array.isArray(copyIdx) ? copyIdx : [])
+    .filter(c => !c.ownerUserId || c.ownerUserId === uid)
+    .filter(c => (c.status || 'in-progress') !== 'archived');
   res.json({
     hasPITs,
     locationName,
@@ -51,7 +55,7 @@ router.get('/', async (req, res) => {
     locationLogo,
     locationId,
     totalCopies: idx.length,
-    recentCopies: idx,           // full index — client handles grouping & pagination
+    recentCopies: idx,           // filtered index — client handles grouping & pagination
   });
 });
 
