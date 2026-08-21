@@ -6,6 +6,15 @@ import { useAIConfig } from '../hooks/useAIConfig.js'
 import { api, getLocationId } from '../lib/api.js'
 import { confirmToast, notifySuccess } from '../lib/toast.jsx'
 
+// Webinar is a staged flow: landing page first, then each piece on request.
+// After the landing page (the 2nd assistant reply), these appear one at a time.
+const WEBINAR_STEPS = [
+  { label: 'Generate Promo Email Sequence →', prompt: 'The landing page looks good. Now write the promo email sequence (3–5 emails).' },
+  { label: 'Generate Replay Emails →',        prompt: 'Now write the replay emails (2–3) for the no-shows.' },
+  { label: 'Generate The Webinar Pitch →',    prompt: 'Now write the webinar pitch (story → teaching → pivot → offer → close).' },
+  { label: 'Generate The Offer Stack →',      prompt: 'Now write the offer stack with values and the price reveal.' },
+]
+
 function useAutoResize(ref) {
   function resize() {
     if (!ref.current) return
@@ -254,8 +263,8 @@ export default function CopywritersChat() {
     }
   }, [locationId, config])
 
-  async function send() {
-    const text = input.trim()
+  async function send(overrideText) {
+    const text = (typeof overrideText === 'string' ? overrideText : input).trim()
     if (!text || streaming) return
     if (!configLoading && !config) {
       const u = new URL('/settings', window.location.origin)
@@ -642,6 +651,23 @@ export default function CopywritersChat() {
               <div className="msg-bubble ai">{cleanDisplayText(streamText)}</div>
             </div>
           )}
+
+          {/* Webinar staged flow — after the landing page, offer the next piece */}
+          {(() => {
+            if (type !== 'webinar' || streaming || showDots) return null
+            const last = messages[messages.length - 1]
+            if (!last || last.role !== 'assistant') return null
+            const assistantCount = messages.filter(m => m.role === 'assistant').length
+            const step = WEBINAR_STEPS[assistantCount - 2] // 2nd assistant reply = landing page
+            if (!step) return null
+            return (
+              <div style={{ display: 'flex', justifyContent: 'center', margin: '4px 0 12px' }}>
+                <button className="btn btn-primary" onClick={() => send(step.prompt)}>
+                  {step.label}
+                </button>
+              </div>
+            )
+          })()}
 
           <div ref={bottomRef} />
         </div>
