@@ -13,9 +13,9 @@ const PROVIDER_MAP = Object.fromEntries(PROVIDERS.map(p => [p.id, p]));
 
 // ── Provider streaming handlers ──────────────────────────────────────────────
 
-async function streamAnthropic(apiKey, model, system, messages, res) {
+async function streamAnthropic(apiKey, model, system, messages, res, maxTokens = 4096) {
   const client = new Anthropic({ apiKey });
-  const stream = client.messages.stream({ model, max_tokens: 4096, system, messages });
+  const stream = client.messages.stream({ model, max_tokens: maxTokens, system, messages });
   for await (const event of stream) {
     if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
       res.write(`data: ${JSON.stringify({ text: event.delta.text })}\n\n`);
@@ -23,13 +23,13 @@ async function streamAnthropic(apiKey, model, system, messages, res) {
   }
 }
 
-async function streamOpenAICompat(apiKey, baseURL, model, system, messages, res) {
+async function streamOpenAICompat(apiKey, baseURL, model, system, messages, res, maxTokens = 4096) {
   const client = new OpenAI({ apiKey, baseURL });
   const stream = await client.chat.completions.create({
     model,
     messages: [{ role: 'system', content: system }, ...messages],
     stream: true,
-    max_tokens: 4096,
+    max_tokens: maxTokens,
   });
   for await (const chunk of stream) {
     const text = chunk.choices[0]?.delta?.content || '';
@@ -1120,6 +1120,86 @@ ${samples.join('\n\n---\n\n')}`;
     console.error('[analyze-voice]', err.message);
     res.status(500).json({ error: err.message });
   }
+});
+
+// ── POST /copywrite/analyze-transcript ───────────────────────────────────────
+// Turn a call/Zoom transcript into a structured project brief the build team
+// can follow (patterned on the Custom Roadmap: stage, BLAST, funnel/ad/build,
+// phases, deliverables, MIT).
+const ANALYZER_SYSTEM = `You are a senior solutions consultant at a funnel & automation agency. You read a discovery/sales call transcript and produce a clear, actionable PROJECT BRIEF that the implementation team will follow to build the client's funnel and automation. The reader is the builder — they must know exactly what to build.
+
+Return clean Markdown with EXACTLY these sections and headings:
+
+## Client Summary
+- Client name (if stated) and business / what they sell
+- Target audience
+- Current stage — pick ONE: Ideation, Formation, Validation, Monetization, Maximization (with a one-line reason)
+- Primary goals and biggest pain points (bullets)
+
+## BLAST Scorecard
+Score each 0–10 based on the transcript, with a one-line reason:
+- Business Model: X/10 — reason
+- Lead Generation: X/10 — reason
+- Automated Systems: X/10 — reason
+- Sales Optimization: X/10 — reason
+- Traffic Sources: X/10 — reason
+
+## Recommended Build
+- Recommended Funnel Type — pick ONE and justify: Lead Magnet, Appointment Booking, Quiz, Limited-Time Offer, Automated Webinar, or Video Sales
+- Recommended Ad Type — Meta, Google, or TBD (with reason)
+- Chatbot / AI recommendation
+- CRM & automations needed (email / SMS / phone)
+- Additional integrations
+
+## Technology Buildout Plan
+- Phase 1 — Funnel & CRM: goals + concrete deliverables
+- Phase 2 — Chatbot & AI: goals + concrete deliverables
+- Phase 3 — Ads & Tracking: goals + concrete deliverables
+
+## Deliverables Checklist
+An ordered, concrete checklist of everything that needs to be completed (pages, workflows, integrations, assets).
+
+## Most Important Thing (MIT)
+The single biggest focus to drive revenue or remove the current bottleneck.
+
+## Consultant Recommendation
+Your best professional recommendation for the build and approach (3–5 sentences).
+
+Base everything strictly on the transcript. Where it lacks detail, make a smart, clearly-reasonable assumption and mark it "(assumption)". Be specific and implementation-ready — no vague filler.`;
+
+router.post('/analyze-transcript', async (req, res) => {
+  const { transcript, provider = 'claude', apiKey, model: reqModel, clientName } = req.body;
+  if (!transcript || !String(transcript).trim()) return res.status(400).json({ error: 'transcript required' });
+
+  const resolvedKey = apiKey || (provider === 'claude' ? process.env.ANTHROPIC_API_KEY : null);
+  if (!resolvedKey) return res.status(400).json({ error: 'No API key configured. Connect an AI provider in Settings.' });
+
+  const providerCfg = PROVIDER_MAP[provider];
+  if (!providerCfg) return res.status(400).json({ error: `Unknown provider: ${provider}` });
+
+  const model = reqModel || providerCfg.defaultModel;
+  const userPrompt = `${clientName ? `Client: ${clientName}\n\n` : ''}CALL TRANSCRIPT:\n${String(transcript).slice(0, 40000)}\n\nProduce the full project brief now.`;
+  const messages = [{ role: 'user', content: userPrompt }];
+
+  res.setHeader('Content-Type',  'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection',    'keep-alive');
+  res.flushHeaders();
+
+  try {
+    switch (providerCfg.type) {
+      case 'anthropic':     await streamAnthropic(resolvedKey, model, ANALYZER_SYSTEM, messages, res, 6000); break;
+      case 'openai-compat': await streamOpenAICompat(resolvedKey, providerCfg.baseUrl, model, ANALYZER_SYSTEM, messages, res, 6000); break;
+      case 'gemini':        await streamGemini(resolvedKey, model, ANALYZER_SYSTEM, messages, res); break;
+      case 'cohere':        await streamCohere(resolvedKey, model, ANALYZER_SYSTEM, messages, res); break;
+      default: res.write(`data: ${JSON.stringify({ error: `Provider ${providerCfg.type} not supported` })}\n\n`);
+    }
+  } catch (err) {
+    const msg = err.response?.data?.error?.message || err.response?.data?.message || err.message;
+    res.write(`data: ${JSON.stringify({ error: msg })}\n\n`);
+  }
+  res.write('data: [DONE]\n\n');
+  res.end();
 });
 
 // ── POST /copywrite/generate-ghl-prompt ──────────────────────────────────────
