@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAIConfig } from '../hooks/useAIConfig.js'
-import { api } from '../lib/api.js'
+import { api, getLocationId } from '../lib/api.js'
 import { notifySuccess, notifyError } from '../lib/toast.jsx'
 
 // Minimal Markdown renderer for the brief (headings, bullets, bold).
@@ -42,11 +43,14 @@ function renderMarkdown(text) {
 }
 
 export default function Analyzer() {
+  const navigate = useNavigate()
+  const locationId = getLocationId()
   const { config, loading: configLoading } = useAIConfig()
   const [transcript, setTranscript] = useState('')
   const [clientName, setClientName] = useState('')
   const [result, setResult]   = useState('')
   const [loading, setLoading] = useState(false)
+  const [saving, setSaving]   = useState(false)
   const [fileName, setFileName] = useState('')
   const fileRef = useRef(null)
 
@@ -78,6 +82,43 @@ export default function Analyzer() {
 
   function copyResult() {
     navigator.clipboard?.writeText(result).then(() => notifySuccess('Brief copied')).catch(() => {})
+  }
+
+  // Save the brief to the Library — grouped under the client (created if needed).
+  async function saveToLibrary() {
+    if (!result.trim()) return
+    setSaving(true)
+    try {
+      let customerId = '_unsorted', customerName = ''
+      const name = clientName.trim()
+      if (name) {
+        const custs = await api.getCustomers().catch(() => [])
+        const existing = (Array.isArray(custs) ? custs : []).find(c => (c.name || '').toLowerCase() === name.toLowerCase())
+        const cust = existing || await api.createCustomer(name)
+        if (cust?.id) { customerId = cust.id; customerName = cust.name }
+      }
+      const title = `Project Brief — ${name || new Date().toLocaleDateString()}`
+      const copy = await api.saveCopy({
+        customerId, customerName,
+        type: 'general',
+        title,
+        preview: result.replace(/[#*]/g, '').slice(0, 120),
+        messages: [
+          { role: 'user', content: 'Analyze this transcript into a project brief.' },
+          { role: 'assistant', content: result },
+        ],
+      })
+      notifySuccess('Brief saved to Library')
+      if (copy?.id) {
+        const u = new URL(`/library/${customerId}/${copy.id}`, window.location.origin)
+        if (locationId) u.searchParams.set('locationId', locationId)
+        navigate(u.pathname + u.search)
+      }
+    } catch (e) {
+      notifyError(e.message || 'Could not save')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -132,7 +173,14 @@ export default function Analyzer() {
           <div className="card" style={{ padding: '20px 24px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
               <div className="fw-700" style={{ fontSize: '.95rem' }}>Project Brief</div>
-              {result && !loading && <button className="btn btn-ghost btn-sm" onClick={copyResult}>Copy</button>}
+              {result && !loading && (
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button className="btn btn-ghost btn-sm" onClick={copyResult}>Copy</button>
+                  <button className="btn btn-primary btn-sm" onClick={saveToLibrary} disabled={saving}>
+                    {saving ? 'Saving…' : 'Save to Library'}
+                  </button>
+                </div>
+              )}
             </div>
             {loading && !result ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'var(--sub)', padding: '12px 0' }}>
