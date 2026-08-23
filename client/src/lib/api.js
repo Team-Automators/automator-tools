@@ -136,6 +136,39 @@ export const api = {
     return r.json()
   },
 
+  // ── Client Pipeline Tracker ──────────────────────────────────────────────
+  async getPipeline() {
+    const r = await apiFetch('/api/pipeline')
+    if (!r.ok) return []
+    return r.json()
+  },
+  async createEngagement(fields) {
+    const r = await fetch('/api/pipeline', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ locationId: getLocationId(), ...fields }),
+    })
+    return r.json()
+  },
+  async updateEngagement(id, fields) {
+    const r = await fetch(`/api/pipeline/${id}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ locationId: getLocationId(), ...fields }),
+    })
+    return r.json()
+  },
+  async deleteEngagement(id) {
+    const url = withLocationId(new URL(`/api/pipeline/${id}`, window.location.origin))
+    const r = await fetch(url.toString(), { method: 'DELETE' })
+    return r.json()
+  },
+  async importPipeline(items) {
+    const r = await fetch('/api/pipeline/import', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ locationId: getLocationId(), items }),
+    })
+    return r.json()
+  },
+
   async getTasks() {
     const r = await apiFetch('/api/tasks')
     if (!r.ok) return []

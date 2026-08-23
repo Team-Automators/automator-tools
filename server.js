@@ -19,6 +19,7 @@ const incomingRouter     = require('./routes/incoming');
 const clickupApiRouter   = require('./routes/clickup-api');
 const ghlProbeRouter     = require('./routes/ghl-probe');
 const workflowsRouter    = require('./routes/workflows-api');
+const pipelineRouter     = require('./routes/pipeline-api');
 const requireLocation    = require('./middleware/require-location');
 
 const app  = express();
@@ -52,6 +53,7 @@ app.use('/api/hooks',     requireLocation, hooksApiRouter);
 app.use('/api/clickup',   requireLocation, clickupApiRouter);
 app.use('/api/ghl-probe', requireLocation, ghlProbeRouter);
 app.use('/api/workflows', requireLocation, workflowsRouter);
+app.use('/api/pipeline',  requireLocation, pipelineRouter);
 app.use('/api',           requireLocation, apiCopyRouter);
 
 // ── React SPA (serve built client) ────────────────────────────────────────────
