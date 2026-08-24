@@ -86,6 +86,18 @@ async function run() {
     check('location token still returned via fallback', token === 'LOCTOKEN_OK', `got ${token}`);
   }
 
+  // Case 3: real findAll() must NOT let a token payload's own locationId:null
+  // clobber the key-derived locationId (agency installs carry locationId:null).
+  {
+    const redis = require('../lib/redis');
+    redis.scan = async () => [0, ['ghl:tokens:AGENCYKEY']];
+    redis.get  = async () => ({ access_token: 'A', refresh_token: 'R', locationId: null, companyId: 'C1' });
+    const store = require('../lib/oauth-store');
+    const all = await store.findAll();
+    check('findAll keeps the redis key as locationId (not payload null)',
+      all[0]?.locationId === 'AGENCYKEY', `got ${all[0]?.locationId}`);
+  }
+
   console.log(`\n${passed} passed, ${failed} failed\n`);
   process.exit(failed ? 1 : 0);
 }
