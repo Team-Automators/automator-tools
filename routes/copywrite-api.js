@@ -1126,7 +1126,9 @@ ${samples.join('\n\n---\n\n')}`;
 // Turn a call/Zoom transcript into a structured project brief the build team
 // can follow (patterned on the Custom Roadmap: stage, BLAST, funnel/ad/build,
 // phases, deliverables, MIT).
-const ANALYZER_SYSTEM = `You are a senior solutions consultant at a funnel & automation agency. You read a discovery/sales call transcript, meeting notes, or a summary and produce a clear, actionable PROJECT BRIEF that the implementation team will follow to build the client's funnel and automation. The reader is the builder — they must know exactly what to build.
+const ANALYZER_SYSTEM = `You are a senior solutions consultant at a funnel & automation agency. You read a discovery/sales call transcript, meeting notes, or a summary and produce a clear, actionable PROJECT BRIEF that the implementation team will follow to build the client's funnel and automation. The reader is the builder — they must know exactly what to build AND what happens next.
+
+Read the ENTIRE conversation and account for BOTH parties — capture what the CLIENT said (goals, context, questions, objections, budget/timeline, anything they asked for or pushed back on) AND what the CONSULTANT said (recommendations, promises, commitments, deadlines, anything they said they'd deliver or follow up on). Nothing discussed by either side should be dropped — if it was raised on the call, it must appear somewhere in the brief.
 
 Return clean Markdown with EXACTLY these sections and headings:
 
@@ -1135,6 +1137,13 @@ Return clean Markdown with EXACTLY these sections and headings:
 - Target audience
 - Current stage — pick ONE: Ideation, Formation, Validation, Monetization, Maximization (with a one-line reason)
 - Primary goals and biggest pain points (bullets)
+
+## Conversation Recap (Both Parties)
+Summarize the full discussion so nothing is lost:
+- **What the client said / wants** — their goals, context, must-haves, budget/timeline if mentioned
+- **What the consultant recommended / committed to** — advice given, promises made, anything they said they'd send or do
+- **Decisions made** — what both sides agreed on
+- **Questions & objections raised** — and how (or whether) they were resolved
 
 ## BLAST Scorecard
 Score each 0–10 based on the transcript, with a one-line reason:
@@ -1162,10 +1171,21 @@ An ordered, concrete checklist of everything that needs to be completed (pages, 
 ## Most Important Thing (MIT)
 The single biggest focus to drive revenue or remove the current bottleneck.
 
-## Consultant Recommendation
-Your best professional recommendation for the build and approach (3–5 sentences).
+## Open Items & Risks
+- Unresolved questions, missing information, or decisions still pending
+- Client objections/concerns not yet fully addressed
+- Risks or dependencies that could block the build
 
-Base everything strictly on the provided material. Where it lacks detail, make a smart, clearly-reasonable assumption and mark it "(assumption)". Be specific and implementation-ready — no vague filler.`;
+## Next Steps (Action Items)
+A clear, ordered checklist so the reader knows exactly what to do next. For EACH item include the owner and any timing mentioned:
+- [ ] Action — **Owner: Agency** (by <date/timeframe if stated>)
+- [ ] Action — **Owner: Client** (by <date/timeframe if stated>)
+Cover follow-ups the consultant promised, information/assets the client still owes, approvals needed, and the immediate first build task.
+
+## Consultant Recommendation
+Your best professional recommendation for the build and approach (3–5 sentences), tying together what both parties said and why this is the right path forward.
+
+Base everything strictly on the provided material and cover the WHOLE conversation from both sides. Where it lacks detail, make a smart, clearly-reasonable assumption and mark it "(assumption)". Be specific and implementation-ready — no vague filler.`;
 
 // POST /copywrite/extract-file — pull plain text out of an uploaded document so
 // the Analyzer can accept PDFs, Word docs, and text files (not just pasted text).
@@ -1222,8 +1242,8 @@ router.post('/analyze-transcript', async (req, res) => {
 
   try {
     switch (providerCfg.type) {
-      case 'anthropic':     await streamAnthropic(resolvedKey, model, ANALYZER_SYSTEM, messages, res, 6000); break;
-      case 'openai-compat': await streamOpenAICompat(resolvedKey, providerCfg.baseUrl, model, ANALYZER_SYSTEM, messages, res, 6000); break;
+      case 'anthropic':     await streamAnthropic(resolvedKey, model, ANALYZER_SYSTEM, messages, res, 8000); break;
+      case 'openai-compat': await streamOpenAICompat(resolvedKey, providerCfg.baseUrl, model, ANALYZER_SYSTEM, messages, res, 8000); break;
       case 'gemini':        await streamGemini(resolvedKey, model, ANALYZER_SYSTEM, messages, res); break;
       case 'cohere':        await streamCohere(resolvedKey, model, ANALYZER_SYSTEM, messages, res); break;
       default: res.write(`data: ${JSON.stringify({ error: `Provider ${providerCfg.type} not supported` })}\n\n`);
