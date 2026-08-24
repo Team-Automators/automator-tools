@@ -256,7 +256,7 @@ export default function Pipeline() {
                       const st = stageOf(e.stage)
                       return (
                         <div key={e.id} onClick={() => setEditId(e.id)} title="Click to edit / move"
-                          style={{ background: bg, border: `1px solid ${bd}`, borderRadius: 10, padding: 12, position: 'relative', cursor: 'pointer' }}>
+                          style={{ background: bg, border: `1px solid ${bd}`, borderRadius: 10, padding: 12, cursor: 'pointer' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
                             <div style={{ fontWeight: 700, fontSize: '.85rem', color: 'var(--text)', lineHeight: 1.3, paddingRight: 4 }}>{e.title}</div>
                             <input type="checkbox" title="Mark complete" onClick={ev => ev.stopPropagation()} onChange={() => complete(e)} style={{ cursor: 'pointer', marginTop: 2 }} />
@@ -274,7 +274,7 @@ export default function Pipeline() {
                               {clientSvcs.map((s, i) => <span key={i} style={{ width: 8, height: 8, borderRadius: '50%', background: SVC[s]?.color || '#999', display: 'inline-block' }} />)}
                             </div>
                           )}
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                             <input
                               type="date"
                               value={e.dueDate || ''}
@@ -283,7 +283,8 @@ export default function Pipeline() {
                               title="Due date — click to edit"
                               style={{
                                 fontSize: '.66rem', border: '1px solid transparent', borderRadius: 6, cursor: 'pointer', padding: '1px 4px',
-                                background: 'var(--surface)', color: isOverdue(e) ? 'var(--danger)' : 'var(--sub)', width: 118,
+                                background: 'var(--surface)', color: isOverdue(e) ? 'var(--danger)' : 'var(--sub)',
+                                flex: '0 0 auto', width: 112, minWidth: 0,
                               }}
                             />
                             <select
@@ -292,6 +293,7 @@ export default function Pipeline() {
                               onChange={ev => setWaiting(e, ev.target.value)}
                               style={{
                                 fontSize: '.66rem', fontWeight: 700, border: 'none', borderRadius: 99, cursor: 'pointer', padding: '2px 6px',
+                                flex: '1 1 auto', minWidth: 0,
                                 background: wait === 'client' ? 'rgba(245,158,11,.18)' : wait === 'consultant' ? 'rgba(124,58,237,.18)' : 'var(--surface)',
                                 color: wait === 'client' ? '#B45309' : wait === 'consultant' ? '#6D28D9' : 'var(--sub)',
                               }}
@@ -300,8 +302,9 @@ export default function Pipeline() {
                               <option value="client">Waiting on Client</option>
                               <option value="consultant">Waiting for Consultant</option>
                             </select>
+                            <button onClick={ev => { ev.stopPropagation(); removeEng(e) }} title="Delete task"
+                              style={{ flex: '0 0 auto', background: 'none', border: 'none', color: 'var(--sub)', cursor: 'pointer', fontSize: '.8rem', padding: '2px 4px', lineHeight: 1 }}>✕</button>
                           </div>
-                          <button onClick={ev => { ev.stopPropagation(); removeEng(e) }} title="Delete task" style={{ position: 'absolute', bottom: 6, right: 8, background: 'none', border: 'none', color: 'var(--sub)', cursor: 'pointer', fontSize: '.7rem' }}>✕</button>
                         </div>
                       )
                     })}
