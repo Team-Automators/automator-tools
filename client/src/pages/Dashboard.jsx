@@ -18,7 +18,7 @@ function relTime(ts) {
   return `${Math.floor(h / 24)}d ago`
 }
 
-function Pagination({ type, page, total, onPage }) {
+function Pagination({ page, total, onPage }) {
   const pages = Math.ceil(total / PAGE_SIZE)
   if (pages <= 1) return null
   return (
@@ -26,7 +26,7 @@ function Pagination({ type, page, total, onPage }) {
       <button
         className="dash-page-btn"
         disabled={page === 0}
-        onClick={() => onPage(type, page - 1)}
+        onClick={() => onPage(page - 1)}
         aria-label="Previous page"
       >
         ‹
@@ -35,7 +35,7 @@ function Pagination({ type, page, total, onPage }) {
       <button
         className="dash-page-btn"
         disabled={page === pages - 1}
-        onClick={() => onPage(type, page + 1)}
+        onClick={() => onPage(page + 1)}
         aria-label="Next page"
       >
         ›
@@ -50,7 +50,7 @@ export default function Dashboard() {
   const { config } = useAIConfig()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [pages, setPages] = useState({}) // { [typeKey]: pageIndex }
+  const [page, setPage] = useState(0) // recent-copy page (5 per page, all categories)
 
   useEffect(() => {
     api.getDashboard()
@@ -62,10 +62,6 @@ export default function Dashboard() {
     const u = new URL(path, window.location.origin)
     if (locationId) u.searchParams.set('locationId', locationId)
     navigate(u.pathname + u.search)
-  }
-
-  function setPage(type, page) {
-    setPages(prev => ({ ...prev, [type]: page }))
   }
 
   async function deleteCopy(e, copyId) {
@@ -109,6 +105,12 @@ export default function Dashboard() {
   })
   const orderedTypes = [...TYPE_ORDER, ...Object.keys(grouped).filter(t => !TYPE_ORDER.includes(t))]
     .filter(t => grouped[t])
+
+  // Flat recent list — newest first, 5 per page across ALL categories.
+  const sortedCopies = [...allCopies].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
+  const totalPages   = Math.max(1, Math.ceil(sortedCopies.length / PAGE_SIZE))
+  const pageSafe     = Math.min(page, totalPages - 1)
+  const pageSlice    = sortedCopies.slice(pageSafe * PAGE_SIZE, pageSafe * PAGE_SIZE + PAGE_SIZE)
 
   return (
     <>
@@ -168,8 +170,11 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Recent copy — grouped by category */}
-        <div className="section-title">Recent Copy</div>
+        {/* Recent copy — newest first, 5 per page across all categories */}
+        <div className="dash-cat-header" style={{ marginBottom: 4 }}>
+          <div className="section-title" style={{ margin: 0 }}>Recent Copy</div>
+          <Pagination page={pageSafe} total={sortedCopies.length} onPage={setPage} />
+        </div>
 
         {allCopies.length === 0 ? (
           <div className="empty-state">
@@ -181,68 +186,39 @@ export default function Dashboard() {
             </button>
           </div>
         ) : (
-          <div className="dash-categories">
-            {orderedTypes.map(typeKey => {
-              const typeInfo = TYPES[typeKey] || TYPES.general
-              const items    = grouped[typeKey]
-              const page     = pages[typeKey] || 0
-              const slice    = items.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
-
+          <div className="recent-list">
+            {pageSlice.map(copy => {
+              const typeInfo = TYPES[copy.type] || TYPES.general
+              const link = copy.customerId && copy.customerId !== '_unsorted'
+                ? `/library/${copy.customerId}/${copy.id}`
+                : `/library/_unsorted/${copy.id}`
               return (
-                <div key={typeKey} className="dash-category">
-                  {/* Category header */}
-                  <div className="dash-cat-header">
-                    <div className="dash-cat-title">
-                      <span
-                        className="badge"
-                        style={{ background: typeInfo.colorBg, color: typeInfo.color }}
-                      >
-                        {typeInfo.title}
-                      </span>
-                      <span className="dash-cat-count">{items.length} {items.length === 1 ? 'copy' : 'copies'}</span>
-                    </div>
-                    <Pagination
-                      type={typeKey}
-                      page={page}
-                      total={items.length}
-                      onPage={setPage}
-                    />
+                <div
+                  key={copy.id}
+                  className="recent-item"
+                  onClick={() => goTo(link)}
+                >
+                  <div className="recent-info">
+                    <div className="recent-title">{copy.title || 'Untitled'}</div>
+                    {copy.preview && (
+                      <div className="recent-preview">{copy.preview}</div>
+                    )}
                   </div>
-
-                  {/* Rows */}
-                  <div className="recent-list">
-                    {slice.map(copy => {
-                      const link = copy.customerId && copy.customerId !== '_unsorted'
-                        ? `/library/${copy.customerId}/${copy.id}`
-                        : `/library/_unsorted/${copy.id}`
-                      return (
-                        <div
-                          key={copy.id}
-                          className="recent-item"
-                          onClick={() => goTo(link)}
-                        >
-                          <div className="recent-info">
-                            <div className="recent-title">{copy.title || 'Untitled'}</div>
-                            {copy.preview && (
-                              <div className="recent-preview">{copy.preview}</div>
-                            )}
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                            <div className="recent-meta">{relTime(copy.updatedAt)}</div>
-                            <button
-                              className="btn btn-ghost btn-sm"
-                              style={{ color: 'var(--danger)', padding: '4px 6px', minHeight: 'auto' }}
-                              onClick={e => deleteCopy(e, copy.id)}
-                              title="Archive"
-                            >
-                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="14" height="14">
-                                <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-                              </svg>
-                            </button>
-                          </div>
-                        </div>
-                      )
-                    })}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                    <span className="badge" style={{ background: typeInfo.colorBg, color: typeInfo.color }}>
+                      {typeInfo.title.replace(' Copywriter', '')}
+                    </span>
+                    <div className="recent-meta">{relTime(copy.updatedAt)}</div>
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      style={{ color: 'var(--danger)', padding: '4px 6px', minHeight: 'auto' }}
+                      onClick={e => deleteCopy(e, copy.id)}
+                      title="Archive"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="14" height="14">
+                        <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                      </svg>
+                    </button>
                   </div>
                 </div>
               )
