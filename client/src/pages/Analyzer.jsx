@@ -48,7 +48,6 @@ export default function Analyzer() {
   const { config, loading: configLoading } = useAIConfig()
   const [transcript, setTranscript] = useState('')
   const [clientName, setClientName] = useState('')
-  const [videoLink, setVideoLink]   = useState('')
   const [result, setResult]   = useState('')
   const [loading, setLoading] = useState(false)
   const [saving, setSaving]   = useState(false)
@@ -97,7 +96,7 @@ export default function Analyzer() {
     setResult('')
     try {
       await api.analyzeTranscriptStream(
-        { transcript, clientName, videoLink, provider: config.provider, apiKey: config.apiKey, model: config.model },
+        { transcript, clientName, provider: config.provider, apiKey: config.apiKey, model: config.model },
         { onChunk: (_c, full) => setResult(full) }
       )
     } catch (e) {
@@ -131,7 +130,7 @@ export default function Analyzer() {
         title,
         preview: result.replace(/[#*]/g, '').slice(0, 120),
         messages: [
-          { role: 'user', content: `Analyze this into a project brief.${videoLink ? `\n\nRecording: ${videoLink}` : ''}` },
+          { role: 'user', content: 'Analyze this into a project brief.' },
           { role: 'assistant', content: result },
         ],
       })
@@ -170,12 +169,6 @@ export default function Analyzer() {
           </div>
 
           <div className="form-group" style={{ margin: 0 }}>
-            <label className="form-label">Recording / video link (optional)</label>
-            <input className="form-input" value={videoLink} onChange={e => setVideoLink(e.target.value)}
-              placeholder="Zoom / Loom / Drive / YouTube link — for the build team's reference" />
-          </div>
-
-          <div className="form-group" style={{ margin: 0 }}>
             <label className="form-label">Transcript, notes, or summary</label>
             <textarea
               className="form-input"
@@ -184,9 +177,6 @@ export default function Analyzer() {
               onChange={e => setTranscript(e.target.value)}
               placeholder="Paste the Zoom/call transcript, your meeting notes, or a summary — or upload a file below…"
             />
-            <div style={{ fontSize: '.72rem', color: 'var(--sub)', marginTop: 4 }}>
-              Tip: a link alone can't be analyzed — paste notes/transcript or upload a file. The link is saved as reference.
-            </div>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>

@@ -436,12 +436,12 @@ export const api = {
     return j
   },
 
-  analyzeTranscriptStream({ transcript, clientName, provider, apiKey, model, videoLink }, { onChunk } = {}) {
+  analyzeTranscriptStream({ transcript, clientName, provider, apiKey, model }, { onChunk } = {}) {
     return new Promise((resolve, reject) => {
       fetch('/copywrite/analyze-transcript', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transcript, clientName, provider, apiKey, model, videoLink }),
+        body: JSON.stringify({ transcript, clientName, provider, apiKey, model }),
       }).then(async resp => {
         if (!resp.ok) {
           const j = await resp.json().catch(() => ({}))

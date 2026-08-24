@@ -1197,7 +1197,7 @@ router.post('/extract-file', async (req, res) => {
 });
 
 router.post('/analyze-transcript', async (req, res) => {
-  const { transcript, provider = 'claude', apiKey, model: reqModel, clientName, videoLink } = req.body;
+  const { transcript, provider = 'claude', apiKey, model: reqModel, clientName } = req.body;
   if (!transcript || !String(transcript).trim()) return res.status(400).json({ error: 'transcript required' });
 
   const resolvedKey = apiKey || (provider === 'claude' ? process.env.ANTHROPIC_API_KEY : null);
@@ -1209,7 +1209,6 @@ router.post('/analyze-transcript', async (req, res) => {
   const model = reqModel || providerCfg.defaultModel;
   const userPrompt = [
     clientName ? `Client: ${clientName}` : '',
-    videoLink ? `Recording / reference link (the build team can review it): ${videoLink}` : '',
     `SOURCE MATERIAL (call transcript, meeting notes, or summary):`,
     String(transcript).slice(0, 40000),
     `\nProduce the full project brief now.`,
