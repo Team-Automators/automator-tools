@@ -105,7 +105,7 @@ function ThumbDownIcon() {
   )
 }
 
-function MsgBubble({ msg, isLast, onSave, onWorkflow, onFeedback, feedback, onMockup, onGeneratePrompt }) {
+function MsgBubble({ msg, isLast, onSave, onWorkflow, onFeedback, feedback, onMockup, onGeneratePrompt, showPreview }) {
   const [copied, setCopied] = useState(false)
   const isAI = msg.role === 'assistant'
   const hasContent = msg.content.length > 60
@@ -141,12 +141,16 @@ function MsgBubble({ msg, isLast, onSave, onWorkflow, onFeedback, feedback, onMo
                 <button className="action-btn workflow" onClick={() => onWorkflow(msg.content)}>
                   Add to Workflow →
                 </button>
-                <button className="action-btn mockup-btn" onClick={onMockup}>
-                  Preview Mockup
-                </button>
-                <button className="action-btn ghl-prompt-btn" onClick={() => onGeneratePrompt(msg.content)}>
-                  Generate Prompt
-                </button>
+                {showPreview && (
+                  <>
+                    <button className="action-btn mockup-btn" onClick={onMockup}>
+                      Preview Mockup
+                    </button>
+                    <button className="action-btn ghl-prompt-btn" onClick={() => onGeneratePrompt(msg.content)}>
+                      Generate Prompt
+                    </button>
+                  </>
+                )}
               </>
             )}
             <button
@@ -682,6 +686,7 @@ export default function CopywritersChat() {
               feedback={feedbackMap[i] || null}
               onMockup={() => handleMockup(cleanDisplayText(msg.content), 'ai')}
               onGeneratePrompt={() => handleGeneratePrompt(cleanDisplayText(msg.content))}
+              showPreview={type === 'webinar' || type === 'sales-page'}
             />
           ))}
 

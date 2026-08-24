@@ -97,7 +97,7 @@ function ThumbDownIcon() {
   )
 }
 
-function MsgBubble({ msg, isLast, onFeedback, feedback, onMockup, onGeneratePrompt }) {
+function MsgBubble({ msg, isLast, onFeedback, feedback, onMockup, onGeneratePrompt, showPreview }) {
   const [copied, setCopied] = useState(false)
   const isAI = msg.role === 'assistant'
   const hasContent = msg.content.length > 60
@@ -127,12 +127,16 @@ function MsgBubble({ msg, isLast, onFeedback, feedback, onMockup, onGenerateProm
                 <button className="action-btn" onClick={copy}>
                   {copied ? 'Copied!' : 'Copy to clipboard'}
                 </button>
-                <button className="action-btn mockup-btn" onClick={onMockup}>
-                  Preview Mockup
-                </button>
-                <button className="action-btn ghl-prompt-btn" onClick={() => onGeneratePrompt(msg.content)}>
-                  Generate Prompt
-                </button>
+                {showPreview && (
+                  <>
+                    <button className="action-btn mockup-btn" onClick={onMockup}>
+                      Preview Mockup
+                    </button>
+                    <button className="action-btn ghl-prompt-btn" onClick={() => onGeneratePrompt(msg.content)}>
+                      Generate Prompt
+                    </button>
+                  </>
+                )}
               </>
             )}
             <button
@@ -649,6 +653,7 @@ export default function LibraryChat() {
                 feedback={feedbackMap[i] || null}
                 onMockup={() => handleMockup(cleanDisplayText(msg.content), 'ai')}
                 onGeneratePrompt={() => handleGeneratePrompt(msg.content)}
+                showPreview={(copy?.type || '') === 'webinar' || (copy?.type || '') === 'sales-page'}
               />
             )
           })}
