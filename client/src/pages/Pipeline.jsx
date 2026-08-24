@@ -194,6 +194,7 @@ export default function Pipeline() {
         <div className="topnav-right" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', gap: 4, background: 'var(--surface)', borderRadius: 8, padding: 3 }}>
             <button className={`btn btn-sm ${view === 'board' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setView('board')}>Board</button>
+            <button className={`btn btn-sm ${view === 'clients' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setView('clients')}>By Client</button>
             <button className={`btn btn-sm ${view === 'completed' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setView('completed')}>Completed Clients</button>
           </div>
           <input className="form-input" style={{ width: 200, height: 34 }} placeholder="Search client or task…" value={search} onChange={e => setSearch(e.target.value)} />
@@ -303,12 +304,14 @@ export default function Pipeline() {
               )
             })}
           </div>
+        ) : view === 'clients' ? (
+          <ClientRollup visible={visible} onComplete={complete} onReopen={reopen} onSetWaiting={setWaiting} />
         ) : (
           <CompletedTable completed={completed} onReopen={reopen} />
         )}
 
         {/* Analytics */}
-        {view === 'board' && (
+        {(view === 'board' || view === 'clients') && (
           <div className="card" style={{ marginTop: 24, padding: 20 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
               <div className="fw-700" style={{ fontSize: '.95rem' }}>Completed Work Analytics</div>
@@ -372,6 +375,108 @@ export default function Pipeline() {
         )}
       </div>
     </>
+  )
+}
+
+// Client-centric rollup: one panel per customer showing every service-tagged
+// task, grouped by service, with a progress bar and an explicit "remaining" list
+// so the user sees exactly what's left for each client.
+function ClientRollup({ visible, onComplete, onReopen, onSetWaiting }) {
+  const [sort, setSort] = useState('remaining')   // 'remaining' | 'name' | 'progress'
+
+  const clients = useMemo(() => {
+    const m = {}
+    visible.forEach(e => {
+      const c = (m[e.clientName] ||= { name: e.clientName, all: [] })
+      c.all.push(e)
+    })
+    const list = Object.values(m).map(c => {
+      const total = c.all.length
+      const done = c.all.filter(e => e.status === 'completed').length
+      const remaining = c.all.filter(e => e.status === 'active')
+      const overdue = remaining.filter(isOverdue).length
+      const services = {}
+      c.all.forEach(e => {
+        const s = (services[e.service] ||= { key: e.service, total: 0, done: 0 })
+        s.total++; if (e.status === 'completed') s.done++
+      })
+      return { ...c, total, done, remaining, overdue, pct: total ? Math.round((done / total) * 100) : 0, services: Object.values(services) }
+    })
+    list.sort((a, b) =>
+      sort === 'name' ? a.name.localeCompare(b.name)
+      : sort === 'progress' ? b.pct - a.pct
+      : (b.remaining.length - a.remaining.length) || a.name.localeCompare(b.name))
+    return list
+  }, [visible, sort])
+
+  if (clients.length === 0) {
+    return <div className="card empty-state" style={{ padding: 32 }}><div className="empty-sub">No clients yet — tag a task with a Customer and a Service.</div></div>
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+        <select className="form-input" style={{ width: 'auto', height: 32, fontSize: '.8rem' }} value={sort} onChange={e => setSort(e.target.value)}>
+          <option value="remaining">Most remaining first</option>
+          <option value="progress">Most complete first</option>
+          <option value="name">Client name</option>
+        </select>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 14 }}>
+        {clients.map(c => (
+          <div key={c.name} className="card" style={{ padding: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
+              <div style={{ fontWeight: 700, fontSize: '.95rem' }}>{c.name}</div>
+              <div style={{ fontSize: '.72rem', color: 'var(--sub)' }}>
+                {c.remaining.length} remaining{c.overdue ? ` · ${c.overdue} overdue` : ''} · {c.done}/{c.total} done
+              </div>
+            </div>
+
+            {/* Progress bar */}
+            <div style={{ height: 8, borderRadius: 99, background: 'var(--surface)', overflow: 'hidden', margin: '10px 0' }}>
+              <div style={{ width: `${c.pct}%`, height: '100%', background: c.pct === 100 ? '#16A34A' : 'var(--accent, #6366F1)', transition: 'width .3s' }} />
+            </div>
+
+            {/* Per-service breakdown */}
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
+              {c.services.map(s => {
+                const rem = s.total - s.done
+                return (
+                  <span key={s.key} title={`${s.done}/${s.total} done`} style={{ fontSize: '.7rem', fontWeight: 700, padding: '3px 9px', borderRadius: 99, background: `${SVC[s.key]?.color || '#999'}18`, color: SVC[s.key]?.color || '#666', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: SVC[s.key]?.color || '#999' }} />
+                    {SVC[s.key]?.label || s.key}
+                    <span style={{ opacity: .8 }}>{rem ? `${rem} left` : '✓'}</span>
+                  </span>
+                )
+              })}
+            </div>
+
+            {/* Remaining tasks — what's left */}
+            {c.remaining.length > 0 ? (
+              <div>
+                <div style={{ fontSize: '.66rem', fontWeight: 700, letterSpacing: '.06em', color: 'var(--sub)', marginBottom: 6 }}>REMAINING</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {c.remaining.map(e => {
+                    const st = stageOf(e.stage)
+                    return (
+                      <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', border: `1px solid ${isOverdue(e) ? 'var(--danger)' : 'var(--border)'}`, borderRadius: 8 }}>
+                        <input type="checkbox" title="Mark complete" onChange={() => onComplete(e)} style={{ cursor: 'pointer' }} />
+                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: SVC[e.service]?.color || '#999', flexShrink: 0 }} />
+                        <span style={{ fontSize: '.8rem', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.title}</span>
+                        {e.dueDate && <span style={{ fontSize: '.66rem', color: isOverdue(e) ? 'var(--danger)' : 'var(--sub)' }}>{fmtDate(e.dueDate)}</span>}
+                        <span style={{ fontSize: '.64rem', fontWeight: 700, padding: '1px 6px', borderRadius: 99, background: st.bg, color: st.color }}>{st.label}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            ) : (
+              <div style={{ fontSize: '.78rem', color: '#16A34A', fontWeight: 600 }}>✓ All tasks complete</div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
   )
 }
 
