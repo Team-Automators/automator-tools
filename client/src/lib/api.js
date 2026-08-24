@@ -417,12 +417,31 @@ export const api = {
   },
 
   // Stream a project brief from a call transcript.
-  analyzeTranscriptStream({ transcript, clientName, provider, apiKey, model }, { onChunk } = {}) {
+  // Extract plain text from an uploaded document (PDF/DOCX/text) server-side.
+  async extractFile(file) {
+    const dataBase64 = await new Promise((resolve, reject) => {
+      const r = new FileReader()
+      r.onload = () => resolve(String(r.result || ''))
+      r.onerror = () => reject(new Error('Could not read file'))
+      r.readAsDataURL(file)
+    })
+    const url = withLocationId(new URL('/copywrite/extract-file', window.location.origin))
+    const resp = await fetch(url.toString(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filename: file.name, dataBase64 }),
+    })
+    const j = await resp.json().catch(() => ({}))
+    if (!resp.ok) throw new Error(j.error || `Extraction failed (${resp.status})`)
+    return j
+  },
+
+  analyzeTranscriptStream({ transcript, clientName, provider, apiKey, model, videoLink }, { onChunk } = {}) {
     return new Promise((resolve, reject) => {
       fetch('/copywrite/analyze-transcript', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transcript, clientName, provider, apiKey, model }),
+        body: JSON.stringify({ transcript, clientName, provider, apiKey, model, videoLink }),
       }).then(async resp => {
         if (!resp.ok) {
           const j = await resp.json().catch(() => ({}))

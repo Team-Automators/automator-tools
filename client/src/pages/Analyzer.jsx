@@ -48,29 +48,56 @@ export default function Analyzer() {
   const { config, loading: configLoading } = useAIConfig()
   const [transcript, setTranscript] = useState('')
   const [clientName, setClientName] = useState('')
+  const [videoLink, setVideoLink]   = useState('')
   const [result, setResult]   = useState('')
   const [loading, setLoading] = useState(false)
   const [saving, setSaving]   = useState(false)
   const [fileName, setFileName] = useState('')
+  const [extracting, setExtracting] = useState(false)
   const fileRef = useRef(null)
 
-  function onFile(e) {
+  const TEXT_EXTS = ['txt', 'vtt', 'srt', 'md', 'csv', 'rtf', 'json', 'html', 'htm', 'log']
+
+  async function onFile(e) {
     const file = e.target.files?.[0]
     if (!file) return
     setFileName(file.name)
-    const reader = new FileReader()
-    reader.onload = () => setTranscript(String(reader.result || ''))
-    reader.readAsText(file)
+    const ext = (file.name.split('.').pop() || '').toLowerCase()
+    // Plain-text formats parse instantly in the browser; PDFs/Word docs go to
+    // the server extractor.
+    if (TEXT_EXTS.includes(ext)) {
+      const reader = new FileReader()
+      reader.onload = () => setTranscript(prev => appendText(prev, String(reader.result || '')))
+      reader.readAsText(file)
+      return
+    }
+    setExtracting(true)
+    try {
+      const { text, chars } = await api.extractFile(file)
+      setTranscript(prev => appendText(prev, text))
+      notifySuccess(`Extracted ${chars.toLocaleString()} characters from ${file.name}`)
+    } catch (err) {
+      notifyError(err.message || 'Could not read that file')
+      setFileName('')
+    } finally {
+      setExtracting(false)
+      e.target.value = ''
+    }
+  }
+
+  function appendText(prev, next) {
+    const a = (prev || '').trim()
+    return a ? `${a}\n\n${next}` : next
   }
 
   async function analyze() {
-    if (!transcript.trim()) { notifyError('Paste or upload a transcript first'); return }
+    if (!transcript.trim()) { notifyError('Add a transcript, notes, summary, or a file first'); return }
     if (!config?.apiKey) { notifyError('Connect an AI provider in Settings first'); return }
     setLoading(true)
     setResult('')
     try {
       await api.analyzeTranscriptStream(
-        { transcript, clientName, provider: config.provider, apiKey: config.apiKey, model: config.model },
+        { transcript, clientName, videoLink, provider: config.provider, apiKey: config.apiKey, model: config.model },
         { onChunk: (_c, full) => setResult(full) }
       )
     } catch (e) {
@@ -104,7 +131,7 @@ export default function Analyzer() {
         title,
         preview: result.replace(/[#*]/g, '').slice(0, 120),
         messages: [
-          { role: 'user', content: 'Analyze this transcript into a project brief.' },
+          { role: 'user', content: `Analyze this into a project brief.${videoLink ? `\n\nRecording: ${videoLink}` : ''}` },
           { role: 'assistant', content: result },
         ],
       })
@@ -143,27 +170,40 @@ export default function Analyzer() {
           </div>
 
           <div className="form-group" style={{ margin: 0 }}>
-            <label className="form-label">Transcript</label>
+            <label className="form-label">Recording / video link (optional)</label>
+            <input className="form-input" value={videoLink} onChange={e => setVideoLink(e.target.value)}
+              placeholder="Zoom / Loom / Drive / YouTube link — for the build team's reference" />
+          </div>
+
+          <div className="form-group" style={{ margin: 0 }}>
+            <label className="form-label">Transcript, notes, or summary</label>
             <textarea
               className="form-input"
               style={{ minHeight: 180, resize: 'vertical', fontFamily: 'inherit' }}
               value={transcript}
               onChange={e => setTranscript(e.target.value)}
-              placeholder="Paste the Zoom/call transcript here…"
+              placeholder="Paste the Zoom/call transcript, your meeting notes, or a summary — or upload a file below…"
             />
+            <div style={{ fontSize: '.72rem', color: 'var(--sub)', marginTop: 4 }}>
+              Tip: a link alone can't be analyzed — paste notes/transcript or upload a file. The link is saved as reference.
+            </div>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-            <input ref={fileRef} type="file" accept=".txt,.vtt,.srt,.md,text/plain" onChange={onFile} style={{ display: 'none' }} />
-            <button className="btn btn-secondary btn-sm" onClick={() => fileRef.current?.click()}>Upload transcript file</button>
-            {fileName && <span style={{ fontSize: '.8rem', color: 'var(--sub)' }}>{fileName}</span>}
+            <input ref={fileRef} type="file"
+              accept=".pdf,.docx,.txt,.vtt,.srt,.md,.csv,.rtf,.json,.html,.htm,.log,application/pdf"
+              onChange={onFile} style={{ display: 'none' }} />
+            <button className="btn btn-secondary btn-sm" onClick={() => fileRef.current?.click()} disabled={extracting}>
+              {extracting ? 'Reading file…' : 'Upload file (PDF, Word, text)'}
+            </button>
+            {fileName && !extracting && <span style={{ fontSize: '.8rem', color: 'var(--sub)' }}>{fileName}</span>}
             <button
               className="btn btn-primary"
               style={{ marginLeft: 'auto' }}
               onClick={analyze}
-              disabled={loading || configLoading || !transcript.trim()}
+              disabled={loading || extracting || configLoading || !transcript.trim()}
             >
-              {loading ? 'Analyzing…' : 'Analyze Transcript'}
+              {loading ? 'Analyzing…' : 'Analyze'}
             </button>
           </div>
         </div>

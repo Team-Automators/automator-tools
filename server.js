@@ -25,8 +25,8 @@ const requireLocation    = require('./middleware/require-location');
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '25mb' }));            // 25mb: room for base64 file uploads (Analyzer PDF/DOCX)
+app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 
 // ── API / webhook routes ───────────────────────────────────────────────────────
 // ── Public / server-to-server routes (no user session) ──────────────────────────

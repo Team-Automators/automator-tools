@@ -1126,7 +1126,7 @@ ${samples.join('\n\n---\n\n')}`;
 // Turn a call/Zoom transcript into a structured project brief the build team
 // can follow (patterned on the Custom Roadmap: stage, BLAST, funnel/ad/build,
 // phases, deliverables, MIT).
-const ANALYZER_SYSTEM = `You are a senior solutions consultant at a funnel & automation agency. You read a discovery/sales call transcript and produce a clear, actionable PROJECT BRIEF that the implementation team will follow to build the client's funnel and automation. The reader is the builder — they must know exactly what to build.
+const ANALYZER_SYSTEM = `You are a senior solutions consultant at a funnel & automation agency. You read a discovery/sales call transcript, meeting notes, or a summary and produce a clear, actionable PROJECT BRIEF that the implementation team will follow to build the client's funnel and automation. The reader is the builder — they must know exactly what to build.
 
 Return clean Markdown with EXACTLY these sections and headings:
 
@@ -1165,10 +1165,39 @@ The single biggest focus to drive revenue or remove the current bottleneck.
 ## Consultant Recommendation
 Your best professional recommendation for the build and approach (3–5 sentences).
 
-Base everything strictly on the transcript. Where it lacks detail, make a smart, clearly-reasonable assumption and mark it "(assumption)". Be specific and implementation-ready — no vague filler.`;
+Base everything strictly on the provided material. Where it lacks detail, make a smart, clearly-reasonable assumption and mark it "(assumption)". Be specific and implementation-ready — no vague filler.`;
+
+// POST /copywrite/extract-file — pull plain text out of an uploaded document so
+// the Analyzer can accept PDFs, Word docs, and text files (not just pasted text).
+// Body: { filename, dataBase64 }  → { text, chars, ext }
+router.post('/extract-file', async (req, res) => {
+  try {
+    const { filename = '', dataBase64 = '' } = req.body || {};
+    if (!dataBase64) return res.status(400).json({ error: 'dataBase64 required' });
+    const buf = Buffer.from(String(dataBase64).split(',').pop(), 'base64'); // tolerate data: URL prefix
+    const ext = (filename.split('.').pop() || '').toLowerCase();
+    let text = '';
+    if (ext === 'pdf') {
+      const pdf = require('pdf-parse');
+      text = (await pdf(buf)).text || '';
+    } else if (ext === 'docx') {
+      const mammoth = require('mammoth');
+      text = (await mammoth.extractRawText({ buffer: buf })).value || '';
+    } else {
+      // txt / vtt / srt / md / csv / rtf / json / html / log and anything else:
+      // best-effort decode as UTF-8 text.
+      text = buf.toString('utf8');
+    }
+    text = text.replace(/ /g, '').replace(/^﻿/, '').replace(/\r\n/g, '\n').trim();
+    if (!text) return res.status(422).json({ error: 'Could not extract text. For .doc use .docx or PDF, or paste the text.' });
+    res.json({ text: text.slice(0, 200000), chars: text.length, ext });
+  } catch (e) {
+    res.status(500).json({ error: e.message || 'Extraction failed' });
+  }
+});
 
 router.post('/analyze-transcript', async (req, res) => {
-  const { transcript, provider = 'claude', apiKey, model: reqModel, clientName } = req.body;
+  const { transcript, provider = 'claude', apiKey, model: reqModel, clientName, videoLink } = req.body;
   if (!transcript || !String(transcript).trim()) return res.status(400).json({ error: 'transcript required' });
 
   const resolvedKey = apiKey || (provider === 'claude' ? process.env.ANTHROPIC_API_KEY : null);
@@ -1178,7 +1207,13 @@ router.post('/analyze-transcript', async (req, res) => {
   if (!providerCfg) return res.status(400).json({ error: `Unknown provider: ${provider}` });
 
   const model = reqModel || providerCfg.defaultModel;
-  const userPrompt = `${clientName ? `Client: ${clientName}\n\n` : ''}CALL TRANSCRIPT:\n${String(transcript).slice(0, 40000)}\n\nProduce the full project brief now.`;
+  const userPrompt = [
+    clientName ? `Client: ${clientName}` : '',
+    videoLink ? `Recording / reference link (the build team can review it): ${videoLink}` : '',
+    `SOURCE MATERIAL (call transcript, meeting notes, or summary):`,
+    String(transcript).slice(0, 40000),
+    `\nProduce the full project brief now.`,
+  ].filter(Boolean).join('\n\n');
   const messages = [{ role: 'user', content: userPrompt }];
 
   res.setHeader('Content-Type',  'text/event-stream');
