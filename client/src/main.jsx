@@ -11,7 +11,20 @@ installAuthFetch()
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => {})
+    // Was a service worker already controlling this page? If so, a controller
+    // change means a NEW version activated — reload once so the freshest bundle
+    // is shown (prevents users being stuck on a cached old build).
+    const hadController = !!navigator.serviceWorker.controller
+    navigator.serviceWorker.register('/sw.js')
+      .then(reg => { reg.update().catch(() => {}) })
+      .catch(() => {})
+
+    let reloaded = false
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (reloaded || !hadController) return
+      reloaded = true
+      window.location.reload()
+    })
   })
 }
 
