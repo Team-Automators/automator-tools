@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { api, getLocationId } from '../lib/api.js'
+import { SERVICES, SVC } from '../lib/services.js'
 
 export const STAGES = [
   { id: 'urgent',       label: 'Urgent',      color: '#EF4444', bg: 'rgba(239,68,68,.12)' },
@@ -71,6 +72,11 @@ export function TaskDetail({ task: initialTask, onClose, onTaskUpdate }) {
                   <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
                 </svg>
                 {task.customerName}
+              </span>
+            )}
+            {task.service && SVC[task.service] && (
+              <span className="kanban-col-badge" style={{ background: `${SVC[task.service].color}22`, color: SVC[task.service].color, fontSize: '.7rem' }}>
+                {SVC[task.service].label}
               </span>
             )}
             {task.clickupTaskId && (
@@ -154,6 +160,8 @@ export function TaskModal({ initial, customers, onSave, onClose }) {
   const [stage,        setStage]        = useState(initial?.stage || 'urgent')
   const [customerId,   setCustomerId]   = useState(initial?.customerId || '')
   const [customerName, setCustomerName] = useState(initial?.customerName || '')
+  const [service,      setService]      = useState(initial?.service || '')
+  const [dueDate,      setDueDate]      = useState(initial?.dueDate || '')
   const [saving,       setSaving]       = useState(false)
 
   const [cuTaskId,      setCuTaskId]      = useState(initial?.clickupTaskId   || '')
@@ -235,7 +243,7 @@ export function TaskModal({ initial, customers, onSave, onClose }) {
     e.preventDefault()
     if (!title.trim()) return
     setSaving(true)
-    await onSave({ title: title.trim(), stage, customerId, customerName, clickupTaskId: cuTaskId, clickupTaskName: cuTaskName })
+    await onSave({ title: title.trim(), stage, customerId, customerName, service, dueDate, clickupTaskId: cuTaskId, clickupTaskName: cuTaskName })
     setSaving(false)
   }
 
@@ -268,6 +276,21 @@ export function TaskModal({ initial, customers, onSave, onClose }) {
               <option value="">— No customer —</option>
               {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">
+              Service <span style={{ color: 'var(--sub)', fontWeight: 400 }}>— shows this task on the Pipeline</span>
+            </label>
+            <select className="form-input form-select" value={service} onChange={e => setService(e.target.value)}>
+              <option value="">— No service (Tasks only) —</option>
+              {SERVICES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+            </select>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Due date (optional)</label>
+            <input type="date" className="form-input" value={dueDate} onChange={e => setDueDate(e.target.value)} />
           </div>
 
           <div className="form-group">

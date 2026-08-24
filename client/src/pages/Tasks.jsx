@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, getLocationId } from '../lib/api.js'
 import { STAGES, stageOf, getNotes, TaskModal, TaskDetail } from '../components/TaskModals.jsx'
+import { SVC } from '../lib/services.js'
 
 // ── Progress bar ──────────────────────────────────────────────────────────────
 function ProgressBar({ tasks }) {
@@ -88,6 +89,12 @@ function TaskCard({ task, onDragStart, onOpenDetail, onEdit, onDelete }) {
       )}
 
       <div className="task-card-footer">
+        {task.service && SVC[task.service] && (
+          <span className="task-customer-chip" style={{ cursor: 'default', background: `${SVC[task.service].color}18`, color: SVC[task.service].color, borderColor: `${SVC[task.service].color}44` }}>
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: SVC[task.service].color, display: 'inline-block' }} />
+            {SVC[task.service].label}
+          </span>
+        )}
         {task.customerName && (
           <button className="task-customer-chip" onClick={goToLibrary}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="11" height="11">

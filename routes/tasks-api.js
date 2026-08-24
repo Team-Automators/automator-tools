@@ -29,10 +29,10 @@ router.get('/', async (req, res) => {
 });
 
 router.post('/', async (req, res) => {
-  const { locationId, title, customerId, customerName, stage } = req.body;
+  const { locationId, title, customerId, customerName, stage, service, dueDate, waitingOn } = req.body;
   if (!locationId || !title) return res.status(400).json({ error: 'locationId and title required' });
   try {
-    res.json(await store.create(locationId, { title, customerId, customerName, stage, ownerUserId: req.userId || '' }));
+    res.json(await store.create(locationId, { title, customerId, customerName, stage, service, dueDate, waitingOn, ownerUserId: req.userId || '' }));
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
