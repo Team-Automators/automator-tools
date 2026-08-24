@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo, Fragment } from 'react'
 import { api } from '../lib/api.js'
 import { confirmToast, notifySuccess, notifyError } from '../lib/toast.jsx'
 import { SERVICES, SVC } from '../lib/services.js'
-import { stageOf } from '../components/TaskModals.jsx'
+import { stageOf, TaskModal } from '../components/TaskModals.jsx'
 
 // The Pipeline is a synchronized VIEW of Tasks: every task that has a Service
 // assigned shows up here as a card in that service's column. Tasks are the
@@ -59,6 +59,7 @@ export default function Pipeline() {
   const [addDue, setAddDue]   = useState('')
   const [analytics, setAnalytics] = useState('monthly')
   const [selMonth, setSelMonth]   = useState(null)
+  const [editId, setEditId]       = useState(null)   // task id being edited in the modal
   const fileRef = useRef(null)
 
   async function load() {
@@ -119,6 +120,19 @@ export default function Pipeline() {
   async function setWaiting(e, waitingOn) {
     patchTask(e.id, { waitingOn })
     await api.updateTask(e.id, { waitingOn }).catch(() => load())
+  }
+  async function setDue(e, dueDate) {
+    patchTask(e.id, { dueDate })
+    await api.updateTask(e.id, { dueDate }).catch(() => load())
+  }
+  // Full edit (title / stage / customer / service / due) — lets a card move
+  // to any service column or stage, or be re-assigned to another client.
+  const editTask = editId ? tasks.find(t => t.id === editId) : null
+  async function saveEdit(fields) {
+    const updated = await api.updateTask(editId, fields).catch(() => null)
+    if (updated?.id) setTasks(prev => prev.map(t => t.id === editId ? updated : t))
+    else await load()
+    setEditId(null)
   }
   async function removeEng(e) {
     if (!(await confirmToast(`Delete task "${e.title}"? This removes it from Tasks and Pipeline.`, { confirmText: 'Delete' }))) return
@@ -241,10 +255,11 @@ export default function Pipeline() {
                       const clientSvcs = svcByClient[e.clientName] || []
                       const st = stageOf(e.stage)
                       return (
-                        <div key={e.id} style={{ background: bg, border: `1px solid ${bd}`, borderRadius: 10, padding: 12, position: 'relative' }}>
+                        <div key={e.id} onClick={() => setEditId(e.id)} title="Click to edit / move"
+                          style={{ background: bg, border: `1px solid ${bd}`, borderRadius: 10, padding: 12, position: 'relative', cursor: 'pointer' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
                             <div style={{ fontWeight: 700, fontSize: '.85rem', color: 'var(--text)', lineHeight: 1.3, paddingRight: 4 }}>{e.title}</div>
-                            <input type="checkbox" title="Mark complete" onChange={() => complete(e)} style={{ cursor: 'pointer', marginTop: 2 }} />
+                            <input type="checkbox" title="Mark complete" onClick={ev => ev.stopPropagation()} onChange={() => complete(e)} style={{ cursor: 'pointer', marginTop: 2 }} />
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '5px 0' }}>
                             <span style={{ fontSize: '.68rem', fontWeight: 700, padding: '1px 7px', borderRadius: 99, background: st.bg, color: st.color }}>{st.label}</span>
@@ -260,9 +275,20 @@ export default function Pipeline() {
                             </div>
                           )}
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>
-                            <span style={{ fontSize: '.7rem', color: isOverdue(e) ? 'var(--danger)' : 'var(--sub)' }}>{e.dueDate ? `Due ${fmtDate(e.dueDate)}` : 'No due date'}</span>
+                            <input
+                              type="date"
+                              value={e.dueDate || ''}
+                              onClick={ev => ev.stopPropagation()}
+                              onChange={ev => setDue(e, ev.target.value)}
+                              title="Due date — click to edit"
+                              style={{
+                                fontSize: '.66rem', border: '1px solid transparent', borderRadius: 6, cursor: 'pointer', padding: '1px 4px',
+                                background: 'var(--surface)', color: isOverdue(e) ? 'var(--danger)' : 'var(--sub)', width: 118,
+                              }}
+                            />
                             <select
                               value={wait || ''}
+                              onClick={ev => ev.stopPropagation()}
                               onChange={ev => setWaiting(e, ev.target.value)}
                               style={{
                                 fontSize: '.66rem', fontWeight: 700, border: 'none', borderRadius: 99, cursor: 'pointer', padding: '2px 6px',
@@ -275,7 +301,7 @@ export default function Pipeline() {
                               <option value="consultant">Waiting for Consultant</option>
                             </select>
                           </div>
-                          <button onClick={() => removeEng(e)} title="Delete task" style={{ position: 'absolute', bottom: 6, right: 8, background: 'none', border: 'none', color: 'var(--sub)', cursor: 'pointer', fontSize: '.7rem' }}>✕</button>
+                          <button onClick={ev => { ev.stopPropagation(); removeEng(e) }} title="Delete task" style={{ position: 'absolute', bottom: 6, right: 8, background: 'none', border: 'none', color: 'var(--sub)', cursor: 'pointer', fontSize: '.7rem' }}>✕</button>
                         </div>
                       )
                     })}
@@ -307,7 +333,7 @@ export default function Pipeline() {
         ) : view === 'clients' ? (
           <ClientRollup visible={visible} onComplete={complete} onReopen={reopen} onSetWaiting={setWaiting} />
         ) : (
-          <CompletedTable completed={completed} onReopen={reopen} />
+          <CompletedTable completed={completed} onReopen={reopen} onEdit={setEditId} />
         )}
 
         {/* Analytics */}
@@ -374,6 +400,15 @@ export default function Pipeline() {
           </div>
         )}
       </div>
+
+      {editTask && (
+        <TaskModal
+          initial={editTask}
+          customers={customers}
+          onSave={saveEdit}
+          onClose={() => setEditId(null)}
+        />
+      )}
     </>
   )
 }
@@ -480,81 +515,94 @@ function ClientRollup({ visible, onComplete, onReopen, onSetWaiting }) {
   )
 }
 
-function CompletedTable({ completed, onReopen }) {
-  const [group, setGroup] = useState(true)
+function CompletedTable({ completed, onReopen, onEdit }) {
   const [sort, setSort]   = useState('finished-desc')
+  const [open, setOpen]   = useState(null)   // expanded client name
 
-  const rows = group
-    ? Object.values(completed.reduce((m, e) => {
-        (m[e.clientName] ||= { clientName: e.clientName, services: [], created: e.createdAt, finished: e.finishedAt, count: 0 })
-        m[e.clientName].services.push(e.service)
-        m[e.clientName].created = Math.min(m[e.clientName].created, e.createdAt)
-        m[e.clientName].finished = Math.max(m[e.clientName].finished || 0, e.finishedAt || 0)
-        m[e.clientName].count++
-        return m
-      }, {}))
-    : completed.map(e => ({ clientName: e.clientName, title: e.title, services: [e.service], created: e.createdAt, finished: e.finishedAt, count: 1, id: e.id, eng: e }))
-
-  rows.sort((a, b) => sort === 'finished-desc' ? (b.finished - a.finished) : sort === 'finished-asc' ? (a.finished - b.finished) : a.clientName.localeCompare(b.clientName))
+  // Group completed tasks by client; keep each client's task history for the
+  // expandable detail view.
+  const byClient = Object.values(completed.reduce((m, e) => {
+    const c = (m[e.clientName] ||= { clientName: e.clientName, tasks: [], services: new Set(), created: e.createdAt, finished: 0 })
+    c.tasks.push(e)
+    c.services.add(e.service)
+    c.created = Math.min(c.created, e.createdAt)
+    c.finished = Math.max(c.finished, e.finishedAt || 0)
+    return m
+  }, {}))
+  byClient.forEach(c => c.tasks.sort((a, b) => (b.finishedAt || 0) - (a.finishedAt || 0)))
+  byClient.sort((a, b) => sort === 'finished-desc' ? (b.finished - a.finished) : sort === 'finished-asc' ? (a.finished - b.finished) : a.clientName.localeCompare(b.clientName))
 
   return (
     <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 18px', flexWrap: 'wrap', gap: 8 }}>
-        <div className="fw-700">Completed Clients</div>
-        <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
-          <label style={{ fontSize: '.8rem', color: 'var(--sub)', display: 'flex', gap: 6, alignItems: 'center', cursor: 'pointer' }}>
-            <input type="checkbox" checked={group} onChange={e => setGroup(e.target.checked)} /> Group by client
-          </label>
-          <select className="form-input" style={{ width: 'auto', height: 32, fontSize: '.8rem' }} value={sort} onChange={e => setSort(e.target.value)}>
-            <option value="finished-desc">Date finished (newest first)</option>
-            <option value="finished-asc">Date finished (oldest first)</option>
-            <option value="name">Client name</option>
-          </select>
+        <div>
+          <div className="fw-700">Completed Clients</div>
+          <div style={{ fontSize: '.72rem', color: 'var(--sub)', marginTop: 2 }}>Click a client to see task history and reopen (move back to board).</div>
         </div>
+        <select className="form-input" style={{ width: 'auto', height: 32, fontSize: '.8rem' }} value={sort} onChange={e => setSort(e.target.value)}>
+          <option value="finished-desc">Date finished (newest first)</option>
+          <option value="finished-asc">Date finished (oldest first)</option>
+          <option value="name">Client name</option>
+        </select>
       </div>
-      {rows.length === 0 ? (
+      {byClient.length === 0 ? (
         <div className="empty-state" style={{ padding: 32 }}><div className="empty-sub">No completed tasks yet.</div></div>
       ) : (
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.85rem' }}>
             <thead>
               <tr style={{ textAlign: 'left', color: 'var(--sub)', fontSize: '.7rem', letterSpacing: '.05em' }}>
+                <th style={{ padding: '10px 18px', width: 28 }}></th>
                 <th style={{ padding: '10px 18px' }}>CLIENT</th>
-                <th style={{ padding: '10px 18px' }}>{group ? 'SERVICES COMPLETED' : 'TASK'}</th>
+                <th style={{ padding: '10px 18px' }}>SERVICES COMPLETED</th>
                 <th style={{ padding: '10px 18px' }}>CREATED</th>
                 <th style={{ padding: '10px 18px' }}>FINISHED</th>
-                <th style={{ padding: '10px 18px' }}>{group ? 'TASKS' : ''}</th>
+                <th style={{ padding: '10px 18px' }}>TASKS</th>
               </tr>
             </thead>
             <tbody>
-              {rows.map((r, i) => (
-                <tr key={i} style={{ borderTop: '1px solid var(--border)' }}>
-                  <td style={{ padding: '12px 18px', fontWeight: 600 }}>{r.clientName}</td>
-                  <td style={{ padding: '12px 18px' }}>
-                    {group ? (
-                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                        {[...new Set(r.services)].map(s => (
-                          <span key={s} style={{ fontSize: '.72rem', fontWeight: 600, padding: '2px 8px', borderRadius: 99, background: `${SVC[s]?.color || '#999'}22`, color: SVC[s]?.color || '#666', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-                            <span style={{ width: 7, height: 7, borderRadius: '50%', background: SVC[s]?.color || '#999' }} />{SVC[s]?.label || s}
-                          </span>
-                        ))}
-                      </div>
-                    ) : (
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                        <span style={{ width: 7, height: 7, borderRadius: '50%', background: SVC[r.services[0]]?.color || '#999' }} />
-                        {r.title}
-                      </span>
+              {byClient.map((r, i) => {
+                const isOpen = open === r.clientName
+                return (
+                  <Fragment key={r.clientName}>
+                    <tr onClick={() => setOpen(isOpen ? null : r.clientName)}
+                      style={{ borderTop: '1px solid var(--border)', cursor: 'pointer', background: isOpen ? 'var(--surface)' : 'transparent' }}>
+                      <td style={{ padding: '12px 18px', color: 'var(--sub)' }}>{isOpen ? '▾' : '▸'}</td>
+                      <td style={{ padding: '12px 18px', fontWeight: 600 }}>{r.clientName}</td>
+                      <td style={{ padding: '12px 18px' }}>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                          {[...r.services].map(s => (
+                            <span key={s} style={{ fontSize: '.72rem', fontWeight: 600, padding: '2px 8px', borderRadius: 99, background: `${SVC[s]?.color || '#999'}22`, color: SVC[s]?.color || '#666', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                              <span style={{ width: 7, height: 7, borderRadius: '50%', background: SVC[s]?.color || '#999' }} />{SVC[s]?.label || s}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                      <td style={{ padding: '12px 18px', color: 'var(--sub)' }}>{fmtDate(r.created)}</td>
+                      <td style={{ padding: '12px 18px', color: 'var(--sub)' }}>{fmtDate(r.finished)}</td>
+                      <td style={{ padding: '12px 18px', color: 'var(--sub)' }}>{r.tasks.length} task{r.tasks.length !== 1 ? 's' : ''}</td>
+                    </tr>
+                    {isOpen && (
+                      <tr style={{ background: 'var(--surface)' }}>
+                        <td colSpan={6} style={{ padding: '4px 18px 14px 46px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            {r.tasks.map(e => (
+                              <div key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--card)' }}>
+                                <span style={{ width: 8, height: 8, borderRadius: '50%', background: SVC[e.service]?.color || '#999', flexShrink: 0 }} />
+                                <span style={{ fontSize: '.82rem', fontWeight: 600, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.title}</span>
+                                <span style={{ fontSize: '.72rem', color: 'var(--sub)' }}>{SVC[e.service]?.label || e.service}</span>
+                                <span style={{ fontSize: '.72rem', color: 'var(--sub)' }}>Finished {fmtDate(e.finishedAt)}</span>
+                                {onEdit && <button className="btn btn-ghost btn-sm" onClick={() => onEdit(e.id)}>Edit</button>}
+                                <button className="btn btn-secondary btn-sm" onClick={() => onReopen(e)} title="Move back onto the board">↩ Reopen</button>
+                              </div>
+                            ))}
+                          </div>
+                        </td>
+                      </tr>
                     )}
-                  </td>
-                  <td style={{ padding: '12px 18px', color: 'var(--sub)' }}>{fmtDate(r.created)}</td>
-                  <td style={{ padding: '12px 18px', color: 'var(--sub)' }}>{fmtDate(r.finished)}</td>
-                  <td style={{ padding: '12px 18px', color: 'var(--sub)' }}>
-                    {group ? `${r.count} task${r.count !== 1 ? 's' : ''}` : (
-                      <button className="btn btn-ghost btn-sm" onClick={() => onReopen(r.eng)}>Reopen</button>
-                    )}
-                  </td>
-                </tr>
-              ))}
+                  </Fragment>
+                )
+              })}
             </tbody>
           </table>
         </div>
