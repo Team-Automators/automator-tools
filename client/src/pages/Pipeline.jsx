@@ -211,7 +211,7 @@ export default function Pipeline() {
             <button className={`btn btn-sm ${view === 'clients' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setView('clients')}>By Client</button>
             <button className={`btn btn-sm ${view === 'completed' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setView('completed')}>Completed Clients</button>
           </div>
-          <input className="form-input" style={{ width: 200, height: 34 }} placeholder="Search client or task…" value={search} onChange={e => setSearch(e.target.value)} />
+          <input className="form-input" style={{ flex: '1 1 150px', minWidth: 0, maxWidth: 240, height: 34 }} placeholder="Search client or task…" value={search} onChange={e => setSearch(e.target.value)} />
           <button className="btn btn-secondary btn-sm" onClick={exportBackup}>Export Backup</button>
           <input ref={fileRef} type="file" accept=".json,application/json" onChange={onImport} style={{ display: 'none' }} />
           <button className="btn btn-secondary btn-sm" onClick={() => fileRef.current?.click()}>Import Backup</button>
@@ -457,7 +457,7 @@ function ClientRollup({ visible, onComplete, onReopen, onSetWaiting }) {
           <option value="name">Client name</option>
         </select>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 320px), 1fr))', gap: 14 }}>
         {clients.map(c => (
           <div key={c.name} className="card" style={{ padding: 16 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>

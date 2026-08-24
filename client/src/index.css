@@ -247,13 +247,15 @@ img { max-width: 100%; display: block; }
 
 /* ── Top nav ───────────────────────────────────────────────────────────────── */
 .topnav {
-  height: var(--topnav-h);
+  min-height: var(--topnav-h);
   background: var(--card);
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 16px;
+  gap: 8px;
+  flex-wrap: wrap;            /* toolbar controls wrap instead of overflowing on small screens */
+  padding: 6px 16px;
   position: sticky;
   top: 0;
   z-index: 40;
@@ -283,10 +285,17 @@ img { max-width: 100%; display: block; }
   border-top: 1px solid var(--border);
   z-index: 50;
   align-items: stretch;
+  /* Many nav items → let them scroll horizontally instead of cramming/overflowing */
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
 }
+.mobile-nav::-webkit-scrollbar { display: none; }
 @media (min-width: 768px) { .mobile-nav { display: none; } }
 .mobile-nav-item {
-  flex: 1;
+  flex: 0 0 auto;
+  min-width: 64px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -297,7 +306,7 @@ img { max-width: 100%; display: block; }
   color: var(--sub);
   transition: color .12s;
   min-height: 44px;
-  padding: 8px 4px;
+  padding: 8px 6px;
 }
 .mobile-nav-item.active { color: var(--accent); }
 .mobile-nav-item svg { flex-shrink: 0; }
