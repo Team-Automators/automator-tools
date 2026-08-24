@@ -257,6 +257,35 @@ router.get('/diagnose', async (req, res) => {
   let canMint = false;
   try { canMint = !!(await locationAccess.getLocationToken(locationId)); } catch {}
 
+  // Deep per-install mint diagnostics — distinguishes "refresh token dead" from
+  // "location not under this agency" from "code not deployed yet".
+  const agencyMintDetail = [];
+  for (const inst of installs) {
+    const d = {
+      companyId:        inst.companyId || null,
+      installKey:       inst.locationId || null,
+      hasRefreshToken:  !!inst.refresh_token,
+      storedTokenExpired: inst.expires_at ? Date.now() >= inst.expires_at : null,
+    };
+    let agencyToken = null;
+    try {
+      agencyToken = await oauthStore.getAccessToken(inst.locationId).catch(() => null);
+      d.refreshOk = !!agencyToken;               // false ⇒ refresh token is dead
+    } catch (e) { d.refreshOk = false; d.refreshErr = e.message; }
+    if (!agencyToken) agencyToken = inst.access_token || null;
+    if (agencyToken) {
+      try {
+        await locationAccess.mintLocationToken(agencyToken, inst.companyId, locationId);
+        d.mint = 'ok';
+      } catch (e) {
+        d.mint = 'fail';
+        d.mintStatus = e.response?.status || 0;   // 401 ⇒ token bad; 4xx ⇒ loc not under agency
+        d.mintMsg = (e.response?.data?.message || e.message || '').slice(0, 140);
+      }
+    } else { d.mint = 'no-token'; }
+    agencyMintDetail.push(d);
+  }
+
   let auth = { ok: false };
   try { auth = await locationAccess.authenticateLocation(locationId); } catch (e) { auth = { ok: false, error: e.message }; }
 
@@ -273,11 +302,13 @@ router.get('/diagnose', async (req, res) => {
           : 'NOT AUTHORIZED — this location is not under any installed agency.';
 
   res.json({
+    buildMarker:             'mint-refresh-2026-08-24',  // confirms this build is live
     locationId,
     agencyOAuthInstalls:     installs.length,
     hasDirectOAuthInstall:   !!oauthDirect,
     hasPitRecord:            hasPit,
     canMintLocationToken:    canMint,
+    agencyMintDetail,
     fullyAuthenticates:      !!auth.ok,
     authMethod:              auth.via || null,
     pitAttempted:            !!auth.pitTried,
