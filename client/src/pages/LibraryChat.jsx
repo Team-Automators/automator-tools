@@ -653,7 +653,7 @@ export default function LibraryChat() {
                 feedback={feedbackMap[i] || null}
                 onMockup={() => handleMockup(cleanDisplayText(msg.content), 'ai')}
                 onGeneratePrompt={() => handleGeneratePrompt(msg.content)}
-                showPreview={(copy?.type || '') === 'webinar' || (copy?.type || '') === 'sales-page'}
+                showPreview={!!(TYPES[copy?.type]?.preview)}
               />
             )
           })}

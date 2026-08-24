@@ -686,7 +686,7 @@ export default function CopywritersChat() {
               feedback={feedbackMap[i] || null}
               onMockup={() => handleMockup(cleanDisplayText(msg.content), 'ai')}
               onGeneratePrompt={() => handleGeneratePrompt(cleanDisplayText(msg.content))}
-              showPreview={type === 'webinar' || type === 'sales-page'}
+              showPreview={!!typeInfo.preview}
             />
           ))}
 
