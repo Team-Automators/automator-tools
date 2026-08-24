@@ -98,6 +98,40 @@ async function run() {
       all[0]?.locationId === 'AGENCYKEY', `got ${all[0]?.locationId}`);
   }
 
+  // Case 4: refresh() must POST form-urlencoded to GHL's /oauth/token (a JSON
+  // body is silently rejected → tokens can never renew).
+  {
+    process.env.GHL_CLIENT_ID = 'cid';
+    process.env.GHL_CLIENT_SECRET = 'secret';
+    const saved = {};
+    // Replace the redis module wholesale (Upstash auto-pipelines, so patching
+    // instance methods is unreliable).
+    require.cache[require.resolve('../lib/redis')] = {
+      id: require.resolve('../lib/redis'), loaded: true, exports: {
+        get: async () => ({ access_token: 'OLD', refresh_token: 'RT', expires_at: 1 }), // expired
+        set: async (k, v) => { saved.v = v; },
+      },
+    };
+    let captured = null;
+    axios.post = async (url, body, cfg) => {
+      if (url.includes('/oauth/token')) {
+        captured = { body, ct: cfg?.headers?.['Content-Type'] };
+        return { data: { access_token: 'NEW', refresh_token: 'RT2', expires_in: 86400 } };
+      }
+      return { data: {} };
+    };
+    delete require.cache[require.resolve('../lib/oauth-store.js')];
+    const store = require('../lib/oauth-store');
+    const tok = await store.getAccessToken('AGENCYKEY');
+    check('refresh returns the renewed access token', tok === 'NEW', `got ${tok}`);
+    check('refresh posts form-urlencoded (not JSON object)',
+      typeof captured?.body === 'string' && /grant_type=refresh_token/.test(captured.body),
+      `body type ${typeof captured?.body}`);
+    check('refresh sets x-www-form-urlencoded content type',
+      captured?.ct === 'application/x-www-form-urlencoded', `got ${captured?.ct}`);
+    check('renewed tokens are persisted', saved.v?.access_token === 'NEW', `saved ${saved.v?.access_token}`);
+  }
+
   console.log(`\n${passed} passed, ${failed} failed\n`);
   process.exit(failed ? 1 : 0);
 }
