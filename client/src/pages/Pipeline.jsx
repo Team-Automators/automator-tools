@@ -195,7 +195,7 @@ export default function Pipeline() {
   const sel = buckets.find(b => b.key === selMonth) || [...buckets].reverse().find(b => b.rows.length) || buckets[buckets.length - 1]
 
   const stat = (n, label, color) => (
-    <div style={{ textAlign: 'center', padding: '6px 16px', border: '1px solid var(--border)', borderRadius: 10, background: 'var(--card)' }}>
+    <div style={{ flex: '1 1 68px', minWidth: 0, textAlign: 'center', padding: '6px 10px', border: '1px solid var(--border)', borderRadius: 10, background: 'var(--card)' }}>
       <div style={{ fontSize: '1.1rem', fontWeight: 800, color: color || 'var(--text)' }}>{n}</div>
       <div style={{ fontSize: '.62rem', fontWeight: 700, letterSpacing: '.08em', color: 'var(--sub)' }}>{label}</div>
     </div>
@@ -219,8 +219,8 @@ export default function Pipeline() {
       </div>
 
       <div className="content">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8, flexWrap: 'wrap' }}>
-          <div className="page-title" style={{ marginRight: 8 }}>Client Pipeline Tracker</div>
+        <div className="page-title" style={{ marginBottom: 12 }}>Client Pipeline Tracker</div>
+        <div style={{ display: 'flex', gap: 10, marginBottom: 8, flexWrap: 'wrap' }}>
           {stat(stats.total, 'TOTAL')}
           {stat(stats.active, 'ACTIVE', '#D97706')}
           {stat(stats.overdue, 'OVERDUE', stats.overdue ? 'var(--danger)' : 'var(--sub)')}
@@ -360,12 +360,12 @@ export default function Pipeline() {
             </div>
 
             <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-              {/* Bars */}
-              <div style={{ flex: '1 1 420px', display: 'flex', alignItems: 'flex-end', gap: 8, height: 160 }}>
+              {/* Bars — scrolls horizontally within its own box so it never widens the page */}
+              <div style={{ flex: '1 1 280px', minWidth: 0, display: 'flex', alignItems: 'flex-end', gap: 8, height: 172, overflowX: 'auto', overflowY: 'hidden' }}>
                 {buckets.map(b => {
                   const h = Math.round((b.rows.length / maxCount) * 130)
                   return (
-                    <div key={b.key} onClick={() => setSelMonth(b.key)} style={{ flex: 1, minWidth: 18, display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer' }}>
+                    <div key={b.key} onClick={() => setSelMonth(b.key)} style={{ flex: '0 0 34px', width: 34, display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer' }}>
                       <div style={{ fontSize: '.7rem', color: 'var(--sub)', marginBottom: 4 }}>{b.rows.length || 0}</div>
                       <div style={{ width: '70%', height: Math.max(2, h), display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', borderRadius: 4, overflow: 'hidden', outline: sel && sel.key === b.key ? '2px solid var(--accent)' : 'none' }}>
                         {SERVICES.map(s => {

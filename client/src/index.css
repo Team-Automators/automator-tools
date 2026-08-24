@@ -271,6 +271,8 @@ img { max-width: 100%; display: block; }
 .content {
   flex: 1;
   padding: 16px;
+  min-width: 0;
+  overflow-x: hidden;   /* guard: wide children (charts, boards) scroll inside their own box, never widen the page */
 }
 @media (min-width: 768px) { .content { padding: 28px 24px; } }
 
