@@ -504,6 +504,16 @@ export const api = {
     return j
   },
 
+  // Fire-and-forget: teaches the account playbook so future builds improve.
+  architectLearn(payload) {
+    try {
+      fetch('/copywrite/architect/learn', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      }).catch(() => {})
+    } catch {}
+  },
+
   architectFunnelStream({ offer, pricePoint, traffic, goal, provider, apiKey, model }, { onChunk } = {}) {
     return new Promise((resolve, reject) => {
       fetch('/copywrite/architect-funnel', {

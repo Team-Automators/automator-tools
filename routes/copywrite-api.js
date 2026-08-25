@@ -7,6 +7,7 @@ const { TYPES }          = require('../lib/copywriter-types');
 const { PROVIDERS }      = require('../lib/ai-providers');
 const brandVoiceStore    = require('../lib/brand-voice-store');
 const copyStore          = require('../lib/copy-store');
+const archMem            = require('../lib/architect-memory-store');
 
 // Map provider id → config for fast lookup
 const PROVIDER_MAP = Object.fromEntries(PROVIDERS.map(p => [p.id, p]));
@@ -1350,6 +1351,18 @@ function architectContext(body) {
   ].filter(Boolean).join('\n');
 }
 
+// A prompt block that carries the account's evolving playbook + recent builds,
+// so each generation learns from what came before and gets sharper over time.
+async function architectMemoryBlock(locationId, userId) {
+  try {
+    const m = await archMem.getMemory(locationId, userId);
+    if (!m.playbook && !(m.examples || []).length) return '';
+    const ex = (m.examples || []).slice(0, 6)
+      .map(e => `- ${e.funnelName || 'funnel'} — ${String(e.offer || '').slice(0, 120)}`).join('\n');
+    return `\n\nACCOUNT PLAYBOOK — this account has run the architect ${m.count || 0} time(s). Apply these hard-won learnings and make THIS result more resonant and specific than the last. Do not repeat generic advice; build on what already works here:\n${m.playbook || '(still learning)'}\n\nRECENT BUILDS FOR THIS ACCOUNT (for continuity, avoid contradicting them):\n${ex || '(none yet)'}\n`;
+  } catch { return ''; }
+}
+
 // ── POST /copywrite/architect/options — 3 funnel options to choose from ───────
 router.post('/architect/options', async (req, res) => {
   const { offer, provider = 'claude', apiKey, model: reqModel } = req.body;
@@ -1360,9 +1373,10 @@ router.post('/architect/options', async (req, res) => {
   if (!providerCfg) return res.status(400).json({ error: `Unknown provider: ${provider}` });
   const model = reqModel || providerCfg.defaultModel;
 
+  const memory = await architectMemoryBlock(req.locationId, req.userId);
   const prompt = `You are a senior funnel architect. Given the offer below, propose THREE distinct funnel approaches to build it, ranked best-fit first.
 
-${architectContext(req.body)}
+${architectContext(req.body)}${memory}
 
 Return ONLY valid JSON (no prose, no code fences) in this exact shape:
 {
@@ -1406,9 +1420,10 @@ router.post('/architect/build', async (req, res) => {
   const model = reqModel || providerCfg.defaultModel;
   const pageList = Array.isArray(pages) && pages.length ? pages : ['Opt-in', 'Calendar', 'Thank You'];
 
+  const memory = await architectMemoryBlock(req.locationId, req.userId);
   const prompt = `You are a senior funnel architect building in GoHighLevel. Produce the COMPLETE build sheet for the "${funnelName}" using ONLY these pages, in this order: ${pageList.join(' → ')}.
 
-${architectContext(req.body)}
+${architectContext(req.body)}${memory}
 
 Return ONLY valid JSON (no prose, no code fences) in this exact shape:
 {
@@ -1482,9 +1497,10 @@ router.post('/architect/page-copy', async (req, res) => {
   const model = reqModel || providerCfg.defaultModel;
   const pageList = Array.isArray(pages) && pages.length ? pages : ['Opt-in', 'Calendar', 'Thank You'];
 
+  const memory = await architectMemoryBlock(req.locationId, req.userId);
   const prompt = `You are a direct-response copywriter. Write the actual on-page copy for each page of the "${funnelName || 'funnel'}" (${pageList.join(' → ')}).
 
-${architectContext(req.body)}
+${architectContext(req.body)}${memory}
 
 Return ONLY valid JSON (no prose, no code fences):
 {
@@ -1511,6 +1527,44 @@ Make every line specific to THIS offer — no placeholders, no lorem.`;
     res.json(json);
   } catch (e) {
     res.status(502).json({ error: 'Could not write the page copy. Try again.', detail: e.message });
+  }
+});
+
+// ── POST /copywrite/architect/learn — evolve the account playbook ─────────────
+// Called (fire-and-forget) after a build and after a save. Records the build and
+// distills what resonates for this account into a rolling playbook that future
+// generations read from — so results improve every time the feature is used.
+router.post('/architect/learn', async (req, res) => {
+  const { offer, funnelName, flow, kept, pricePoint, traffic, goal, provider = 'claude', apiKey, model: reqModel } = req.body;
+  if (!offer || !funnelName) return res.status(400).json({ ok: false, error: 'offer and funnelName required' });
+  try {
+    await archMem.recordBuild(req.locationId, req.userId, {
+      offer: String(offer).slice(0, 240), funnelName, flow: flow || '',
+      pricePoint: pricePoint || '', traffic: traffic || '', goal: goal || '', kept: !!kept,
+    });
+
+    const resolvedKey = apiKey || (provider === 'claude' ? process.env.ANTHROPIC_API_KEY : null);
+    const providerCfg = PROVIDER_MAP[provider];
+    if (resolvedKey && providerCfg) {
+      const m = await archMem.getMemory(req.locationId, req.userId);
+      const model = reqModel || providerCfg.defaultModel;
+      const prompt = `You maintain a concise, evolving PLAYBOOK for one marketing account's funnel builds. Fold the new build into it.
+
+CURRENT PLAYBOOK:
+${m.playbook || '(empty — start it)'}
+
+NEW BUILD ${kept ? '(the user SAVED/kept this — a strong signal it resonated)' : '(freshly generated)'}:
+Offer: ${String(offer).slice(0, 500)}
+Funnel: ${funnelName}${flow ? ` (${flow})` : ''}
+Price: ${pricePoint || ''} · Traffic: ${traffic || ''} · Goal: ${goal || ''}
+
+Rewrite the PLAYBOOK (max ~220 words, tight bullet notes) capturing what works for THIS account: which funnel types fit their offers, the hooks/angles and tone that land, offer and price patterns, page-flow preferences, and automation patterns. Keep prior learnings that still apply, drop stale ones, and sharpen. Output ONLY the playbook text — no preamble.`;
+      const text = await callAI(providerCfg, resolvedKey, model, prompt, 500).catch(() => null);
+      if (text && text.trim()) await archMem.setPlaybook(req.locationId, req.userId, text.trim());
+    }
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(200).json({ ok: false, error: e.message }); // never block the UX
   }
 });
 

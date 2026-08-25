@@ -181,6 +181,8 @@ export default function FunnelArchitect() {
       setBuild(j)
       setCopyIdx(0)
       setStage('build')
+      // Evolve the account playbook so the next build is sharper (background).
+      api.architectLearn({ ...aiArgs(), funnelName: j.funnelName || chosen.name, flow: j.flow || pages.join(' → '), kept: false })
     } catch (e) { notifyError(e.message || 'Failed') } finally { setLoading(false) }
   }
 
@@ -213,6 +215,8 @@ export default function FunnelArchitect() {
         ],
       })
       notifySuccess('Saved to Library')
+      // A save is the strongest "this resonated" signal — reinforce the playbook.
+      api.architectLearn({ ...aiArgs(), funnelName: build.funnelName, flow: build.flow, kept: true })
       if (copy?.id) {
         const u = new URL(`/library/_unsorted/${copy.id}`, window.location.origin)
         if (locationId) u.searchParams.set('locationId', locationId)
