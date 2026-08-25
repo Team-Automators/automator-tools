@@ -2,7 +2,83 @@ import { useState, useEffect, useRef } from 'react'
 import { useAIConfig } from '../hooks/useAIConfig.js'
 import { PROVIDERS } from '../lib/providers.js'
 import { apiFetch, getLocationId, api } from '../lib/api.js'
-import { confirmToast, notifySuccess } from '../lib/toast.jsx'
+import { confirmToast, notifySuccess, notifyError } from '../lib/toast.jsx'
+
+// ── Backup & Restore ──────────────────────────────────────────────────────────
+function BackupCard() {
+  const fileRef = useRef(null)
+  const [exporting, setExporting] = useState(false)
+  const [importing, setImporting] = useState(false)
+
+  const today = () => new Date().toISOString().slice(0, 10)
+
+  async function doExport() {
+    setExporting(true)
+    try {
+      const payload = await api.exportBackup()
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url; a.download = `automator-backup-${today()}.json`
+      document.body.appendChild(a); a.click(); a.remove()
+      URL.revokeObjectURL(url)
+      const c = payload.data || {}
+      notifySuccess(`Backed up ${c.copies?.length || 0} copies, ${c.tasks?.length || 0} tasks, ${c.pipeline?.length || 0} pipeline, ${c.hooks?.length || 0} hooks`)
+    } catch (e) {
+      notifyError(e.message || 'Export failed')
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  function onFile(ev) {
+    const file = ev.target.files?.[0]; if (!file) return
+    const reader = new FileReader()
+    reader.onload = async () => {
+      try {
+        const payload = JSON.parse(String(reader.result || '{}'))
+        if (payload.format !== 'automator-backup') throw new Error('Not an Automator backup file')
+        const c = payload.data || {}
+        const summary = `${c.copies?.length || 0} copies, ${c.tasks?.length || 0} tasks, ${c.pipeline?.length || 0} pipeline, ${c.hooks?.length || 0} hooks`
+        if (!(await confirmToast(`Restore ${summary}? Existing items are updated, new ones added — nothing is deleted.`, { confirmText: 'Restore' }))) return
+        setImporting(true)
+        const out = await api.importBackup(payload)
+        const n = out.counts || {}
+        notifySuccess(`Restored ${n.copies || 0} copies, ${n.tasks || 0} tasks, ${n.pipeline || 0} pipeline, ${n.hooks || 0} hooks`)
+      } catch (e) {
+        notifyError(e.message || 'Import failed')
+      } finally {
+        setImporting(false)
+      }
+    }
+    reader.readAsText(file)
+    ev.target.value = ''
+  }
+
+  return (
+    <div className="settings-section">
+      <h2>Backup &amp; Restore</h2>
+      <div className="text-sub text-sm" style={{ lineHeight: 1.6, marginBottom: 12 }}>
+        Download a full backup of <strong>your</strong> data on this location — copies, customers,
+        tasks, pipeline, hooks, brand voice, feedback, and AI settings — as one JSON file.
+        Restore it later on any location to merge it back (existing items are updated, new ones
+        added; nothing is deleted).
+        <div style={{ marginTop: 6, color: 'var(--danger)' }}>
+          ⚠ The file includes your API keys — keep it private and don’t share it.
+        </div>
+      </div>
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        <button className="btn btn-primary" onClick={doExport} disabled={exporting || importing}>
+          {exporting ? 'Preparing…' : 'Download backup'}
+        </button>
+        <input ref={fileRef} type="file" accept=".json,application/json" onChange={onFile} style={{ display: 'none' }} />
+        <button className="btn btn-secondary" onClick={() => fileRef.current?.click()} disabled={exporting || importing}>
+          {importing ? 'Restoring…' : 'Restore from file'}
+        </button>
+      </div>
+    </div>
+  )
+}
 
 // ── ClickUp workspace browser ─────────────────────────────────────────────────
 
@@ -596,6 +672,9 @@ export default function Settings() {
             </a>
           )}
         </div>
+
+        {/* Backup & restore */}
+        <BackupCard />
 
         {/* Legacy data migration */}
         <div className="settings-section">

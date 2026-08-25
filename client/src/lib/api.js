@@ -483,4 +483,24 @@ export const api = {
     })
     return r.json()
   },
+
+  // ── Backup / restore ──────────────────────────────────────────────────────
+  async exportBackup() {
+    const url = withLocationId(new URL('/api/backup/export', window.location.origin))
+    const r = await fetch(url.toString())
+    const j = await r.json().catch(() => ({}))
+    if (!r.ok) throw new Error(j.error || `Export failed (${r.status})`)
+    return j
+  },
+
+  async importBackup(backup) {
+    const r = await fetch('/api/backup/import', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ backup, locationId: getLocationId() }),
+    })
+    const j = await r.json().catch(() => ({}))
+    if (!r.ok) throw new Error(j.error || `Import failed (${r.status})`)
+    return j
+  },
 }
