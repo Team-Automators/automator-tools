@@ -59,7 +59,7 @@ function RequireLocation({ children }) {
   if (!getLocationId())          return <Navigate to="/login" replace />
   if (!getSessionToken())        return <Navigate to="/login" replace />
   if (!getSessionClaims()?.uid)  return <Navigate to="/login" replace />  // needs verified user
-  if (!hasAIConfig())            return <Navigate to="/login" replace />
+  // AI API key is NOT required to enter — users can explore and add it later in Settings.
   return children
 }
 

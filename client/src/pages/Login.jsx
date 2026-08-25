@@ -2,37 +2,28 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getLocationId, persistLocationId } from '../lib/api.js'
 import { setSessionToken, getSessionToken, getSessionClaims } from '../lib/session.js'
-import { PROVIDERS } from '../lib/providers.js'
-
-const AI_KEY = 'ghl_ai_config'
-
-function readAIConfig() {
-  try { return JSON.parse(localStorage.getItem(AI_KEY)) } catch { return null }
-}
 
 export default function Login() {
   const navigate = useNavigate()
 
-  const [step, setStep]         = useState(1)       // 1 = location, 2 = email, 3 = api key
+  const [step, setStep]         = useState(1)       // 1 = location, 2 = email
   const [locationId, setLocationId] = useState('')
   const [email, setEmail]       = useState('')
-  const [provider, setProvider] = useState(PROVIDERS[0].id)
-  const [apiKey, setApiKey]     = useState('')
-  const [model, setModel]       = useState('')
   const [error, setError]       = useState('')
   const [verifying, setVerifying] = useState(false)
 
-  const selectedProv = PROVIDERS.find(p => p.id === provider) || PROVIDERS[0]
+  function enterApp(id) {
+    navigate(`/?locationId=${(id || locationId || getLocationId() || '').trim()}`, { replace: true })
+  }
 
   // Resume at the right step based on what's already established.
   useEffect(() => {
     const id = getLocationId()
     const hasLocation = id && getSessionToken()
     const hasUser = !!getSessionClaims()?.uid
-    if (hasLocation && hasUser && readAIConfig()) navigate('/', { replace: true })
-    else if (hasLocation && hasUser) { setLocationId(id); setStep(3) } // needs API key
-    else if (hasLocation)            { setLocationId(id); setStep(2) } // needs email
-    else if (id) setLocationId(id) // prefill known location (e.g. from GHL URL)
+    if (hasLocation && hasUser) enterApp(id)         // fully signed in → straight to the app
+    else if (hasLocation)      { setLocationId(id); setStep(2) } // needs email
+    else if (id) setLocationId(id)                   // prefill known location (e.g. from GHL URL)
   }, [navigate])
 
   async function handleEmailSubmit(e) {
@@ -54,7 +45,7 @@ export default function Login() {
         return
       }
       setSessionToken(data.token)
-      setStep(3)
+      enterApp()   // done — API key is set later in Settings
     } catch {
       setError('Could not reach the server. Please try again.')
     } finally {
@@ -91,18 +82,6 @@ export default function Login() {
     }
   }
 
-  function handleAPIKeySubmit(e) {
-    e.preventDefault()
-    const key = apiKey.trim()
-    if (!key) { setError('Please enter your API key'); return }
-    localStorage.setItem(AI_KEY, JSON.stringify({
-      provider,
-      apiKey: key,
-      model: model || selectedProv.defaultModel,
-    }))
-    navigate(`/?locationId=${locationId.trim() || getLocationId()}`, { replace: true })
-  }
-
   return (
     <div style={{
       minHeight: '100vh',
@@ -135,7 +114,7 @@ export default function Login() {
 
           {/* Step indicator */}
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
-            {[1, 2, 3].map(s => (
+            {[1, 2].map(s => (
               <div key={s} style={{
                 width: 8, height: 8, borderRadius: '50%',
                 background: s === step ? 'var(--accent)' : 'var(--border)',
@@ -150,7 +129,7 @@ export default function Login() {
           <>
             <div style={{ marginBottom: 24 }}>
               <div style={{ fontWeight: 700, fontSize: '1.125rem', color: 'var(--text)', marginBottom: 6 }}>
-                Step 1 of 3 — Location ID
+                Step 1 of 2 — Location ID
               </div>
               <div style={{ fontSize: '.875rem', color: 'var(--sub)' }}>
                 Enter the GHL Location ID for your sub-account
@@ -193,7 +172,7 @@ export default function Login() {
           <>
             <div style={{ marginBottom: 24 }}>
               <div style={{ fontWeight: 700, fontSize: '1.125rem', color: 'var(--text)', marginBottom: 6 }}>
-                Step 2 of 3 — Your Email
+                Step 2 of 2 — Your Email
               </div>
               <div style={{ fontSize: '.875rem', color: 'var(--sub)' }}>
                 Enter the email of your GHL account on this location — used to keep your work private to you
@@ -214,7 +193,7 @@ export default function Login() {
                 />
                 {error && <div style={{ fontSize: '.8125rem', color: 'var(--danger)', marginTop: 6 }}>{error}</div>}
                 <div className="text-xs text-sub mt-1">
-                  Must match a user on this GHL location.
+                  Must match a user on this GHL location. You can add your AI API key later in Settings.
                 </div>
               </div>
 
@@ -224,96 +203,13 @@ export default function Login() {
                 style={{ width: '100%', marginTop: 8 }}
                 disabled={!email.trim() || verifying}
               >
-                {verifying ? 'Verifying…' : 'Next →'}
+                {verifying ? 'Verifying…' : 'Enter Automator →'}
               </button>
               <button
                 type="button"
                 className="btn btn-ghost"
                 style={{ width: '100%', marginTop: 8 }}
                 onClick={() => { setStep(1); setError('') }}
-              >
-                ← Back
-              </button>
-            </form>
-          </>
-        )}
-
-        {/* ── Step 3: API Key ── */}
-        {step === 3 && (
-          <>
-            <div style={{ marginBottom: 24 }}>
-              <div style={{ fontWeight: 700, fontSize: '1.125rem', color: 'var(--text)', marginBottom: 6 }}>
-                Step 3 of 3 — AI Provider
-              </div>
-              <div style={{ fontSize: '.875rem', color: 'var(--sub)' }}>
-                Enter your own API key — this stays on this device only
-              </div>
-              {locationId && (
-                <div style={{ marginTop: 10, padding: '7px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, fontSize: '.8rem', color: 'var(--sub)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span>Location: <strong style={{ color: 'var(--text)', fontFamily: 'monospace' }}>{locationId}</strong></span>
-                  <button type="button" style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: '.8rem', padding: 0 }} onClick={() => { localStorage.removeItem('ghl_location_id'); setSessionToken(''); setStep(1); setLocationId('') }}>Change</button>
-                </div>
-              )}
-            </div>
-
-            <form onSubmit={handleAPIKeySubmit}>
-              {/* Provider */}
-              <div className="form-group">
-                <label className="form-label">Provider</label>
-                <select
-                  className="form-input form-select"
-                  value={provider}
-                  onChange={e => { setProvider(e.target.value); setModel('') }}
-                >
-                  {PROVIDERS.map(p => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* API Key */}
-              <div className="form-group">
-                <label className="form-label">API Key</label>
-                <input
-                  className="form-input"
-                  type="password"
-                  value={apiKey}
-                  onChange={e => { setApiKey(e.target.value); setError('') }}
-                  placeholder={selectedProv.placeholder}
-                  autoComplete="off"
-                  autoFocus
-                />
-                {error && <div style={{ fontSize: '.8125rem', color: 'var(--danger)', marginTop: 6 }}>{error}</div>}
-              </div>
-
-              {/* Model */}
-              <div className="form-group">
-                <label className="form-label">Model</label>
-                <select
-                  className="form-input form-select"
-                  value={model || selectedProv.defaultModel}
-                  onChange={e => setModel(e.target.value)}
-                >
-                  {selectedProv.models.map(m => (
-                    <option key={m} value={m}>{m}{m === selectedProv.defaultModel ? ' (default)' : ''}</option>
-                  ))}
-                </select>
-              </div>
-
-              <button
-                type="submit"
-                className="btn btn-primary"
-                style={{ width: '100%', marginTop: 8 }}
-                disabled={!apiKey.trim()}
-              >
-                Start using Automator
-              </button>
-
-              <button
-                type="button"
-                className="btn btn-ghost"
-                style={{ width: '100%', marginTop: 8 }}
-                onClick={() => { setStep(2); setError('') }}
               >
                 ← Back
               </button>
