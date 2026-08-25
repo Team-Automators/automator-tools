@@ -1342,14 +1342,61 @@ function parseModelJSON(text) {
 }
 
 function architectContext(body) {
-  const { offer, pricePoint, traffic, goal } = body;
+  const { offer, pricePoint, traffic, goal, notes } = body;
   return [
     `OFFER:\n${String(offer || '').slice(0, 6000)}`,
     pricePoint ? `Price point: ${pricePoint}` : '',
     traffic    ? `Main traffic source: ${traffic}` : '',
     goal       ? `Primary goal: ${goal}` : '',
+    notes && String(notes).trim() ? `MEETING NOTES / CONTEXT (ground everything in this — use the client's real words, situation, and constraints):\n${String(notes).slice(0, 7000)}` : '',
   ].filter(Boolean).join('\n');
 }
+
+const ARCH_PRICE = ['Free / Lead magnet', '$100 to $1k', '$1k to $5k', '$5k to $25k', '$25k+'];
+const ARCH_TRAFFIC = ['Paid ads', 'Organic / Social', 'Email list', 'SEO', 'Referrals', 'Cold outreach'];
+const ARCH_GOALS = ['Book calls', 'Sell a product', 'Collect leads', 'Webinar registrations', 'Applications'];
+
+// ── POST /copywrite/architect/from-notes — derive the inputs from meeting notes ─
+router.post('/architect/from-notes', async (req, res) => {
+  const { notes, provider = 'claude', apiKey, model: reqModel } = req.body;
+  if (!notes || !String(notes).trim()) return res.status(400).json({ error: 'notes required' });
+  const resolvedKey = apiKey || (provider === 'claude' ? process.env.ANTHROPIC_API_KEY : null);
+  if (!resolvedKey) return res.status(400).json({ error: 'No API key configured. Connect an AI provider in Settings.' });
+  const providerCfg = PROVIDER_MAP[provider];
+  if (!providerCfg) return res.status(400).json({ error: `Unknown provider: ${provider}` });
+  const model = reqModel || providerCfg.defaultModel;
+
+  const prompt = `Read these meeting notes / call summary and extract the inputs needed to architect a funnel. Return ONLY valid JSON (no prose, no code fences):
+{
+  "offer": "a crisp 1-3 sentence description: what they sell, who it's for, and the core promise/result",
+  "pricePoint": one of ${JSON.stringify(ARCH_PRICE)},
+  "traffic": one of ${JSON.stringify(ARCH_TRAFFIC)},
+  "goal": one of ${JSON.stringify(ARCH_GOALS)},
+  "summary": "2-4 sentence summary of their situation and what they need"
+}
+Choose the closest option for pricePoint/traffic/goal even if you must infer. Base everything strictly on the notes.
+
+MEETING NOTES:
+${String(notes).slice(0, 9000)}`;
+
+  try {
+    const raw = await callAI(providerCfg, resolvedKey, model, prompt, 900);
+    const json = parseModelJSON(raw);
+    if (!json.offer) throw new Error('bad shape');
+    // Snap to the allowed option lists.
+    const snap = (v, list) => list.includes(v) ? v : (list.find(x => String(v || '').toLowerCase().includes(x.toLowerCase().split(' ')[0])) || '');
+    res.json({
+      offer: json.offer,
+      pricePoint: snap(json.pricePoint, ARCH_PRICE) || ARCH_PRICE[1],
+      traffic: snap(json.traffic, ARCH_TRAFFIC) || ARCH_TRAFFIC[0],
+      goal: snap(json.goal, ARCH_GOALS) || ARCH_GOALS[0],
+      summary: json.summary || '',
+    });
+  } catch (e) {
+    res.status(502).json({ error: 'Could not read the notes. Try again or paste the offer directly.', detail: e.message });
+  }
+});
+
 
 // The shared "brand brain" for the Funnel Architect: its own evolving playbook
 // PLUS the same brand voice + copy feedback the copywriters learn from, so the

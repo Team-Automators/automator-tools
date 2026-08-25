@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAIConfig } from '../hooks/useAIConfig.js'
 import { api, getLocationId } from '../lib/api.js'
@@ -135,6 +135,10 @@ export default function FunnelArchitect() {
   const [price, setPrice]     = useState(PRICE_POINTS[1])
   const [traffic, setTraffic] = useState(TRAFFIC[0])
   const [goal, setGoal]       = useState(GOALS[0])
+  const [notes, setNotes]     = useState('')
+  const [notesFile, setNotesFile] = useState('')
+  const [analyzing, setAnalyzing] = useState(false)
+  const [extracting, setExtracting] = useState(false)
 
   const [options, setOptions] = useState([])
   const [chosen, setChosen]   = useState(null)
@@ -149,9 +153,45 @@ export default function FunnelArchitect() {
   const [pb, setPb]           = useState(null)     // { playbook, count, examples }
   const [pbText, setPbText]   = useState('')
   const [pbBusy, setPbBusy]   = useState(false)
+  const notesFileRef = useRef(null)
 
   const ctx = { offer, price, traffic, goal }
-  const aiArgs = () => ({ offer, pricePoint: price, traffic, goal, provider: config.provider, apiKey: config.apiKey, model: config.model })
+  const aiArgs = () => ({ offer, pricePoint: price, traffic, goal, notes, provider: config.provider, apiKey: config.apiKey, model: config.model })
+
+  const TEXT_EXTS = ['txt', 'vtt', 'srt', 'md', 'csv', 'rtf', 'json', 'html', 'htm', 'log']
+  async function onNotesFile(e) {
+    const file = e.target.files?.[0]; if (!file) return
+    setNotesFile(file.name)
+    const ext = (file.name.split('.').pop() || '').toLowerCase()
+    if (TEXT_EXTS.includes(ext)) {
+      const reader = new FileReader()
+      reader.onload = () => setNotes(prev => (prev ? prev + '\n\n' : '') + String(reader.result || ''))
+      reader.readAsText(file)
+      e.target.value = ''
+      return
+    }
+    setExtracting(true)
+    try {
+      const { text, chars } = await api.extractFile(file)
+      setNotes(prev => (prev ? prev + '\n\n' : '') + text)
+      notifySuccess(`Extracted ${chars.toLocaleString()} characters`)
+    } catch (err) { notifyError(err.message || 'Could not read that file'); setNotesFile('') }
+    finally { setExtracting(false); e.target.value = '' }
+  }
+
+  async function analyzeNotes() {
+    if (!notes.trim()) { notifyError('Paste or upload notes first'); return }
+    if (!config?.apiKey) { notifyError('Connect an AI provider in Settings first'); return }
+    setAnalyzing(true)
+    try {
+      const d = await api.architectFromNotes({ notes, provider: config.provider, apiKey: config.apiKey, model: config.model })
+      if (d.offer) setOffer(d.offer)
+      if (d.pricePoint) setPrice(d.pricePoint)
+      if (d.traffic) setTraffic(d.traffic)
+      if (d.goal) setGoal(d.goal)
+      notifySuccess('Read your notes — offer & inputs filled in')
+    } catch (e) { notifyError(e.message || 'Could not read the notes') } finally { setAnalyzing(false) }
+  }
 
   async function getOptions() {
     if (!offer.trim()) { notifyError('Tell me the offer first'); return }
@@ -330,6 +370,28 @@ export default function FunnelArchitect() {
               </div>
             </div>
             <div className="card" style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {/* From meeting notes */}
+              <div style={{ border: '1px dashed var(--border)', borderRadius: 10, padding: 14, background: 'var(--surface)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+                  <label className="form-label" style={{ margin: 0 }}>Have meeting notes or a summary? <span style={{ color: 'var(--sub)', fontWeight: 400 }}>— I’ll read them and fill everything in</span></label>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <input ref={notesFileRef} type="file" accept=".pdf,.docx,.txt,.vtt,.srt,.md,.csv,.rtf,.json,.html,.htm,.log,application/pdf" onChange={onNotesFile} style={{ display: 'none' }} />
+                    <button className="btn btn-ghost btn-sm" onClick={() => notesFileRef.current?.click()} disabled={extracting}>
+                      {extracting ? 'Reading file…' : '📎 Upload file'}
+                    </button>
+                  </div>
+                </div>
+                <textarea className="form-input" style={{ minHeight: 90, resize: 'vertical', fontFamily: 'inherit', fontSize: '.85rem' }}
+                  value={notes} onChange={e => setNotes(e.target.value)}
+                  placeholder="Paste your Zoom/call notes or a summary here — or upload a PDF/Word/text file…" />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8, flexWrap: 'wrap' }}>
+                  <button className="btn btn-secondary btn-sm" onClick={analyzeNotes} disabled={analyzing || extracting || !notes.trim()}>
+                    {analyzing ? 'Reading…' : 'Analyze notes → fill offer'}
+                  </button>
+                  {notesFile && !extracting && <span style={{ fontSize: '.75rem', color: 'var(--sub)' }}>{notesFile}</span>}
+                </div>
+              </div>
+
               <div className="form-group" style={{ margin: 0 }}>
                 <label className="form-label">The offer</label>
                 <textarea className="form-input" style={{ minHeight: 120, resize: 'vertical', fontFamily: 'inherit', background: 'var(--surface)' }}

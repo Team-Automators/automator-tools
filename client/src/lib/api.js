@@ -474,30 +474,40 @@ export const api = {
     })
   },
 
-  async architectOptions({ offer, pricePoint, traffic, goal, provider, apiKey, model }) {
+  async architectFromNotes({ notes, provider, apiKey, model }) {
+    const r = await fetch('/copywrite/architect/from-notes', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ notes, provider, apiKey, model }),
+    })
+    const j = await r.json().catch(() => ({}))
+    if (!r.ok) throw new Error(j.error || `Request failed (${r.status})`)
+    return j
+  },
+
+  async architectOptions({ offer, pricePoint, traffic, goal, notes, provider, apiKey, model }) {
     const r = await fetch('/copywrite/architect/options', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ offer, pricePoint, traffic, goal, provider, apiKey, model }),
+      body: JSON.stringify({ offer, pricePoint, traffic, goal, notes, provider, apiKey, model }),
     })
     const j = await r.json().catch(() => ({}))
     if (!r.ok) throw new Error(j.error || `Request failed (${r.status})`)
     return j
   },
 
-  async architectBuild({ offer, pricePoint, traffic, goal, funnelName, pages, provider, apiKey, model }) {
+  async architectBuild({ offer, pricePoint, traffic, goal, notes, funnelName, pages, provider, apiKey, model }) {
     const r = await fetch('/copywrite/architect/build', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ offer, pricePoint, traffic, goal, funnelName, pages, provider, apiKey, model }),
+      body: JSON.stringify({ offer, pricePoint, traffic, goal, notes, funnelName, pages, provider, apiKey, model }),
     })
     const j = await r.json().catch(() => ({}))
     if (!r.ok) throw new Error(j.error || `Request failed (${r.status})`)
     return j
   },
 
-  async architectPageCopy({ offer, pricePoint, traffic, goal, funnelName, pages, provider, apiKey, model }) {
+  async architectPageCopy({ offer, pricePoint, traffic, goal, notes, funnelName, pages, provider, apiKey, model }) {
     const r = await fetch('/copywrite/architect/page-copy', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ offer, pricePoint, traffic, goal, funnelName, pages, provider, apiKey, model }),
+      body: JSON.stringify({ offer, pricePoint, traffic, goal, notes, funnelName, pages, provider, apiKey, model }),
     })
     const j = await r.json().catch(() => ({}))
     if (!r.ok) throw new Error(j.error || `Request failed (${r.status})`)
