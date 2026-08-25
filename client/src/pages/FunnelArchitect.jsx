@@ -137,6 +137,7 @@ export default function FunnelArchitect() {
   const [price, setPrice]     = useState(PRICE_POINTS[1])
   const [traffic, setTraffic] = useState(TRAFFIC[0])
   const [goal, setGoal]       = useState(GOALS[0])
+  const [inputMode, setInputMode] = useState('offer') // 'offer' | 'notes'
   const [notes, setNotes]     = useState('')
   const [notesFile, setNotesFile] = useState('')
   const [analyzing, setAnalyzing] = useState(false)
@@ -222,7 +223,7 @@ export default function FunnelArchitect() {
     if (st.auto && !config?.apiKey) return // wait for config to load
     handoffDone.current = true
     if (st.auto && config?.apiKey) runFromNotes(st.notes)
-    else setNotes(st.notes)
+    else { setNotes(st.notes); setInputMode('notes') }
   }, [location.state, config?.apiKey])
 
   async function getOptions() {
@@ -398,53 +399,60 @@ export default function FunnelArchitect() {
             <div className="page-header">
               <div>
                 <div className="page-title">Funnel Architect</div>
-                <div className="page-sub">Tell me the offer — I’ll draw the whole build. One offer in, one build sheet out.</div>
+                <div className="page-sub">Start with your offer, or drop in a meeting transcript — one build sheet out.</div>
               </div>
             </div>
-            <div className="card" style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
-              {/* From meeting notes */}
-              <div style={{ border: '1px dashed var(--border)', borderRadius: 10, padding: 14, background: 'var(--surface)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
-                  <label className="form-label" style={{ margin: 0 }}>Have meeting notes or a summary? <span style={{ color: 'var(--sub)', fontWeight: 400 }}>— I’ll read them and fill everything in</span></label>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <input ref={notesFileRef} type="file" accept=".pdf,.docx,.txt,.vtt,.srt,.md,.csv,.rtf,.json,.html,.htm,.log,application/pdf" onChange={onNotesFile} style={{ display: 'none' }} />
-                    <button className="btn btn-ghost btn-sm" onClick={() => notesFileRef.current?.click()} disabled={extracting}>
-                      {extracting ? 'Reading file…' : '📎 Upload file'}
-                    </button>
-                  </div>
+
+            {/* Mode chooser */}
+            <div style={{ display: 'inline-flex', gap: 4, background: 'var(--surface)', borderRadius: 10, padding: 4, marginBottom: 14 }}>
+              <button className={`btn btn-sm ${inputMode === 'offer' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setInputMode('offer')}>I have the offer</button>
+              <button className={`btn btn-sm ${inputMode === 'notes' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setInputMode('notes')}>I have meeting notes / transcript</button>
+            </div>
+
+            {inputMode === 'offer' ? (
+              <div className="card" style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label">The offer</label>
+                  <textarea className="form-input" style={{ minHeight: 120, resize: 'vertical', fontFamily: 'inherit', background: 'var(--surface)' }}
+                    value={offer} onChange={e => setOffer(e.target.value)}
+                    placeholder='Example: 12-week 1-on-1 coaching for female founders who want to hit their first $10k month. Includes weekly calls, a template vault, and Slack access.' />
                 </div>
-                <textarea className="form-input" style={{ minHeight: 90, resize: 'vertical', fontFamily: 'inherit', fontSize: '.85rem' }}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+                  <div className="form-group" style={{ margin: 0 }}><label className="form-label">Price point</label>
+                    <select className="form-input form-select" value={price} onChange={e => setPrice(e.target.value)}>{PRICE_POINTS.map(p => <option key={p}>{p}</option>)}</select></div>
+                  <div className="form-group" style={{ margin: 0 }}><label className="form-label">Main traffic</label>
+                    <select className="form-input form-select" value={traffic} onChange={e => setTraffic(e.target.value)}>{TRAFFIC.map(t => <option key={t}>{t}</option>)}</select></div>
+                  <div className="form-group" style={{ margin: 0 }}><label className="form-label">Primary goal</label>
+                    <select className="form-input form-select" value={goal} onChange={e => setGoal(e.target.value)}>{GOALS.map(g => <option key={g}>{g}</option>)}</select></div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                  <button className="btn btn-primary" onClick={getOptions} disabled={loading || configLoading || !offer.trim()}>
+                    {loading ? 'Thinking…' : 'Recommend funnels'}
+                  </button>
+                  <span style={{ fontSize: '.75rem', color: 'var(--sub)' }}>funnel type · page flow · customer journey · GHL workflows</span>
+                </div>
+              </div>
+            ) : (
+              <div className="card" style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <label className="form-label" style={{ margin: 0 }}>Meeting transcript, notes, or summary</label>
+                  <input ref={notesFileRef} type="file" accept=".pdf,.docx,.txt,.vtt,.srt,.md,.csv,.rtf,.json,.html,.htm,.log,application/pdf" onChange={onNotesFile} style={{ display: 'none' }} />
+                  <button className="btn btn-ghost btn-sm" onClick={() => notesFileRef.current?.click()} disabled={extracting}>
+                    {extracting ? 'Reading file…' : '📎 Upload PDF / Word / text'}
+                  </button>
+                </div>
+                <textarea className="form-input" style={{ minHeight: 160, resize: 'vertical', fontFamily: 'inherit', background: 'var(--surface)' }}
                   value={notes} onChange={e => setNotes(e.target.value)}
-                  placeholder="Paste your Zoom/call notes or a summary here — or upload a PDF/Word/text file…" />
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8, flexWrap: 'wrap' }}>
-                  <button className="btn btn-secondary btn-sm" onClick={analyzeNotes} disabled={analyzing || extracting || !notes.trim()}>
-                    {analyzing ? 'Reading…' : 'Analyze notes → fill offer'}
+                  placeholder="Paste the Zoom/call transcript or your meeting notes here — or upload a file. I’ll read it, derive the offer, and recommend funnels." />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                  <button className="btn btn-primary" onClick={() => runFromNotes(notes)} disabled={analyzing || loading || extracting || configLoading || !notes.trim()}>
+                    {analyzing ? 'Reading your notes…' : loading ? 'Recommending funnels…' : 'Build from notes →'}
                   </button>
                   {notesFile && !extracting && <span style={{ fontSize: '.75rem', color: 'var(--sub)' }}>{notesFile}</span>}
+                  <span style={{ fontSize: '.75rem', color: 'var(--sub)' }}>derives the offer → recommends funnels</span>
                 </div>
               </div>
-
-              <div className="form-group" style={{ margin: 0 }}>
-                <label className="form-label">The offer</label>
-                <textarea className="form-input" style={{ minHeight: 120, resize: 'vertical', fontFamily: 'inherit', background: 'var(--surface)' }}
-                  value={offer} onChange={e => setOffer(e.target.value)}
-                  placeholder='Example: 12-week 1-on-1 coaching for female founders who want to hit their first $10k month. Includes weekly calls, a template vault, and Slack access.' />
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
-                <div className="form-group" style={{ margin: 0 }}><label className="form-label">Price point</label>
-                  <select className="form-input form-select" value={price} onChange={e => setPrice(e.target.value)}>{PRICE_POINTS.map(p => <option key={p}>{p}</option>)}</select></div>
-                <div className="form-group" style={{ margin: 0 }}><label className="form-label">Main traffic</label>
-                  <select className="form-input form-select" value={traffic} onChange={e => setTraffic(e.target.value)}>{TRAFFIC.map(t => <option key={t}>{t}</option>)}</select></div>
-                <div className="form-group" style={{ margin: 0 }}><label className="form-label">Primary goal</label>
-                  <select className="form-input form-select" value={goal} onChange={e => setGoal(e.target.value)}>{GOALS.map(g => <option key={g}>{g}</option>)}</select></div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                <button className="btn btn-primary" onClick={getOptions} disabled={loading || configLoading || !offer.trim()}>
-                  {loading ? 'Thinking…' : 'Recommend funnels'}
-                </button>
-                <span style={{ fontSize: '.75rem', color: 'var(--sub)' }}>funnel type · page flow · customer journey · GHL workflows</span>
-              </div>
-            </div>
+            )}
           </>
         )}
 
