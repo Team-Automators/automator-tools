@@ -1351,15 +1351,34 @@ function architectContext(body) {
   ].filter(Boolean).join('\n');
 }
 
-// A prompt block that carries the account's evolving playbook + recent builds,
-// so each generation learns from what came before and gets sharper over time.
+// The shared "brand brain" for the Funnel Architect: its own evolving playbook
+// PLUS the same brand voice + copy feedback the copywriters learn from, so the
+// whole suite stays consistent and each side feeds the other.
 async function architectMemoryBlock(locationId, userId) {
   try {
-    const m = await archMem.getMemory(locationId, userId);
-    if (!m.playbook && !(m.examples || []).length) return '';
-    const ex = (m.examples || []).slice(0, 6)
-      .map(e => `- ${e.funnelName || 'funnel'} — ${String(e.offer || '').slice(0, 120)}`).join('\n');
-    return `\n\nACCOUNT PLAYBOOK — this account has run the architect ${m.count || 0} time(s). Apply these hard-won learnings and make THIS result more resonant and specific than the last. Do not repeat generic advice; build on what already works here:\n${m.playbook || '(still learning)'}\n\nRECENT BUILDS FOR THIS ACCOUNT (for continuity, avoid contradicting them):\n${ex || '(none yet)'}\n`;
+    const [m, voice, feedback] = await Promise.all([
+      archMem.getMemory(locationId, userId),
+      brandVoiceStore.getVoice(locationId, userId).catch(() => null),
+      brandVoiceStore.getFeedback(locationId, userId).catch(() => []),
+    ]);
+    const parts = [];
+
+    if (voice?.profile) {
+      parts.push(`BRAND VOICE (from the copywriters — keep all copy on-brand):\n${voice.profile}`);
+    }
+    const liked    = (feedback || []).filter(f => f.sentiment === 'up').slice(0, 4);
+    const disliked = (feedback || []).filter(f => f.sentiment === 'down').slice(0, 4);
+    if (liked.length)    parts.push(`WHAT THE CLIENT LOVED — lean into this:\n${liked.map(f => `• ${f.text}`).join('\n')}`);
+    if (disliked.length) parts.push(`WHAT THE CLIENT REJECTED — avoid this:\n${disliked.map(f => `• ${f.text}`).join('\n')}`);
+
+    if (m.playbook || (m.examples || []).length) {
+      const ex = (m.examples || []).slice(0, 6).map(e => `- ${e.funnelName || 'funnel'} — ${String(e.offer || '').slice(0, 120)}`).join('\n');
+      parts.push(`ACCOUNT PLAYBOOK — run ${m.count || 0} time(s); build on what already works, make this sharper than the last:\n${m.playbook || '(still learning)'}`);
+      if (ex) parts.push(`RECENT BUILDS (for continuity, don't contradict):\n${ex}`);
+    }
+
+    if (!parts.length) return '';
+    return `\n\n=== SHARED BRAND BRAIN (apply consistently) ===\n${parts.join('\n\n')}\n=== end brand brain ===\n`;
   } catch { return ''; }
 }
 
@@ -1565,6 +1584,16 @@ router.post('/architect/learn', async (req, res) => {
       offer: String(offer).slice(0, 240), funnelName, flow: flow || '',
       pricePoint: pricePoint || '', traffic: traffic || '', goal: goal || '', kept: !!kept, sentiment: sentiment || '',
     });
+
+    // Shared brain: an explicit thumb/save also lands in the brand-voice feedback
+    // pool the copywriters read, so the two sides genuinely feed each other.
+    if (down || up) {
+      await brandVoiceStore.addFeedback(req.locationId, req.userId, {
+        type: 'funnel',
+        text: `${funnelName}${flow ? ` (${flow})` : ''} — ${String(offer).slice(0, 140)}`,
+        sentiment: down ? 'down' : 'up',
+      }).catch(() => {});
+    }
 
     const resolvedKey = apiKey || (provider === 'claude' ? process.env.ANTHROPIC_API_KEY : null);
     const providerCfg = PROVIDER_MAP[provider];
@@ -2192,6 +2221,13 @@ router.post('/', async (req, res) => {
       if (disliked.length > 0) {
         additions.push(`\nWHAT THE CLIENT REJECTED — AVOID this style:\n${disliked.map(f => `• ${f.text}`).join('\n')}`);
       }
+
+      // Shared brand brain — also apply what the Funnel Architect has learned for
+      // this account, so copy stays consistent with the funnels/offers.
+      try {
+        const pb = (await archMem.getMemory(locationId, req.userId))?.playbook;
+        if (pb) additions.push(`\nACCOUNT FUNNEL/OFFER PLAYBOOK (learned across this account — keep copy consistent with it):\n${pb}`);
+      } catch {}
 
       if (additions.length) system = system + '\n' + additions.join('\n');
     } catch {}
