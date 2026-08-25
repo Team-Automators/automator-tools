@@ -60,6 +60,8 @@ export default function Pipeline() {
   const [analytics, setAnalytics] = useState('monthly')
   const [selMonth, setSelMonth]   = useState(null)
   const [editId, setEditId]       = useState(null)   // task id being edited in the modal
+  const [dragId, setDragId]       = useState(null)   // task id being dragged
+  const [dragOver, setDragOver]   = useState(null)   // service column hovered while dragging
   const fileRef = useRef(null)
 
   async function load() {
@@ -124,6 +126,13 @@ export default function Pipeline() {
   async function setDue(e, dueDate) {
     patchTask(e.id, { dueDate })
     await api.updateTask(e.id, { dueDate }).catch(() => load())
+  }
+  // Drag a card into a different service column → re-tag the task's service.
+  async function moveToService(taskId, serviceKey) {
+    const t = tasks.find(x => x.id === taskId)
+    if (!t || t.service === serviceKey) return
+    patchTask(taskId, { service: serviceKey })
+    await api.updateTask(taskId, { service: serviceKey }).catch(() => load())
   }
   // Full edit (title / stage / customer / service / due) — lets a card move
   // to any service column or stage, or be re-assigned to another client.
@@ -239,7 +248,11 @@ export default function Pipeline() {
               const overdueN = colItems.filter(isOverdue).length
               const doneN = items.filter(e => e.service === svc.key && e.status === 'completed').length
               return (
-                <div key={svc.key} style={{ minWidth: 260, width: 260, flexShrink: 0, background: 'var(--surface)', borderRadius: 12, borderTop: `3px solid ${svc.color}`, display: 'flex', flexDirection: 'column' }}>
+                <div key={svc.key}
+                  onDragOver={ev => { if (dragId) { ev.preventDefault(); if (dragOver !== svc.key) setDragOver(svc.key) } }}
+                  onDragLeave={ev => { if (!ev.currentTarget.contains(ev.relatedTarget)) setDragOver(o => o === svc.key ? null : o) }}
+                  onDrop={ev => { ev.preventDefault(); if (dragId) moveToService(dragId, svc.key); setDragId(null); setDragOver(null) }}
+                  style={{ minWidth: 260, width: 260, flexShrink: 0, background: 'var(--surface)', borderRadius: 12, borderTop: `3px solid ${svc.color}`, display: 'flex', flexDirection: 'column', outline: dragOver === svc.key ? `2px dashed ${svc.color}` : 'none', outlineOffset: -2, transition: 'outline-color .1s' }}>
                   <div style={{ padding: '12px 14px' }}>
                     <div style={{ fontWeight: 700, fontSize: '.9rem', color: 'var(--text)' }}>{svc.label}</div>
                     <div style={{ fontSize: '.72rem', color: 'var(--sub)', marginTop: 2 }}>
@@ -255,8 +268,12 @@ export default function Pipeline() {
                       const clientSvcs = svcByClient[e.clientName] || []
                       const st = stageOf(e.stage)
                       return (
-                        <div key={e.id} onClick={() => setEditId(e.id)} title="Click to edit / move"
-                          style={{ background: bg, border: `1px solid ${bd}`, borderRadius: 10, padding: 12, cursor: 'pointer' }}>
+                        <div key={e.id}
+                          draggable
+                          onDragStart={ev => { ev.dataTransfer.effectAllowed = 'move'; ev.dataTransfer.setData('text/plain', e.id); setDragId(e.id) }}
+                          onDragEnd={() => { setDragId(null); setDragOver(null) }}
+                          onClick={() => setEditId(e.id)} title="Drag to another column · click to edit"
+                          style={{ background: bg, border: `1px solid ${bd}`, borderRadius: 10, padding: 12, cursor: 'grab', opacity: dragId === e.id ? 0.5 : 1 }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
                             <div style={{ fontWeight: 700, fontSize: '.85rem', color: 'var(--text)', lineHeight: 1.3, paddingRight: 4 }}>{e.title}</div>
                             <input type="checkbox" title="Mark complete" onClick={ev => ev.stopPropagation()} onChange={() => complete(e)} style={{ cursor: 'pointer', marginTop: 2 }} />
