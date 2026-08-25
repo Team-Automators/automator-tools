@@ -6,7 +6,7 @@ const store   = require('../lib/pipeline-store');
 async function owned(locationId, id, req) {
   const e = (await store.getAll(locationId)).find(x => x.id === id);
   if (!e) return null;
-  if (e.ownerUserId && req.userId && e.ownerUserId !== req.userId) return null;
+  if ((e.ownerUserId || '') !== (req.userId || '')) return null;
   return e;
 }
 
@@ -16,7 +16,7 @@ router.get('/', async (req, res) => {
   if (!locationId) return res.json([]);
   try {
     const all = await store.getAll(locationId);
-    res.json(all.filter(e => !e.ownerUserId || e.ownerUserId === req.userId));
+    res.json(all.filter(e => (e.ownerUserId || '') === (req.userId || '')));
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

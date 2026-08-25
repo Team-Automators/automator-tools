@@ -690,8 +690,8 @@ export default function Settings() {
               if (!(await confirmToast('Claim all currently-shared conversations, tasks, and hooks on this location as yours?', { confirmText: 'Claim', danger: false }))) return
               const r = await api.claimLegacyData().catch(() => null)
               if (r?.ok) {
-                const { copies = 0, tasks = 0, hooks = 0 } = r.claimed || {}
-                notifySuccess(`Claimed ${copies} conversations, ${tasks} tasks, ${hooks} hooks`)
+                const { copies = 0, tasks = 0, hooks = 0, customers = 0, pipeline = 0 } = r.claimed || {}
+                notifySuccess(`Claimed ${customers} folders, ${copies} conversations, ${tasks} tasks, ${pipeline} pipeline, ${hooks} hooks`)
               } else {
                 notifySuccess('Nothing to claim (or you must sign in with your email first)')
               }

@@ -4,22 +4,31 @@ const copyStore  = require('../lib/copy-store');
 const tasksStore = require('../lib/tasks-store');
 const hooksStore = require('../lib/hooks-store');
 
-// Load a copy the caller is allowed to touch: same location AND (owned by the
-// caller OR legacy with no owner). Returns null otherwise → callers 404.
+// Load a copy the caller is allowed to touch: same location AND owned by the
+// caller. Legacy (no owner) is NOT accessible. Returns null otherwise → 404.
 async function ownedCopy(copyId, req) {
   const copy = await copyStore.getCopy(copyId);
   if (!copy) return null;
   if (req.locationId && copy.locationId !== req.locationId) return null;
-  if (copy.ownerUserId && req.userId && copy.ownerUserId !== req.userId) return null;
+  if ((copy.ownerUserId || '') !== (req.userId || '')) return null;
   return copy;
 }
 
-// GET /api/customers?locationId=
+// A customer folder the caller owns (strict per-user). Null otherwise.
+async function ownedCustomer(locationId, id, req) {
+  const c = (await copyStore.getCustomers(locationId)).find(x => x.id === id);
+  if (!c) return null;
+  if ((c.ownerUserId || '') !== (req.userId || '')) return null;
+  return c;
+}
+
+// GET /api/customers?locationId= — the caller's own folders only.
 router.get('/customers', async (req, res) => {
   const { locationId } = req.query;
   if (!locationId) return res.status(400).json({ error: 'locationId required' });
   try {
-    const customers = await copyStore.getCustomers(locationId);
+    const uid = req.userId || '';
+    const customers = (await copyStore.getCustomers(locationId)).filter(c => (c.ownerUserId || '') === uid);
     res.json(customers);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -31,7 +40,7 @@ router.post('/customers', async (req, res) => {
   const { locationId, name, email } = req.body;
   if (!locationId || !name) return res.status(400).json({ error: 'locationId and name required' });
   try {
-    const customer = await copyStore.createCustomer(locationId, { name, email });
+    const customer = await copyStore.createCustomer(locationId, { name, email, ownerUserId: req.userId || '' });
     res.json(customer);
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -44,6 +53,7 @@ router.put('/customers/:id', async (req, res) => {
   if (!locationId) return res.status(400).json({ error: 'locationId required' });
   if (name !== undefined && !String(name).trim()) return res.status(400).json({ error: 'name cannot be empty' });
   try {
+    if (!(await ownedCustomer(locationId, req.params.id, req))) return res.status(404).json({ error: 'Customer not found' });
     const cust = await copyStore.updateCustomer(locationId, req.params.id, { name, email });
     if (!cust) return res.status(404).json({ error: 'Customer not found' });
     // Sync the rename across the whole system — tasks and hooks reference the
@@ -65,6 +75,7 @@ router.delete('/customers/:id', async (req, res) => {
   const { locationId } = req.query;
   if (!locationId) return res.status(400).json({ error: 'locationId required' });
   try {
+    if (!(await ownedCustomer(locationId, req.params.id, req))) return res.status(404).json({ error: 'Customer not found' });
     await copyStore.deleteCustomer(locationId, req.params.id);   // copies → Unsorted
     await Promise.all([
       tasksStore.detachCustomer(locationId, req.params.id).catch(() => {}),
@@ -88,8 +99,8 @@ router.get('/copies', async (req, res) => {
       ? await copyStore.getCustomerCopies(locationId, customerId)
       : await copyStore.getCopyIndex(locationId);
 
-    // Per-user scope: caller's copies + legacy copies (no owner) stay visible.
-    copies = copies.filter(c => !c.ownerUserId || c.ownerUserId === uid);
+    // Strict per-user scope: only the caller's own copies (legacy hidden).
+    copies = copies.filter(c => (c.ownerUserId || '') === (uid || ''));
 
     if (status) {
       copies = copies.filter(c => (c.status || 'in-progress') === status);

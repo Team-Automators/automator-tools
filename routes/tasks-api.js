@@ -13,7 +13,7 @@ function stageLabel(id) { return STAGE_LABELS[id] || id; }
 async function ownedTask(locationId, taskId, req) {
   const t = (await store.getAll(locationId)).find(x => x.id === taskId);
   if (!t) return null;
-  if (t.ownerUserId && req.userId && t.ownerUserId !== req.userId) return null;
+  if ((t.ownerUserId || '') !== (req.userId || '')) return null;
   return t;
 }
 
@@ -22,7 +22,7 @@ router.get('/', async (req, res) => {
   if (!locationId) return res.json([]);
   try {
     const all = await store.getAll(locationId);
-    res.json(all.filter(t => !t.ownerUserId || t.ownerUserId === req.userId));
+    res.json(all.filter(t => (t.ownerUserId || '') === (req.userId || '')));
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

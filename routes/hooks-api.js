@@ -7,7 +7,7 @@ const store   = require('../lib/hooks-store');
 async function ownedHook(locationId, hookId, req) {
   const h = (await store.getAll(locationId)).find(x => x.id === hookId);
   if (!h) return null;
-  if (h.ownerUserId && req.userId && h.ownerUserId !== req.userId) return null;
+  if ((h.ownerUserId || '') !== (req.userId || '')) return null;
   return h;
 }
 
@@ -26,7 +26,7 @@ router.get('/', async (req, res) => {
       }
     }
     if (dirty) await store.saveAll(locationId, hooks);
-    res.json(hooks.filter(h => !h.ownerUserId || h.ownerUserId === req.userId));
+    res.json(hooks.filter(h => (h.ownerUserId || '') === (req.userId || '')));
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

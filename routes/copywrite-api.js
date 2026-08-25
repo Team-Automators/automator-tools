@@ -1068,7 +1068,7 @@ router.post('/analyze-voice', async (req, res) => {
 
   // Per-user brand voice: train only on this user's own, non-archived copies.
   const idx = (await copyStore.getCopyIndex(locationId).catch(() => []))
-    .filter(c => !c.ownerUserId || c.ownerUserId === req.userId)
+    .filter(c => (c.ownerUserId || '') === (req.userId || ''))
     .filter(c => (c.status || 'in-progress') !== 'archived');
   if (idx.length < 2) {
     return res.json({ ok: true, skipped: true, reason: 'Save at least 2 copies first' });

@@ -16,7 +16,7 @@ const check = (n, c, x = '') => { if (c) passed++; else failed++; console.log(` 
   console.log('\n=== Backup export / restore ===\n');
 
   // Seed source location for user U1.
-  const cust = await copyStore.createCustomer(SRC, { name: 'Acme' });
+  const cust = await copyStore.createCustomer(SRC, { name: 'Acme', ownerUserId: U });
   await copyStore.saveCopy(SRC, { customerId: cust.id, customerName: 'Acme', type: 'email', messages: [{ role: 'assistant', content: 'hi' }], title: 'Welcome', ownerUserId: U });
   await tasks.create(SRC, { title: 'Build funnel', service: 'funnels', ownerUserId: U });
   await pipeline.create(SRC, { clientName: 'Acme', service: 'funnels', ownerUserId: U });

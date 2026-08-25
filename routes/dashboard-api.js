@@ -46,7 +46,7 @@ router.get('/', async (req, res) => {
   // Per-user + hide archived (mirror /api/copies). Legacy copies (no owner) stay visible.
   const uid = req.userId;
   const idx = (Array.isArray(copyIdx) ? copyIdx : [])
-    .filter(c => !c.ownerUserId || c.ownerUserId === uid)
+    .filter(c => (c.ownerUserId || '') === (uid || ''))
     .filter(c => (c.status || 'in-progress') !== 'archived');
   res.json({
     hasPITs,
