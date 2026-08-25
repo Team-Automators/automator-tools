@@ -3,6 +3,8 @@ import { getLocationId, apiFetch } from '../lib/api.js'
 
 const STORAGE_KEY = 'ghl_ai_config'
 
+const AI_EVENT = 'aiconfig-changed'
+
 function readLocal() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
@@ -31,11 +33,22 @@ export function useAIConfig() {
 
   useEffect(() => { refresh() }, [refresh])
 
+  // Keep every useAIConfig instance (sidebar chip, banner, pages) in sync when
+  // the key is saved/cleared anywhere — same tab (custom event) or another tab
+  // (native storage event).
+  useEffect(() => {
+    const sync = () => setConfig(readLocal())
+    window.addEventListener(AI_EVENT, sync)
+    window.addEventListener('storage', sync)
+    return () => { window.removeEventListener(AI_EVENT, sync); window.removeEventListener('storage', sync) }
+  }, [])
+
   function saveConfig({ provider, apiKey, model, businessName }) {
     // AI config → localStorage (device-specific)
     const stored = { provider, apiKey, model }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(stored))
     setConfig(stored)
+    window.dispatchEvent(new Event(AI_EVENT))
 
     // Business name → server (shared per locationId)
     if (businessName !== undefined) {
@@ -52,6 +65,7 @@ export function useAIConfig() {
   function clearConfig() {
     localStorage.removeItem(STORAGE_KEY)
     setConfig(null)
+    window.dispatchEvent(new Event(AI_EVENT))
   }
 
   return { config, loading, locationName, locationLogo, saveConfig, clearConfig, refresh }
