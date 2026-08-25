@@ -110,6 +110,14 @@ export default function Analyzer() {
     navigator.clipboard?.writeText(result).then(() => notifySuccess('Brief copied')).catch(() => {})
   }
 
+  // Hand the meeting material straight to the Funnel Architect (prefill + auto-run).
+  function buildFunnel() {
+    const material = [transcript.trim(), result.trim() ? `PROJECT BRIEF:\n${result.trim()}` : ''].filter(Boolean).join('\n\n')
+    const u = new URL('/architect', window.location.origin)
+    if (locationId) u.searchParams.set('locationId', locationId)
+    navigate(u.pathname + u.search, { state: { notes: material, auto: true } })
+  }
+
   // Save the brief to the Library — grouped under the client (created if needed).
   async function saveToLibrary() {
     if (!result.trim()) return
@@ -204,8 +212,9 @@ export default function Analyzer() {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
               <div className="fw-700" style={{ fontSize: '.95rem' }}>Project Brief</div>
               {result && !loading && (
-                <div style={{ display: 'flex', gap: 8 }}>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   <button className="btn btn-ghost btn-sm" onClick={copyResult}>Copy</button>
+                  <button className="btn btn-secondary btn-sm" onClick={buildFunnel}>Build funnel from this →</button>
                   <button className="btn btn-primary btn-sm" onClick={saveToLibrary} disabled={saving}>
                     {saving ? 'Saving…' : 'Save to Library'}
                   </button>

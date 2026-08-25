@@ -1,5 +1,5 @@
-import { useState, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useRef, useEffect } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useAIConfig } from '../hooks/useAIConfig.js'
 import { api, getLocationId } from '../lib/api.js'
 import { notifySuccess, notifyError, confirmToast } from '../lib/toast.jsx'
@@ -127,8 +127,10 @@ function downloadPDF(ctx, b) {
 
 export default function FunnelArchitect() {
   const navigate = useNavigate()
+  const location = useLocation()
   const locationId = getLocationId()
   const { config, loading: configLoading } = useAIConfig()
+  const handoffDone = useRef(false)
 
   const [stage, setStage]     = useState('intake') // intake | options | pages | build
   const [offer, setOffer]     = useState('')
@@ -192,6 +194,36 @@ export default function FunnelArchitect() {
       notifySuccess('Read your notes — offer & inputs filled in')
     } catch (e) { notifyError(e.message || 'Could not read the notes') } finally { setAnalyzing(false) }
   }
+
+  // Hand-off from the Analyzer: prefill notes and run notes → offer → options with
+  // explicit values (avoids stale React state).
+  async function runFromNotes(text) {
+    setNotes(text)
+    setAnalyzing(true)
+    let derived = { offer: '', pricePoint: price, traffic, goal }
+    try {
+      const d = await api.architectFromNotes({ notes: text, provider: config.provider, apiKey: config.apiKey, model: config.model })
+      derived = { offer: d.offer || '', pricePoint: d.pricePoint || price, traffic: d.traffic || traffic, goal: d.goal || goal }
+      setOffer(derived.offer); setPrice(derived.pricePoint); setTraffic(derived.traffic); setGoal(derived.goal)
+    } catch (e) { setAnalyzing(false); notifyError(e.message || 'Could not read the notes'); return }
+    setAnalyzing(false)
+    setLoading(true)
+    try {
+      const j = await api.architectOptions({ ...derived, notes: text, provider: config.provider, apiKey: config.apiKey, model: config.model })
+      setOptions(j.options || []); setStage('options')
+    } catch (e) { notifyError(e.message || 'Failed') } finally { setLoading(false) }
+  }
+
+  // When arriving from the Analyzer with material, prefill and (if auto) run once
+  // the AI config is ready.
+  useEffect(() => {
+    const st = location.state
+    if (!st?.notes || handoffDone.current) return
+    if (st.auto && !config?.apiKey) return // wait for config to load
+    handoffDone.current = true
+    if (st.auto && config?.apiKey) runFromNotes(st.notes)
+    else setNotes(st.notes)
+  }, [location.state, config?.apiKey])
 
   async function getOptions() {
     if (!offer.trim()) { notifyError('Tell me the offer first'); return }
