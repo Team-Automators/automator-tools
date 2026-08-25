@@ -4,6 +4,7 @@
 // server also sets an httpOnly cookie as a fallback for standalone use.
 
 const KEY = 'ghl_session'
+const EMAIL_KEY = 'ghl_user_email'   // remembered so we can silently re-login as the user
 
 export function getSessionToken() {
   try { return localStorage.getItem(KEY) || '' } catch { return '' }
@@ -11,25 +12,44 @@ export function getSessionToken() {
 
 export function setSessionToken(token) {
   try {
-    if (token) localStorage.setItem(KEY, token)
-    else localStorage.removeItem(KEY)
+    if (token) {
+      localStorage.setItem(KEY, token)
+      // Remember the user's email from the token so an expired session can be
+      // silently restored WITH the user identity (uid), not just location-level.
+      const email = decodeClaims(token)?.email
+      if (email) localStorage.setItem(EMAIL_KEY, email)
+    } else {
+      localStorage.removeItem(KEY)
+    }
   } catch {}
+}
+
+// Only cleared on an explicit sign-out — NOT on transient session expiry, so
+// silent re-auth can always recover the user.
+export function getRememberedEmail() {
+  try { return localStorage.getItem(EMAIL_KEY) || '' } catch { return '' }
+}
+export function setRememberedEmail(email) {
+  try { if (email) localStorage.setItem(EMAIL_KEY, email); else localStorage.removeItem(EMAIL_KEY) } catch {}
 }
 
 export function clearSessionToken() {
   setSessionToken('')
 }
 
-// Decode the (signed, not encrypted) session payload for UI gating only.
-// The server always re-verifies — never trust this for authorization.
-export function getSessionClaims() {
-  const t = getSessionToken()
+function decodeClaims(t) {
   if (!t || t.indexOf('.') < 1) return null
   try {
     let b = t.slice(0, t.indexOf('.')).replace(/-/g, '+').replace(/_/g, '/')
     while (b.length % 4) b += '='
     return JSON.parse(atob(b))
   } catch { return null }
+}
+
+// Decode the (signed, not encrypted) session payload for UI gating only.
+// The server always re-verifies — never trust this for authorization.
+export function getSessionClaims() {
+  return decodeClaims(getSessionToken())
 }
 
 // The location context we can silently re-authenticate against.
@@ -40,21 +60,38 @@ function currentLocationId() {
   } catch { return '' }
 }
 
-// Silently re-issue a session token for the known location. Uses `origFetch`
-// (unpatched) to avoid recursing through the auth wrapper. Returns the new
-// token, or '' if the location can't be authenticated.
-async function reauth(origFetch) {
+// Silently restore a session for the known location — and, when we remember the
+// user's email, restore the FULL user session (uid/email) so route guards that
+// require a verified user don't bounce to /login. Uses `origFetch` (unpatched)
+// to avoid recursing through the auth wrapper. Returns the new token, or ''.
+export async function reauth(origFetch = window.fetch.bind(window)) {
   const id = currentLocationId()
   if (!id) return ''
   try {
-    const r = await origFetch('/auth/location-login', {
+    // Step 1 — location session.
+    const lr = await origFetch('/auth/location-login', {
       method:      'POST',
       credentials: 'include',
       headers:     { 'Content-Type': 'application/json' },
       body:        JSON.stringify({ locationId: id }),
     })
-    const d = await r.json().catch(() => ({}))
-    if (r.ok && d.token) { setSessionToken(d.token); return d.token }
+    const ld = await lr.json().catch(() => ({}))
+    if (!lr.ok || !ld.token) return ''
+    setSessionToken(ld.token)
+
+    // Step 2 — upgrade to the user session if we remember the email.
+    const email = getRememberedEmail()
+    if (email) {
+      const ur = await origFetch('/auth/user-login', {
+        method:      'POST',
+        credentials: 'include',
+        headers:     { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ld.token}` },
+        body:        JSON.stringify({ locationId: id, email }),
+      })
+      const ud = await ur.json().catch(() => ({}))
+      if (ur.ok && ud.token) { setSessionToken(ud.token); return ud.token }
+    }
+    return ld.token
   } catch {}
   return ''
 }

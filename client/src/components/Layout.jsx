@@ -208,6 +208,7 @@ export default function Layout() {
                 onClick={() => {
                   localStorage.removeItem('ghl_ai_config')
                   localStorage.removeItem('ghl_session')
+                  localStorage.removeItem('ghl_user_email')
                   fetch('/auth/logout', { method: 'POST' }).catch(() => {})
                   window.location.href = '/login'
                 }}

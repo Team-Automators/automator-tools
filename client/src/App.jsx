@@ -17,7 +17,7 @@ import Analyzer from './pages/Analyzer.jsx'
 import Pipeline from './pages/Pipeline.jsx'
 import Login from './pages/Login.jsx'
 import { getLocationId, persistLocationId } from './lib/api.js'
-import { getSessionToken, setSessionToken, getSessionClaims } from './lib/session.js'
+import { getSessionToken, setSessionToken, getSessionClaims, reauth } from './lib/session.js'
 
 function hasAIConfig() {
   try { return !!JSON.parse(localStorage.getItem('ghl_ai_config'))?.apiKey } catch { return false }
@@ -30,34 +30,21 @@ function hasAIConfig() {
 //   • the GHL-embedded context — locationId in the URL for an already-installed
 //     agency — which we can authenticate silently, no manual entry.
 async function bootstrapAuth() {
-  if (getSessionToken()) return // already have a local session
+  // If we already hold a VALID (unexpired) user session, keep it.
+  const claims = getSessionClaims()
+  if (claims?.uid && claims.exp && Date.now() < claims.exp) return
 
-  // A valid httpOnly cookie session? Restore it (and mint a bearer for the iframe).
+  // A valid httpOnly cookie session? Restore the location id first.
   try {
     const s = await fetch('/auth/session', { credentials: 'include' }).then(r => r.json()).catch(() => null)
-    if (s?.authenticated && s.locationId) {
-      persistLocationId(s.locationId)
-      // Re-issue a bearer token so requests work even where cookies are blocked.
-      await silentLogin(s.locationId)
-      return
-    }
+    if (s?.authenticated && s.locationId) persistLocationId(s.locationId)
   } catch {}
 
-  // GHL iframe (or a persisted id) but no session yet — verify silently.
+  // GHL iframe (or a persisted id) — silently restore the FULL user session
+  // (location-login → user-login using the remembered email) so we're not
+  // bounced to /login when the old token lapses.
   const id = getLocationId()
-  if (id) await silentLogin(id)
-}
-
-async function silentLogin(locationId) {
-  try {
-    const r = await fetch('/auth/location-login', {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ locationId }),
-    })
-    const d = await r.json().catch(() => ({}))
-    if (r.ok && d.token) { setSessionToken(d.token); persistLocationId(locationId) }
-  } catch {}
+  if (id) { await reauth(); persistLocationId(id) }
 }
 
 // Forces a full remount of CopywritersChat when the type param changes,
