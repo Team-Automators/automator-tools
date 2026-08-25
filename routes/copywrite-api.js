@@ -1330,6 +1330,147 @@ router.post('/architect-funnel', async (req, res) => {
   res.end();
 });
 
+// Robustly pull a JSON object out of a model response (tolerates code fences).
+function parseModelJSON(text) {
+  let t = String(text || '').trim();
+  const fence = t.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fence) t = fence[1].trim();
+  const s = t.indexOf('{'), e = t.lastIndexOf('}');
+  if (s !== -1 && e !== -1) t = t.slice(s, e + 1);
+  return JSON.parse(t);
+}
+
+function architectContext(body) {
+  const { offer, pricePoint, traffic, goal } = body;
+  return [
+    `OFFER:\n${String(offer || '').slice(0, 6000)}`,
+    pricePoint ? `Price point: ${pricePoint}` : '',
+    traffic    ? `Main traffic source: ${traffic}` : '',
+    goal       ? `Primary goal: ${goal}` : '',
+  ].filter(Boolean).join('\n');
+}
+
+// ── POST /copywrite/architect/options — 3 funnel options to choose from ───────
+router.post('/architect/options', async (req, res) => {
+  const { offer, provider = 'claude', apiKey, model: reqModel } = req.body;
+  if (!offer || !String(offer).trim()) return res.status(400).json({ error: 'offer required' });
+  const resolvedKey = apiKey || (provider === 'claude' ? process.env.ANTHROPIC_API_KEY : null);
+  if (!resolvedKey) return res.status(400).json({ error: 'No API key configured. Connect an AI provider in Settings.' });
+  const providerCfg = PROVIDER_MAP[provider];
+  if (!providerCfg) return res.status(400).json({ error: `Unknown provider: ${provider}` });
+  const model = reqModel || providerCfg.defaultModel;
+
+  const prompt = `You are a senior funnel architect. Given the offer below, propose THREE distinct funnel approaches to build it, ranked best-fit first.
+
+${architectContext(req.body)}
+
+Return ONLY valid JSON (no prose, no code fences) in this exact shape:
+{
+  "options": [
+    {
+      "id": "lead-magnet",
+      "badge": "Best Fit",                    // "Best Fit", "Option 2", "Option 3"
+      "name": "Lead Magnet to Call Funnel",
+      "tagline": "QUALIFY THEN BOOK",         // 2-3 word ALL-CAPS strategy
+      "fit": 94,                               // 0-100 fit score for THIS offer
+      "description": "1-2 sentences on why/when this works for this offer.",
+      "mvpFlow": ["Opt-in", "Calendar", "Thank You"],   // core pages in order
+      "pages": ["Opt-in","VSL","Calendar","Application","Thank You"], // all relevant pages (core + add-ons)
+      "corePages": ["Opt-in","Calendar","Thank You"],   // which of pages are core (rest are add-ons)
+      "watchOut": "1 sentence on the main risk/failure mode of this funnel for this offer."
+    }
+    // exactly 3 options
+  ]
+}
+Pick funnel types appropriate to the offer, price point, traffic, and goal. Fit scores must differ and be honest.`;
+
+  try {
+    const raw = await callAI(providerCfg, resolvedKey, model, prompt, 2500);
+    const json = parseModelJSON(raw);
+    if (!Array.isArray(json.options)) throw new Error('bad shape');
+    res.json(json);
+  } catch (e) {
+    res.status(502).json({ error: 'Could not generate options. Try again.', detail: e.message });
+  }
+});
+
+// ── POST /copywrite/architect/build — full build sheet for a chosen funnel ────
+router.post('/architect/build', async (req, res) => {
+  const { offer, funnelName, pages, provider = 'claude', apiKey, model: reqModel } = req.body;
+  if (!offer || !String(offer).trim()) return res.status(400).json({ error: 'offer required' });
+  if (!funnelName) return res.status(400).json({ error: 'funnelName required' });
+  const resolvedKey = apiKey || (provider === 'claude' ? process.env.ANTHROPIC_API_KEY : null);
+  if (!resolvedKey) return res.status(400).json({ error: 'No API key configured. Connect an AI provider in Settings.' });
+  const providerCfg = PROVIDER_MAP[provider];
+  if (!providerCfg) return res.status(400).json({ error: `Unknown provider: ${provider}` });
+  const model = reqModel || providerCfg.defaultModel;
+  const pageList = Array.isArray(pages) && pages.length ? pages : ['Opt-in', 'Calendar', 'Thank You'];
+
+  const prompt = `You are a senior funnel architect building in GoHighLevel. Produce the COMPLETE build sheet for the "${funnelName}" using ONLY these pages, in this order: ${pageList.join(' → ')}.
+
+${architectContext(req.body)}
+
+Return ONLY valid JSON (no prose, no code fences) in this exact shape:
+{
+  "funnelName": "${funnelName}",
+  "flow": "${pageList.join(' → ')}",
+  "watchOut": "the single biggest risk for this build",
+  "journey": [
+    {
+      "page": "Opt-in",
+      "mindset": "what the prospect is thinking/feeling on this page (1-2 sentences, first person)",
+      "pageJob": "the ONE job this page does",
+      "mustHave": ["3-6 concrete must-have elements"],
+      "button": "the exact button label",
+      "dropOff": "why people abandon here"
+    }
+    // one entry per page, in order
+  ],
+  "pageCopy": [
+    {
+      "page": "Opt-in",
+      "badge": "01 · OPT-IN",
+      "headline": "the actual headline",
+      "subhead": "the actual subhead",
+      "bullets": ["3-4 benefit bullets as real copy"],
+      "formFields": ["Email address"],
+      "button": "CTA button label",
+      "testimonial": "one short proof line in quotes (or empty string)"
+    }
+    // one per page, in order
+  ],
+  "workflows": [
+    {
+      "name": "Checklist Capture and Deliver",
+      "trigger": "Form Submitted: <name>",
+      "steps": [
+        { "type": "TAG", "text": "Add tag: ...; remove tag: ..." },
+        { "type": "PIPELINE", "text": "Move contact to pipeline: ..., stage: ..." },
+        { "type": "EMAIL", "text": "Send ..." },
+        { "type": "SMS", "text": "Send text: ..." },
+        { "type": "WAIT", "text": "Wait 1 hour ..." },
+        { "type": "INTERNAL", "text": "Trigger workflow: ..." },
+        { "type": "CONDITION", "text": "If ... then ... else ..." }
+      ]
+    }
+    // 2-4 workflows covering capture/deliver, nurture, and call reminders/no-show follow-up
+  ],
+  "tagsToCreate": ["lead-magnet","nurture-active","call-booked","no-show"],
+  "customFields": ["Lead Analysis Interest","Call Booked Date"],
+  "pipelineStages": ["New Lead","Nurture","Call Scheduled","Call Completed","Enrolled"]
+}
+Use ONLY step "type" values: TAG, PIPELINE, EMAIL, SMS, WAIT, INTERNAL, CONDITION. Make everything specific to THIS offer — real headlines, real tags, real triggers. No placeholders.`;
+
+  try {
+    const raw = await callAI(providerCfg, resolvedKey, model, prompt, 8000);
+    const json = parseModelJSON(raw);
+    if (!Array.isArray(json.journey)) throw new Error('bad shape');
+    res.json(json);
+  } catch (e) {
+    res.status(502).json({ error: 'Could not generate the build. Try again.', detail: e.message });
+  }
+});
+
 // ── POST /copywrite/generate-ghl-prompt ──────────────────────────────────────
 
 router.post('/generate-ghl-prompt', async (req, res) => {
