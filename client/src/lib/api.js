@@ -474,6 +474,44 @@ export const api = {
     })
   },
 
+  architectFunnelStream({ offer, pricePoint, traffic, goal, provider, apiKey, model }, { onChunk } = {}) {
+    return new Promise((resolve, reject) => {
+      fetch('/copywrite/architect-funnel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ offer, pricePoint, traffic, goal, provider, apiKey, model }),
+      }).then(async resp => {
+        if (!resp.ok) {
+          const j = await resp.json().catch(() => ({}))
+          reject(new Error(j.error || `Request failed (${resp.status})`))
+          return
+        }
+        const reader = resp.body.getReader()
+        const decoder = new TextDecoder()
+        let buf = '', full = '', errText = ''
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          buf += decoder.decode(value, { stream: true })
+          const lines = buf.split('\n')
+          buf = lines.pop()
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue
+            const raw = line.slice(6)
+            if (raw === '[DONE]') continue
+            try {
+              const parsed = JSON.parse(raw)
+              if (parsed.error) errText = parsed.error
+              else if (parsed.text) { full += parsed.text; onChunk?.(parsed.text, full) }
+            } catch {}
+          }
+        }
+        if (errText && !full) reject(new Error(errText))
+        else resolve(full)
+      }).catch(reject)
+    })
+  },
+
   async analyzeVoice({ provider, apiKey, model }) {
     const url = withLocationId(new URL('/copywrite/analyze-voice', window.location.origin))
     const r = await fetch(url.toString(), {

@@ -14,6 +14,7 @@ import Hooks from './pages/Hooks.jsx'
 import Workflows from './pages/Workflows.jsx'
 import Archive from './pages/Archive.jsx'
 import Analyzer from './pages/Analyzer.jsx'
+import FunnelArchitect from './pages/FunnelArchitect.jsx'
 import Pipeline from './pages/Pipeline.jsx'
 import Login from './pages/Login.jsx'
 import { getLocationId, persistLocationId } from './lib/api.js'
@@ -99,6 +100,7 @@ export default function App() {
         <Route path="workflows" element={<Workflows />} />
         <Route path="archive" element={<Archive />} />
         <Route path="analyzer" element={<Analyzer />} />
+        <Route path="architect" element={<FunnelArchitect />} />
         <Route path="pipeline" element={<Pipeline />} />
         <Route path="settings" element={<Settings />} />
         <Route path="*" element={<Navigate to="/" replace />} />

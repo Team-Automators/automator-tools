@@ -1256,6 +1256,80 @@ router.post('/analyze-transcript', async (req, res) => {
   res.end();
 });
 
+// ── POST /copywrite/architect-funnel ─────────────────────────────────────────
+// One offer in → one complete build sheet out (funnel type, page flow, customer
+// journey, GHL workflows). Streams like the analyzer.
+const FUNNEL_ARCHITECT_SYSTEM = `You are a senior funnel architect at a GoHighLevel automation agency. The user gives you ONE offer (plus price point, main traffic source, and primary goal). You return ONE complete BUILD SHEET the team can implement in GoHighLevel. Be specific and practical — a builder should be able to follow it step by step, not a vague overview.
+
+Return clean Markdown with EXACTLY these sections and headings:
+
+## Recommended Funnel Type
+Pick ONE and justify in 1–2 sentences, based on the offer, price point, traffic, and goal: Lead Magnet, Appointment Booking, Quiz, VSL (Video Sales Letter), Automated Webinar, Tripwire / Low-Ticket, or Application.
+
+## Page Flow
+The exact pages in order (e.g. Landing → Opt-in → Booking → Thank You). For EACH page give:
+- **Purpose** — what this page must accomplish
+- **Key sections** — headline angle, the form fields to collect, and the primary CTA
+
+## Customer Journey
+Map the journey from first touch to post-purchase across these stages: Awareness → Interest → Decision → Action → Retention. For each stage, one line: what the prospect experiences and what moves them to the next step.
+
+## GHL Workflows
+The automations behind the funnel, ready to build in GoHighLevel. For EACH workflow give:
+- **Name**
+- **Trigger** — form submitted, appointment booked, tag added, payment received, etc.
+- **Steps (in order)** — send email/SMS, wait X, add/remove tag, move pipeline stage, notify team, etc.
+List the key **tags** and the **pipeline stages** you'd create to support them.
+
+## Tech & Assets Checklist
+An ordered checklist of everything to build: pages, forms, calendars, workflows, emails/SMS, integrations, and tracking.
+
+## Build Order
+A short numbered sequence — what to build first, second, third — so the team knows exactly where to start.
+
+Tailor everything to the specific offer, price point, traffic source, and primary goal provided. Where a detail is missing, make a smart, clearly-reasonable assumption and mark it "(assumption)". No fluff — every line should help the builder.`;
+
+router.post('/architect-funnel', async (req, res) => {
+  const { offer, pricePoint, traffic, goal, provider = 'claude', apiKey, model: reqModel } = req.body;
+  if (!offer || !String(offer).trim()) return res.status(400).json({ error: 'offer required' });
+
+  const resolvedKey = apiKey || (provider === 'claude' ? process.env.ANTHROPIC_API_KEY : null);
+  if (!resolvedKey) return res.status(400).json({ error: 'No API key configured. Connect an AI provider in Settings.' });
+
+  const providerCfg = PROVIDER_MAP[provider];
+  if (!providerCfg) return res.status(400).json({ error: `Unknown provider: ${provider}` });
+
+  const model = reqModel || providerCfg.defaultModel;
+  const userPrompt = [
+    `OFFER:\n${String(offer).slice(0, 6000)}`,
+    pricePoint ? `Price point: ${pricePoint}` : '',
+    traffic    ? `Main traffic source: ${traffic}` : '',
+    goal       ? `Primary goal: ${goal}` : '',
+    `\nDraw the complete funnel build sheet now.`,
+  ].filter(Boolean).join('\n');
+  const messages = [{ role: 'user', content: userPrompt }];
+
+  res.setHeader('Content-Type',  'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection',    'keep-alive');
+  res.flushHeaders();
+
+  try {
+    switch (providerCfg.type) {
+      case 'anthropic':     await streamAnthropic(resolvedKey, model, FUNNEL_ARCHITECT_SYSTEM, messages, res, 8000); break;
+      case 'openai-compat': await streamOpenAICompat(resolvedKey, providerCfg.baseUrl, model, FUNNEL_ARCHITECT_SYSTEM, messages, res, 8000); break;
+      case 'gemini':        await streamGemini(resolvedKey, model, FUNNEL_ARCHITECT_SYSTEM, messages, res); break;
+      case 'cohere':        await streamCohere(resolvedKey, model, FUNNEL_ARCHITECT_SYSTEM, messages, res); break;
+      default: res.write(`data: ${JSON.stringify({ error: `Provider ${providerCfg.type} not supported` })}\n\n`);
+    }
+  } catch (err) {
+    const msg = err.response?.data?.error?.message || err.response?.data?.message || err.message;
+    res.write(`data: ${JSON.stringify({ error: msg })}\n\n`);
+  }
+  res.write('data: [DONE]\n\n');
+  res.end();
+});
+
 // ── POST /copywrite/generate-ghl-prompt ──────────────────────────────────────
 
 router.post('/generate-ghl-prompt', async (req, res) => {
