@@ -504,6 +504,26 @@ export const api = {
     return j
   },
 
+  async getArchitectMemory() {
+    const url = withLocationId(new URL('/copywrite/architect/memory', window.location.origin))
+    const r = await fetch(url.toString())
+    return r.ok ? r.json() : { playbook: '', count: 0, examples: [] }
+  },
+  async setArchitectPlaybook(playbook) {
+    const r = await fetch('/copywrite/architect/memory', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ playbook, locationId: getLocationId() }),
+    })
+    const j = await r.json().catch(() => ({}))
+    if (!r.ok) throw new Error(j.error || 'Save failed')
+    return j
+  },
+  async resetArchitectMemory() {
+    const url = withLocationId(new URL('/copywrite/architect/memory', window.location.origin))
+    const r = await fetch(url.toString(), { method: 'DELETE' })
+    return r.json().catch(() => ({ ok: false }))
+  },
+
   // Fire-and-forget: teaches the account playbook so future builds improve.
   architectLearn(payload) {
     try {

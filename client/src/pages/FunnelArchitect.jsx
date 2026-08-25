@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAIConfig } from '../hooks/useAIConfig.js'
 import { api, getLocationId } from '../lib/api.js'
-import { notifySuccess, notifyError } from '../lib/toast.jsx'
+import { notifySuccess, notifyError, confirmToast } from '../lib/toast.jsx'
 
 const PRICE_POINTS = ['Free / Lead magnet', '$100 to $1k', '$1k to $5k', '$5k to $25k', '$25k+']
 const TRAFFIC      = ['Paid ads', 'Organic / Social', 'Email list', 'SEO', 'Referrals', 'Cold outreach']
@@ -144,6 +144,11 @@ export default function FunnelArchitect() {
   const [saving, setSaving]   = useState(false)
   const [copyIdx, setCopyIdx] = useState(0)   // which page-copy page is showing
   const [rewriting, setRewriting] = useState(false)
+  const [feedback, setFeedback] = useState(null)   // 'up' | 'down' on the current build
+  const [showPB, setShowPB]   = useState(false)    // playbook panel open
+  const [pb, setPb]           = useState(null)     // { playbook, count, examples }
+  const [pbText, setPbText]   = useState('')
+  const [pbBusy, setPbBusy]   = useState(false)
 
   const ctx = { offer, price, traffic, goal }
   const aiArgs = () => ({ offer, pricePoint: price, traffic, goal, provider: config.provider, apiKey: config.apiKey, model: config.model })
@@ -180,10 +185,38 @@ export default function FunnelArchitect() {
       const j = await api.architectBuild({ ...aiArgs(), funnelName: chosen.name, pages })
       setBuild(j)
       setCopyIdx(0)
+      setFeedback(null)
       setStage('build')
       // Evolve the account playbook so the next build is sharper (background).
       api.architectLearn({ ...aiArgs(), funnelName: j.funnelName || chosen.name, flow: j.flow || pages.join(' → '), kept: false })
     } catch (e) { notifyError(e.message || 'Failed') } finally { setLoading(false) }
+  }
+
+  async function openPlaybook() {
+    const next = !showPB
+    setShowPB(next)
+    if (next) {
+      setPbBusy(true)
+      try { const m = await api.getArchitectMemory(); setPb(m); setPbText(m.playbook || '') }
+      catch { /* ignore */ } finally { setPbBusy(false) }
+    }
+  }
+  async function savePlaybook() {
+    setPbBusy(true)
+    try { await api.setArchitectPlaybook(pbText); setPb(p => ({ ...(p || {}), playbook: pbText })); notifySuccess('Playbook saved') }
+    catch (e) { notifyError(e.message || 'Save failed') } finally { setPbBusy(false) }
+  }
+  async function resetPlaybook() {
+    if (!(await confirmToast('Reset everything the Architect has learned for this account? This clears the playbook and history.', { confirmText: 'Reset', danger: true }))) return
+    setPbBusy(true)
+    try { await api.resetArchitectMemory(); setPb({ playbook: '', count: 0, examples: [] }); setPbText(''); notifySuccess('Playbook reset') }
+    catch (e) { notifyError(e.message || 'Reset failed') } finally { setPbBusy(false) }
+  }
+
+  function thumb(sentiment) {
+    setFeedback(sentiment)
+    api.architectLearn({ ...aiArgs(), funnelName: build.funnelName, flow: build.flow, sentiment })
+    notifySuccess(sentiment === 'up' ? 'Thanks — reinforced for next time' : 'Noted — I’ll steer away from this')
   }
 
   async function rewriteCopy() {
@@ -231,16 +264,61 @@ export default function FunnelArchitect() {
     <>
       <div className="topnav">
         <div className="topnav-left"><span className="breadcrumb-current">Funnel Architect</span></div>
-        {stage !== 'intake' && (
-          <div className="topnav-right">
-            <button className="btn btn-ghost btn-sm" onClick={() => { setStage('intake'); setBuild(null); setChosen(null) }}>Start over</button>
-          </div>
-        )}
+        <div className="topnav-right" style={{ display: 'flex', gap: 8 }}>
+          <button className={`btn btn-sm ${showPB ? 'btn-secondary' : 'btn-ghost'}`} onClick={openPlaybook} title="What the Architect has learned for this account">
+            ✦ Playbook
+          </button>
+          {stage !== 'intake' && (
+            <button className="btn btn-ghost btn-sm" onClick={() => { setStage('intake'); setBuild(null); setChosen(null); setFeedback(null) }}>Start over</button>
+          )}
+        </div>
       </div>
 
       <div className="content" style={{ maxWidth: 980 }}>
 
         <Stepper stage={stage} />
+
+        {/* ── Playbook panel ─────────────────────────────────────── */}
+        {showPB && (
+          <div className="card" style={{ padding: 18, marginBottom: 18, borderLeft: '3px solid var(--accent)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
+              <div>
+                <div className="fw-700">Account Playbook</div>
+                <div style={{ fontSize: '.76rem', color: 'var(--sub)' }}>
+                  What the Architect has learned for this account{pb?.count ? ` · ${pb.count} build${pb.count !== 1 ? 's' : ''} so far` : ''}. It gets applied to every generation and sharpens with 👍/👎 and saves.
+                </div>
+              </div>
+              <button className="btn btn-ghost btn-sm" onClick={() => setShowPB(false)}>Close</button>
+            </div>
+            {pbBusy && !pb ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'var(--sub)', padding: '10px 0' }}><div className="spinner" /> Loading…</div>
+            ) : (
+              <>
+                <textarea className="form-input" style={{ minHeight: 130, resize: 'vertical', fontFamily: 'inherit', fontSize: '.85rem', background: 'var(--surface)' }}
+                  value={pbText} onChange={e => setPbText(e.target.value)}
+                  placeholder="The playbook is still learning — run a few builds, or write your own notes here (funnel types that fit, tone, offers, what to avoid)…" />
+                {(pb?.examples || []).length > 0 && (
+                  <div style={{ marginTop: 10 }}>
+                    <div style={{ fontSize: '.62rem', fontWeight: 700, letterSpacing: '.08em', color: 'var(--sub)', marginBottom: 6 }}>RECENT BUILDS</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      {pb.examples.map((e, i) => (
+                        <div key={i} style={{ fontSize: '.78rem', color: 'var(--sub)', display: 'flex', gap: 8, alignItems: 'center' }}>
+                          <span style={{ fontWeight: 700, color: 'var(--text)' }}>{e.funnelName}</span>
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.offer}</span>
+                          {e.kept && <span style={{ color: 'var(--accent)' }}>★ saved</span>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+                  <button className="btn btn-primary btn-sm" onClick={savePlaybook} disabled={pbBusy}>Save playbook</button>
+                  <button className="btn btn-ghost btn-sm" style={{ color: 'var(--danger)' }} onClick={resetPlaybook} disabled={pbBusy}>Reset learning</button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
 
         {/* ── Intake ─────────────────────────────────────────────── */}
         {stage === 'intake' && (
@@ -359,7 +437,13 @@ export default function FunnelArchitect() {
                 <div className="page-title">{build.funnelName}</div>
                 <div className="page-sub" style={{ marginTop: 4 }}>{build.flow}</div>
               </div>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: 4, marginRight: 4 }} title="Teach the Architect whether this build resonated">
+                  <button className="btn btn-ghost btn-sm" onClick={() => thumb('up')}
+                    style={{ padding: '4px 8px', color: feedback === 'up' ? 'var(--accent)' : 'var(--sub)', background: feedback === 'up' ? 'color-mix(in srgb, var(--accent) 12%, transparent)' : undefined }}>👍</button>
+                  <button className="btn btn-ghost btn-sm" onClick={() => thumb('down')}
+                    style={{ padding: '4px 8px', color: feedback === 'down' ? 'var(--danger)' : 'var(--sub)', background: feedback === 'down' ? 'color-mix(in srgb, var(--danger) 12%, transparent)' : undefined }}>👎</button>
+                </div>
                 <button className="btn btn-ghost btn-sm" onClick={() => setStage('pages')}>← Pages</button>
                 <button className="btn btn-secondary btn-sm" onClick={copySheet}>Copy as text</button>
                 <button className="btn btn-secondary btn-sm" onClick={() => downloadPDF(ctx, build)}>Download PDF</button>

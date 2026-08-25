@@ -1530,17 +1530,40 @@ Make every line specific to THIS offer — no placeholders, no lorem.`;
   }
 });
 
+// ── Account playbook: view / edit / reset ─────────────────────────────────────
+router.get('/architect/memory', async (req, res) => {
+  try {
+    const m = await archMem.getMemory(req.locationId, req.userId);
+    res.json({
+      playbook: m.playbook || '', count: m.count || 0, updatedAt: m.updatedAt || 0,
+      examples: (m.examples || []).slice(0, 10).map(e => ({ funnelName: e.funnelName, offer: e.offer, at: e.at, kept: !!e.kept })),
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+router.put('/architect/memory', async (req, res) => {
+  try {
+    const m = await archMem.setPlaybook(req.locationId, req.userId, req.body?.playbook || '');
+    res.json({ ok: true, playbook: m.playbook });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+router.delete('/architect/memory', async (req, res) => {
+  try { await archMem.reset(req.locationId, req.userId); res.json({ ok: true }); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // ── POST /copywrite/architect/learn — evolve the account playbook ─────────────
 // Called (fire-and-forget) after a build and after a save. Records the build and
 // distills what resonates for this account into a rolling playbook that future
 // generations read from — so results improve every time the feature is used.
 router.post('/architect/learn', async (req, res) => {
-  const { offer, funnelName, flow, kept, pricePoint, traffic, goal, provider = 'claude', apiKey, model: reqModel } = req.body;
+  const { offer, funnelName, flow, kept, sentiment, pricePoint, traffic, goal, provider = 'claude', apiKey, model: reqModel } = req.body;
   if (!offer || !funnelName) return res.status(400).json({ ok: false, error: 'offer and funnelName required' });
+  const down = sentiment === 'down';
+  const up   = sentiment === 'up' || !!kept;
   try {
     await archMem.recordBuild(req.locationId, req.userId, {
       offer: String(offer).slice(0, 240), funnelName, flow: flow || '',
-      pricePoint: pricePoint || '', traffic: traffic || '', goal: goal || '', kept: !!kept,
+      pricePoint: pricePoint || '', traffic: traffic || '', goal: goal || '', kept: !!kept, sentiment: sentiment || '',
     });
 
     const resolvedKey = apiKey || (provider === 'claude' ? process.env.ANTHROPIC_API_KEY : null);
@@ -1548,17 +1571,22 @@ router.post('/architect/learn', async (req, res) => {
     if (resolvedKey && providerCfg) {
       const m = await archMem.getMemory(req.locationId, req.userId);
       const model = reqModel || providerCfg.defaultModel;
-      const prompt = `You maintain a concise, evolving PLAYBOOK for one marketing account's funnel builds. Fold the new build into it.
+      const signal = down
+        ? `The user marked this build DOWN — it did NOT resonate. Capture what to AVOID for this account (this funnel type / angle / tone for this kind of offer), and prefer a different approach next time.`
+        : up
+          ? `The user SAVED / thumbed-UP this build — a strong signal it resonated. Reinforce what made it work.`
+          : `Freshly generated build — fold in anything useful.`;
+      const prompt = `You maintain a concise, evolving PLAYBOOK for one marketing account's funnel builds. Fold the new signal into it.
 
 CURRENT PLAYBOOK:
 ${m.playbook || '(empty — start it)'}
 
-NEW BUILD ${kept ? '(the user SAVED/kept this — a strong signal it resonated)' : '(freshly generated)'}:
+NEW BUILD — ${signal}
 Offer: ${String(offer).slice(0, 500)}
 Funnel: ${funnelName}${flow ? ` (${flow})` : ''}
 Price: ${pricePoint || ''} · Traffic: ${traffic || ''} · Goal: ${goal || ''}
 
-Rewrite the PLAYBOOK (max ~220 words, tight bullet notes) capturing what works for THIS account: which funnel types fit their offers, the hooks/angles and tone that land, offer and price patterns, page-flow preferences, and automation patterns. Keep prior learnings that still apply, drop stale ones, and sharpen. Output ONLY the playbook text — no preamble.`;
+Rewrite the PLAYBOOK (max ~220 words, tight bullet notes) capturing what works — and, when relevant, an "Avoid" list of what does NOT work — for THIS account: funnel types that fit their offers, hooks/angles and tone that land, offer and price patterns, page-flow preferences, and automation patterns. Keep prior learnings that still apply, drop stale ones, sharpen. Output ONLY the playbook text — no preamble.`;
       const text = await callAI(providerCfg, resolvedKey, model, prompt, 500).catch(() => null);
       if (text && text.trim()) await archMem.setPlaybook(req.locationId, req.userId, text.trim());
     }
