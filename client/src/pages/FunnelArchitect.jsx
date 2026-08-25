@@ -142,6 +142,8 @@ export default function FunnelArchitect() {
   const [build, setBuild]     = useState(null)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving]   = useState(false)
+  const [copyIdx, setCopyIdx] = useState(0)   // which page-copy page is showing
+  const [rewriting, setRewriting] = useState(false)
 
   const ctx = { offer, price, traffic, goal }
   const aiArgs = () => ({ offer, pricePoint: price, traffic, goal, provider: config.provider, apiKey: config.apiKey, model: config.model })
@@ -177,8 +179,22 @@ export default function FunnelArchitect() {
     try {
       const j = await api.architectBuild({ ...aiArgs(), funnelName: chosen.name, pages })
       setBuild(j)
+      setCopyIdx(0)
       setStage('build')
     } catch (e) { notifyError(e.message || 'Failed') } finally { setLoading(false) }
+  }
+
+  async function rewriteCopy() {
+    setRewriting(true)
+    try {
+      const pages = (build.pageCopy || []).map(p => p.page).filter(Boolean)
+      const j = await api.architectPageCopy({ ...aiArgs(), funnelName: build.funnelName, pages: pages.length ? pages : orderedSelected() })
+      if (Array.isArray(j.pageCopy) && j.pageCopy.length) {
+        setBuild(b => ({ ...b, pageCopy: j.pageCopy }))
+        setCopyIdx(i => Math.min(i, j.pageCopy.length - 1))
+        notifySuccess('Page copy rewritten')
+      }
+    } catch (e) { notifyError(e.message || 'Rewrite failed') } finally { setRewriting(false) }
   }
 
   function copySheet() {
@@ -219,6 +235,8 @@ export default function FunnelArchitect() {
       </div>
 
       <div className="content" style={{ maxWidth: 980 }}>
+
+        <Stepper stage={stage} />
 
         {/* ── Intake ─────────────────────────────────────────────── */}
         {stage === 'intake' && (
@@ -265,7 +283,8 @@ export default function FunnelArchitect() {
               {options.map((o, i) => {
                 const best = i === 0
                 return (
-                  <div key={o.id || i} className="card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 8, border: best ? '2px solid var(--accent)' : '1px solid var(--border)' }}>
+                  <div key={o.id || i} className="card" style={{ position: 'relative', overflow: 'hidden', padding: 16, paddingTop: best ? 20 : 16, display: 'flex', flexDirection: 'column', gap: 8, border: best ? '1px solid var(--accent)' : '1px solid var(--border)', boxShadow: best ? '0 8px 28px color-mix(in srgb, var(--accent) 20%, transparent)' : undefined }}>
+                    {best && <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 4, background: 'linear-gradient(90deg,#14B8A6,var(--accent))' }} />}
                     <Chip color={best ? 'var(--accent)' : undefined}>{(o.badge || (best ? 'Best Fit' : `Option ${i + 1}`)).toUpperCase()}</Chip>
                     <div style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--text)' }}>{o.name}</div>
                     <div style={{ fontSize: '.68rem', fontWeight: 700, letterSpacing: '.08em', color: 'var(--sub)' }}>{o.tagline}</div>
@@ -374,31 +393,65 @@ export default function FunnelArchitect() {
               ))}
             </div>
 
-            {/* Page copy */}
-            {(build.pageCopy || []).length > 0 && (
-              <>
-                <div className="section-title">Page copy</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 24 }}>
-                  {build.pageCopy.map((p, i) => (
-                    <div key={i} className="card" style={{ padding: 18 }}>
+            {/* Page copy — paged, one page at a time */}
+            {(build.pageCopy || []).length > 0 && (() => {
+              const total = build.pageCopy.length
+              const idx = Math.min(copyIdx, total - 1)
+              const p = build.pageCopy[idx]
+              return (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', margin: '4px 0 10px' }}>
+                    <div className="section-title" style={{ margin: 0 }}>Page copy <span style={{ fontSize: '.66rem', color: 'var(--sub)', fontWeight: 600 }}>· {idx + 1} of {total}</span></div>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <button className="btn btn-ghost btn-sm" disabled={idx === 0} onClick={() => setCopyIdx(idx - 1)}>‹ Prev</button>
+                      <button className="btn btn-ghost btn-sm" disabled={idx >= total - 1} onClick={() => setCopyIdx(idx + 1)}>Next ›</button>
+                      <button className="btn btn-secondary btn-sm" onClick={rewriteCopy} disabled={rewriting}>
+                        {rewriting ? 'Rewriting…' : '↻ Rewrite copy'}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: 14, opacity: rewriting ? 0.55 : 1, transition: 'opacity .15s' }}>
+                    {/* page preview header */}
+                    <div style={{ padding: '20px 24px', background: 'linear-gradient(135deg, color-mix(in srgb, var(--accent) 10%, var(--card)), var(--card))', borderBottom: '1px solid var(--border)' }}>
                       <Chip color="#0EA5E9">{p.badge || p.page}</Chip>
-                      <div style={{ fontWeight: 800, fontSize: '1.05rem', margin: '10px 0 6px', lineHeight: 1.3 }}>{p.headline}</div>
-                      {p.subhead && <div style={{ color: 'var(--sub)', fontSize: '.9rem', marginBottom: 10 }}>{p.subhead}</div>}
+                      <div style={{ fontWeight: 800, fontSize: '1.35rem', margin: '12px 0 8px', lineHeight: 1.25, letterSpacing: '-.01em' }}>{p.headline}</div>
+                      {p.subhead && <div style={{ color: 'var(--sub)', fontSize: '.95rem', lineHeight: 1.5, maxWidth: 640 }}>{p.subhead}</div>}
+                    </div>
+                    <div style={{ padding: '18px 24px' }}>
                       {(p.bullets || []).length > 0 && (
-                        <ul style={{ margin: '0 0 12px', paddingLeft: 18, fontSize: '.88rem', lineHeight: 1.55 }}>{p.bullets.map((b, k) => <li key={k}>{b}</li>)}</ul>
+                        <ul style={{ margin: '0 0 16px', paddingLeft: 4, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          {p.bullets.map((b, k) => (
+                            <li key={k} style={{ display: 'flex', gap: 10, fontSize: '.9rem', lineHeight: 1.5 }}>
+                              <span style={{ color: 'var(--accent)', fontWeight: 800, flexShrink: 0 }}>✓</span><span>{b}</span>
+                            </li>
+                          ))}
+                        </ul>
                       )}
                       {(p.formFields || []).length > 0 && (
-                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
-                          {p.formFields.map((f, k) => <span key={k} style={{ fontSize: '.72rem', padding: '4px 10px', border: '1px dashed var(--border)', borderRadius: 6, color: 'var(--sub)' }}>{f}</span>)}
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+                          {p.formFields.map((f, k) => (
+                            <span key={k} style={{ fontSize: '.8rem', padding: '9px 14px', border: '1px dashed var(--border)', borderRadius: 8, color: 'var(--sub)', background: 'var(--surface)', minWidth: 140 }}>{f}</span>
+                          ))}
                         </div>
                       )}
-                      {p.button && <div><span className="btn btn-primary btn-sm" style={{ pointerEvents: 'none' }}>{p.button}</span></div>}
-                      {p.testimonial && <div style={{ fontStyle: 'italic', color: 'var(--sub)', fontSize: '.82rem', marginTop: 10 }}>{p.testimonial}</div>}
+                      {p.button && <div><span className="btn btn-primary" style={{ pointerEvents: 'none', fontSize: '.95rem', padding: '11px 22px' }}>{p.button}</span></div>}
+                      {p.testimonial && (
+                        <div style={{ marginTop: 16, paddingLeft: 14, borderLeft: '3px solid var(--accent)', fontStyle: 'italic', color: 'var(--sub)', fontSize: '.86rem', lineHeight: 1.5 }}>{p.testimonial}</div>
+                      )}
                     </div>
-                  ))}
-                </div>
-              </>
-            )}
+                  </div>
+
+                  {/* page dots */}
+                  <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginBottom: 24 }}>
+                    {build.pageCopy.map((_, k) => (
+                      <button key={k} onClick={() => setCopyIdx(k)} aria-label={`Page ${k + 1}`}
+                        style={{ width: k === idx ? 22 : 8, height: 8, borderRadius: 99, border: 'none', cursor: 'pointer', padding: 0, background: k === idx ? 'var(--accent)' : 'var(--border)', transition: 'width .15s, background .15s' }} />
+                    ))}
+                  </div>
+                </>
+              )
+            })()}
 
             {/* GHL automation map */}
             <div className="section-title">GHL automation map <span style={{ fontSize: '.66rem', color: 'var(--sub)', fontWeight: 600 }}>· {(build.workflows || []).length} workflows</span></div>
@@ -449,6 +502,28 @@ export default function FunnelArchitect() {
         )}
       </div>
     </>
+  )
+}
+
+function Stepper({ stage }) {
+  const steps = ['Offer', 'Options', 'Pages', 'Build']
+  const idx = ({ intake: 0, options: 1, pages: 2, build: 3 })[stage] ?? 0
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 22, flexWrap: 'wrap' }}>
+      {steps.map((s, i) => (
+        <span key={s} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: 8, padding: '5px 12px 5px 6px', borderRadius: 99,
+            background: i <= idx ? 'var(--accent)' : 'var(--surface)', color: i <= idx ? '#fff' : 'var(--sub)',
+            border: i <= idx ? '1px solid transparent' : '1px solid var(--border)', fontSize: '.76rem', fontWeight: 700, transition: 'all .15s',
+          }}>
+            <span style={{ width: 20, height: 20, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: i <= idx ? 'rgba(255,255,255,.22)' : 'var(--border)', fontSize: '.68rem' }}>{i < idx ? '✓' : i + 1}</span>
+            {s}
+          </span>
+          {i < steps.length - 1 && <span style={{ width: 18, height: 2, borderRadius: 2, background: i < idx ? 'var(--accent)' : 'var(--border)' }} />}
+        </span>
+      ))}
+    </div>
   )
 }
 

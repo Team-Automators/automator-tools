@@ -1471,6 +1471,49 @@ Use ONLY step "type" values: TAG, PIPELINE, EMAIL, SMS, WAIT, INTERNAL, CONDITIO
   }
 });
 
+// ── POST /copywrite/architect/page-copy — (re)write the funnel page copy ──────
+router.post('/architect/page-copy', async (req, res) => {
+  const { offer, funnelName, pages, provider = 'claude', apiKey, model: reqModel } = req.body;
+  if (!offer || !String(offer).trim()) return res.status(400).json({ error: 'offer required' });
+  const resolvedKey = apiKey || (provider === 'claude' ? process.env.ANTHROPIC_API_KEY : null);
+  if (!resolvedKey) return res.status(400).json({ error: 'No API key configured. Connect an AI provider in Settings.' });
+  const providerCfg = PROVIDER_MAP[provider];
+  if (!providerCfg) return res.status(400).json({ error: `Unknown provider: ${provider}` });
+  const model = reqModel || providerCfg.defaultModel;
+  const pageList = Array.isArray(pages) && pages.length ? pages : ['Opt-in', 'Calendar', 'Thank You'];
+
+  const prompt = `You are a direct-response copywriter. Write the actual on-page copy for each page of the "${funnelName || 'funnel'}" (${pageList.join(' → ')}).
+
+${architectContext(req.body)}
+
+Return ONLY valid JSON (no prose, no code fences):
+{
+  "pageCopy": [
+    {
+      "page": "Opt-in",
+      "badge": "01 · OPT-IN",
+      "headline": "the actual headline",
+      "subhead": "the actual subhead",
+      "bullets": ["3-4 benefit bullets written as real copy"],
+      "formFields": ["Email address"],
+      "button": "CTA button label",
+      "testimonial": "one short proof line in quotes (or empty string)"
+    }
+    // one per page, in the given order
+  ]
+}
+Make every line specific to THIS offer — no placeholders, no lorem.`;
+
+  try {
+    const raw = await callAI(providerCfg, resolvedKey, model, prompt, 4000);
+    const json = parseModelJSON(raw);
+    if (!Array.isArray(json.pageCopy)) throw new Error('bad shape');
+    res.json(json);
+  } catch (e) {
+    res.status(502).json({ error: 'Could not write the page copy. Try again.', detail: e.message });
+  }
+});
+
 // ── POST /copywrite/generate-ghl-prompt ──────────────────────────────────────
 
 router.post('/generate-ghl-prompt', async (req, res) => {
