@@ -534,6 +534,33 @@ export const api = {
     return r.json().catch(() => ({ ok: false }))
   },
 
+  // ── Admin console ─────────────────────────────────────────────────────────
+  async getAdminUsers() {
+    const url = withLocationId(new URL('/api/admin/users', window.location.origin))
+    const r = await fetch(url.toString())
+    const j = await r.json().catch(() => ({}))
+    if (!r.ok) throw new Error(j.error || `Request failed (${r.status})`)
+    return j
+  },
+  async revokeUserKey(email) {
+    const r = await fetch('/api/admin/revoke-key', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, locationId: getLocationId() }),
+    })
+    const j = await r.json().catch(() => ({}))
+    if (!r.ok) throw new Error(j.error || 'Failed')
+    return j
+  },
+  async setUserBlocked(email, blocked) {
+    const r = await fetch('/api/admin/block', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, blocked, locationId: getLocationId() }),
+    })
+    const j = await r.json().catch(() => ({}))
+    if (!r.ok) throw new Error(j.error || 'Failed')
+    return j
+  },
+
   // Fire-and-forget: teaches the account playbook so future builds improve.
   architectLearn(payload) {
     try {

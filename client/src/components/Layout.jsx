@@ -100,6 +100,17 @@ const NAV_ITEMS = [
     ),
   },
   {
+    key: 'admin',
+    label: 'Admin',
+    path: '/admin',
+    adminOnly: true,
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
+        <path d="M12 2 4 5v6c0 5 3.4 8.5 8 11 4.6-2.5 8-6 8-11V5z"/><path d="m9 12 2 2 4-4"/>
+      </svg>
+    ),
+  },
+  {
     key: 'settings',
     label: 'Settings',
     path: '/settings',
@@ -137,6 +148,7 @@ export default function Layout() {
 
   const locationId = getLocationId()
   const user = getSessionClaims()
+  const navItems = NAV_ITEMS.filter(i => !i.adminOnly || user?.adm)
   const userName = user?.name || user?.email || ''
   const initials = user ? userInitials(user.name, user.email) : (locationId ? locationId.slice(0, 2).toUpperCase() : 'GL')
 
@@ -161,7 +173,7 @@ export default function Layout() {
 
         <nav className="sb-nav">
           <div className="sb-section-label">Menu</div>
-          {NAV_ITEMS.map(item => (
+          {navItems.map(item => (
             <NavLink
               key={item.key}
               to={navPath(item.path)}
@@ -241,7 +253,7 @@ export default function Layout() {
 
       {/* ── Mobile bottom nav ────────────────────────────────────── */}
       <nav className="mobile-nav">
-        {NAV_ITEMS.map(item => (
+        {navItems.map(item => (
           <NavLink
             key={item.key}
             to={navPath(item.path)}

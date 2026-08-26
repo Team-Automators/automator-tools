@@ -21,6 +21,7 @@ const ghlProbeRouter     = require('./routes/ghl-probe');
 const workflowsRouter    = require('./routes/workflows-api');
 const pipelineRouter     = require('./routes/pipeline-api');
 const backupRouter       = require('./routes/backup-api');
+const adminRouter        = require('./routes/admin-api');
 const requireLocation    = require('./middleware/require-location');
 
 const app  = express();
@@ -56,6 +57,7 @@ app.use('/api/ghl-probe', requireLocation, ghlProbeRouter);
 app.use('/api/workflows', requireLocation, workflowsRouter);
 app.use('/api/pipeline',  requireLocation, pipelineRouter);
 app.use('/api/backup',    requireLocation, backupRouter);
+app.use('/api/admin',     requireLocation, adminRouter);
 app.use('/api',           requireLocation, apiCopyRouter);
 
 // ── React SPA (serve built client) ────────────────────────────────────────────

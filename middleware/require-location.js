@@ -6,6 +6,7 @@
 // value so existing handlers become tenant-scoped and spoof-proof automatically.
 
 const { verify } = require('../lib/session');
+const block      = require('../lib/user-block-store');
 
 function parseCookies(header) {
   const out = {};
@@ -27,7 +28,7 @@ function readSessionToken(req) {
   return parseCookies(req.headers['cookie'])['ghl_session'] || null;
 }
 
-function requireLocation(req, res, next) {
+async function requireLocation(req, res, next) {
   if (req.method === 'OPTIONS') return next(); // let CORS preflights through
 
   const claims = verify(readSessionToken(req));
@@ -39,6 +40,16 @@ function requireLocation(req, res, next) {
   req.companyId  = claims.cid || '';
   req.userId     = claims.uid || null;   // set once the user verifies their email
   req.userEmail  = claims.email || null;
+  req.isAdmin    = !!claims.adm;
+
+  // Admin "force logout": a blocked user's active sessions stop working.
+  if (req.userEmail) {
+    try {
+      if (await block.isBlocked(req.userEmail)) {
+        return res.status(401).json({ error: 'access_revoked', message: 'Your access was revoked by an administrator.' });
+      }
+    } catch {}
+  }
 
   // Force the trusted locationId onto the request so downstream handlers that
   // read req.query.locationId / req.body.locationId cannot be spoofed.

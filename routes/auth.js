@@ -12,6 +12,9 @@ const keyStore   = require('../lib/key-store');
 const session    = require('../lib/session');
 const locationAccess = require('../lib/location-access');
 const ghlUsers   = require('../lib/ghl-users');
+const admins     = require('../lib/admins');
+const userReg    = require('../lib/user-registry');
+const block      = require('../lib/user-block-store');
 const requireLocation = require('../middleware/require-location');
 const { readSessionToken } = require('../middleware/require-location');
 
@@ -231,12 +234,21 @@ router.post('/user-login', requireLocation, async (req, res) => {
     return res.status(403).json({ error: 'not_a_user', message: 'That email is not a user on this location.' });
   }
 
+  // Blocked by an admin — deny sign-in.
+  if (await block.isBlocked(result.user.email).catch(() => false)) {
+    return res.status(403).json({ error: 'access_revoked', message: 'Your access has been revoked. Contact your administrator.' });
+  }
+
+  // Remember this user for the admin console.
+  userReg.record(result.user.email, { name: result.user.name, locationId: req.locationId }).catch(() => {});
+
   const token = session.sign({
     lid:   req.locationId,
     cid:   req.companyId || '',
     uid:   result.user.id,
     email: result.user.email,
     name:  result.user.name,
+    adm:   admins.isAdmin(result.user.email),   // drives the Admin console visibility
   });
   res.setHeader('Set-Cookie', sessionCookie(token));
   res.json({ ok: true, token, user: result.user });

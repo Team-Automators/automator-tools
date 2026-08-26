@@ -16,6 +16,7 @@ import Archive from './pages/Archive.jsx'
 import Analyzer from './pages/Analyzer.jsx'
 import FunnelArchitect from './pages/FunnelArchitect.jsx'
 import Pipeline from './pages/Pipeline.jsx'
+import Admin from './pages/Admin.jsx'
 import Login from './pages/Login.jsx'
 import { getLocationId, persistLocationId } from './lib/api.js'
 import { getSessionToken, setSessionToken, getSessionClaims, reauth } from './lib/session.js'
@@ -106,6 +107,7 @@ export default function App() {
         <Route path="analyzer" element={<Analyzer />} />
         <Route path="architect" element={<FunnelArchitect />} />
         <Route path="pipeline" element={<Pipeline />} />
+        <Route path="admin" element={<Admin />} />
         <Route path="settings" element={<Settings />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
