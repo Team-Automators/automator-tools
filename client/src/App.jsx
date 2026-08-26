@@ -92,6 +92,7 @@ export default function App() {
       <ToastContainer position="bottom-right" autoClose={3000} newestOnTop theme="colored" pauseOnFocusLoss={false} />
       <Routes>
       <Route path="login" element={<Login />} />
+      <Route path="admin" element={<Admin />} />
       <Route element={<RequireLocation><Layout /></RequireLocation>}>
         <Route index element={<Dashboard />} />
         <Route path="dashboard" element={<Dashboard />} />
@@ -107,7 +108,6 @@ export default function App() {
         <Route path="analyzer" element={<Analyzer />} />
         <Route path="architect" element={<FunnelArchitect />} />
         <Route path="pipeline" element={<Pipeline />} />
-        <Route path="admin" element={<Admin />} />
         <Route path="settings" element={<Settings />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
