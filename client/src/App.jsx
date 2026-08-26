@@ -31,6 +31,10 @@ function hasAIConfig() {
 //   • the GHL-embedded context — locationId in the URL for an already-installed
 //     agency — which we can authenticate silently, no manual entry.
 async function bootstrapAuth() {
+  // On the login page, never attempt a silent re-auth — it would block rendering
+  // (blank/spinner) while a network round-trip runs. Let the login screen show.
+  if (window.location.pathname === '/login') return
+
   // If we already hold a VALID (unexpired) user session, keep it.
   const claims = getSessionClaims()
   if (claims?.uid && claims.exp && Date.now() < claims.exp) return
