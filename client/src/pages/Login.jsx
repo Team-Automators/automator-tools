@@ -23,7 +23,7 @@ export default function Login() {
     const hasUser = !!getSessionClaims()?.uid
     if (hasLocation && hasUser) enterApp(id)         // fully signed in → straight to the app
     else if (hasLocation)      { setLocationId(id); setStep(2) } // needs email
-    else if (id) setLocationId(id)                   // prefill known location (e.g. from GHL URL)
+    else if (id) setLocationId(id)                   // prefill known location (e.g. from the URL)
   }, [navigate])
 
   async function handleEmailSubmit(e) {
@@ -132,7 +132,7 @@ export default function Login() {
                 Step 1 of 2 — Location ID
               </div>
               <div style={{ fontSize: '.875rem', color: 'var(--sub)' }}>
-                Enter the GHL Location ID for your sub-account
+                Enter the Automator Location ID for your sub-account
               </div>
             </div>
 
@@ -151,7 +151,7 @@ export default function Login() {
                 />
                 {error && <div style={{ fontSize: '.8125rem', color: 'var(--danger)', marginTop: 6 }}>{error}</div>}
                 <div className="text-xs text-sub mt-1">
-                  Found in GHL → Settings → Business Info
+                  Found in Automator → Settings → Business Info
                 </div>
               </div>
 
@@ -175,7 +175,7 @@ export default function Login() {
                 Step 2 of 2 — Your Email
               </div>
               <div style={{ fontSize: '.875rem', color: 'var(--sub)' }}>
-                Enter the email of your GHL account on this location — used to keep your work private to you
+                Enter the email of your Automator account on this location — used to keep your work private to you
               </div>
             </div>
 
@@ -193,7 +193,7 @@ export default function Login() {
                 />
                 {error && <div style={{ fontSize: '.8125rem', color: 'var(--danger)', marginTop: 6 }}>{error}</div>}
                 <div className="text-xs text-sub mt-1">
-                  Must match a user on this GHL location. You can add your AI API key later in Settings.
+                  Must match a user on this Automator location. You can add your AI API key later in Settings.
                 </div>
               </div>
 
