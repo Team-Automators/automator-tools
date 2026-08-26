@@ -30,6 +30,51 @@ const CLEAR_COOKIE = 'ghl_session=; Path=/; HttpOnly; Secure; SameSite=None; Max
 
 const GHL_OAUTH = 'https://marketplace.gohighlevel.com';
 const clean = (v) => (v || '').replace(/^﻿/, '').trim();
+
+// A clear post-install confirmation page (agency- or location-aware).
+function installedPage({ agency, companyId, locationId }) {
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const id  = agency ? companyId : (locationId || companyId);
+  const idLabel = agency ? 'Agency ID' : 'Location ID';
+  const title = agency ? 'Automator is installed on your agency' : 'Automator is connected';
+  const body  = agency
+    ? 'Every sub-account under this agency can now sign in with its Location ID and email — no per-account install needed.'
+    : 'This sub-account is connected. Sign in with its Location ID and email to start.';
+  return `<!doctype html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Automator — Installed</title>
+<style>
+  :root{--bg:#F5F8FC;--card:#FFFFFF;--ink:#0E1A2F;--sub:#58697F;--line:#E3E9F2;--accent:#2563EB;--ok:#17935A;--ok-bg:#E6F5EC;--chip:#F1F5FB}
+  @media(prefers-color-scheme:dark){:root{--bg:#0A0F1C;--card:#10192B;--ink:#E9EFF8;--sub:#93A2B8;--line:#223149;--accent:#5B8DEF;--ok:#3FBE83;--ok-bg:#10251C;--chip:#0D1626}}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--ink);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:44px 40px;max-width:460px;width:100%;text-align:center;box-shadow:0 12px 40px -12px rgba(15,26,47,.18);animation:rise .4s cubic-bezier(.22,.61,.36,1) both}
+  @keyframes rise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+  .ring{width:76px;height:76px;border-radius:50%;background:var(--ok-bg);display:flex;align-items:center;justify-content:center;margin:0 auto 24px}
+  .check{stroke:var(--ok);stroke-width:3;stroke-linecap:round;stroke-linejoin:round;fill:none;stroke-dasharray:30;stroke-dashoffset:30;animation:draw .5s .25s cubic-bezier(.4,0,.2,1) forwards}
+  @keyframes draw{to{stroke-dashoffset:0}}
+  .brand{display:inline-flex;align-items:center;gap:8px;margin-bottom:22px;color:var(--sub);font-weight:600;font-size:.9rem}
+  .bolt{width:26px;height:26px;border-radius:7px;background:var(--accent);display:grid;place-items:center}
+  h1{font-size:1.4rem;font-weight:800;letter-spacing:-.02em;margin-bottom:10px;line-height:1.25}
+  p.sub{color:var(--sub);font-size:.95rem;line-height:1.6;margin-bottom:24px}
+  .chip{display:inline-flex;align-items:center;gap:8px;background:var(--chip);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:.8rem;margin-bottom:26px;max-width:100%;word-break:break-all}
+  .chip b{font-size:.64rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--sub);white-space:nowrap}
+  .chip code{font-family:'SF Mono',ui-monospace,monospace;color:var(--ink)}
+  .btn{display:inline-flex;align-items:center;gap:8px;background:var(--accent);color:#fff;text-decoration:none;font-weight:600;font-size:.95rem;padding:12px 26px;border-radius:11px}
+  .note{margin-top:16px;font-size:.8rem;color:var(--sub)}
+  @media(prefers-reduced-motion:reduce){*{animation-duration:.001ms!important}}
+</style></head><body>
+<div class="card">
+  <div class="brand"><span class="bolt"><svg viewBox="0 0 24 24" fill="#fff" width="15" height="15"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg></span>Automator</div>
+  <div class="ring"><svg width="36" height="36" viewBox="0 0 24 24"><polyline class="check" points="4,13 9,18 20,7"/></svg></div>
+  <h1>${esc(title)}</h1>
+  <p class="sub">${esc(body)}</p>
+  ${id ? `<div class="chip"><b>${esc(idLabel)}</b><code>${esc(id)}</code></div>` : ''}
+  <div><a class="btn" href="/login">Go to sign-in →</a></div>
+  <div class="note">You can close this tab — the install is saved.</div>
+</div></body></html>`;
+}
+
 const GHL_API   = 'https://services.leadconnectorhq.com';
 const SCOPES    = 'locations.readonly users.readonly users.write contacts.readonly contacts.write locations/customValues.readonly locations/customValues.write locations/tasks.readonly locations/tasks.write recurring-tasks.readonly recurring-tasks.write locations/tags.readonly locations/tags.write locations/templates.readonly oauth.write oauth.readonly conversations.readonly conversations/message.readonly conversations/message.write opportunities.readonly opportunities.write';
 
@@ -92,13 +137,9 @@ router.get('/callback', async (req, res) => {
     await oauthStore.set(storeKey, tokens);
     await recordCallback({ stage: 'stored', success: true, storeKey, locationId: loc || null, companyId: companyId || null, hasAccess: !!data.access_token, hasRefresh: !!data.refresh_token });
 
-    // Redirect directly to GHL integration page after OAuth
-    const clientId  = clean(process.env.GHL_CLIENT_ID).split('-')[0];
-    const versionId = clean(process.env.GHL_VERSION_ID);
-    const dest      = loc || companyId;
-    return res.redirect(
-      `https://app.automator.ai/v2/location/${dest}/integration/${clientId}/versions/${versionId}?app_from=installedApps&view=agency`
-    );
+    // Show a clear "Installed ✓" confirmation so an agency install is unambiguous.
+    const isAgency = !loc && !!companyId;
+    return res.status(200).send(installedPage({ agency: isAgency, companyId, locationId: loc }));
   } catch (err) {
     const msg = err.response?.data?.message || err.response?.data?.error_description || err.message;
     await recordCallback({ stage: 'exchange_error', success: false, status: err.response?.status || 0, error: err.response?.data || err.message });
