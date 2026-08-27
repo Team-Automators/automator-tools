@@ -217,11 +217,13 @@ export default function Layout() {
               <button
                 className="user-menu-item danger"
                 onClick={() => {
+                  // Call logout FIRST (session token still present → server knows who
+                  // to drop from the admin registry), then clear local state.
+                  fetch('/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {})
                   localStorage.removeItem('ghl_ai_config')
                   localStorage.removeItem('ghl_session')
                   localStorage.removeItem('ghl_user_email')
                   localStorage.removeItem('ghl_location_id')  // prevent silent re-auth blanking the page
-                  fetch('/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {})
                   navigate('/login', { replace: true })       // instant client-side transition (no reload)
                 }}
               >

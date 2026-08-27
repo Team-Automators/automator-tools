@@ -53,9 +53,9 @@ export default function AdminPortal() {
   }
 
   function signOut() {
+    fetch('/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {})
     localStorage.removeItem('ghl_session')
     localStorage.removeItem('ghl_user_email')
-    fetch('/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {})
     setStep(1); setEmail(''); setTick(t => t + 1)
   }
 

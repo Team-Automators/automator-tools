@@ -619,7 +619,13 @@ router.get('/logout', async (req, res) => {
   res.setHeader('Set-Cookie', CLEAR_COOKIE);
   res.redirect('/');
 });
-router.post('/logout', (req, res) => {
+router.post('/logout', async (req, res) => {
+  // Drop the user from the registry so they leave the admin list until next login.
+  // Identity comes from the verified session only (never a client-supplied email).
+  try {
+    const claims = session.verify(readSessionToken(req));
+    if (claims?.email) await userReg.remove(claims.email).catch(() => {});
+  } catch {}
   res.setHeader('Set-Cookie', CLEAR_COOKIE);
   res.json({ ok: true });
 });
