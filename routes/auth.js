@@ -36,9 +36,9 @@ function installedPage({ agency, companyId, locationId }) {
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const id  = agency ? companyId : (locationId || companyId);
   const idLabel = agency ? 'Agency ID' : 'Location ID';
-  const title = agency ? 'Automator is installed on your agency' : 'Automator is connected';
+  const title = agency ? 'Agency connected' : 'Automator is connected';
   const body  = agency
-    ? 'Every sub-account under this agency can now sign in with its Location ID and email — no per-account install needed.'
+    ? 'Your agency is connected to Automator. Sub-accounts sign in with their Location ID and email — as long as Automator is enabled for sub-accounts in your GoHighLevel app settings. If a sub-account reports "not authorized", enable sub-account distribution (or install Automator on that sub-account).'
     : 'This sub-account is connected. Sign in with its Location ID and email to start.';
   return `<!doctype html><html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
