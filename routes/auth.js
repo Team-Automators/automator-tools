@@ -161,20 +161,33 @@ router.get('/agency-locations', async (req, res) => {
     if (!token) return res.json({ companyId, error: 'Could not resolve a fresh agency token.' });
 
     try {
-      const { data } = await axios.get(`${GHL_API}/locations/search`, {
-        headers: { Authorization: `Bearer ${token}`, Version: '2021-07-28', Accept: 'application/json' },
-        params: { companyId, limit: 250 },
-        timeout: 12000,
-      });
-      const raw = data.locations || data.data || (Array.isArray(data) ? data : []);
-      const locations = raw.map(l => ({ id: l.id || l._id, name: l.name || l.businessName || '' }));
+      // Paginate through every sub-account (GHL caps each page ~100–250).
+      const pageLimit = 100;
+      let skip = 0, guard = 0;
+      const all = [];
+      const H = { Authorization: `Bearer ${token}`, Version: '2021-07-28', Accept: 'application/json' };
+      let reportedTotal = null;
+      while (guard++ < 200) { // hard stop at 20k
+        const { data } = await axios.get(`${GHL_API}/locations/search`, {
+          headers: H, params: { companyId, limit: pageLimit, skip }, timeout: 15000,
+        });
+        const raw = data.locations || data.data || (Array.isArray(data) ? data : []);
+        if (data && (data.total ?? data.count) != null) reportedTotal = data.total ?? data.count;
+        if (!raw.length) break;
+        for (const l of raw) all.push({ id: l.id || l._id, name: l.name || l.businessName || '' });
+        if (raw.length < pageLimit) break;
+        skip += pageLimit;
+      }
       const target = (req.query.locationId || '').trim();
+      const matched = target ? all.find(l => l.id === target) || null : undefined;
       res.json({
         companyId,
-        count: locations.length,
-        includesTarget: target ? locations.some(l => l.id === target) : undefined,
+        count: all.length,
+        reportedTotal,
+        includesTarget: target ? !!matched : undefined,
         target: target || undefined,
-        locations,
+        matched,
+        locations: all,
       });
     } catch (e) {
       res.json({
