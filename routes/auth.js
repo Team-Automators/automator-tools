@@ -148,6 +148,22 @@ router.get('/callback', async (req, res) => {
   }
 });
 
+// GET /auth/registry-count — how many users have signed in (no PII), to verify
+// the admin list is populating. Shows count + how many pinged in the last 2 min.
+router.get('/registry-count', async (req, res) => {
+  try {
+    const all = await userReg.list().catch(() => []);
+    const now = Date.now();
+    res.json({
+      total: all.length,
+      onlineLast2m: all.filter(u => u.lastSeen && (now - u.lastSeen) < 120000).length,
+      lastSeenTimes: all.map(u => u.lastSeen).sort((a, b) => b - a).slice(0, 10),
+    });
+  } catch (e) {
+    res.json({ error: e.message });
+  }
+});
+
 // POST /auth/ping — heartbeat from an open app; keeps the user's online status
 // fresh in the admin console. Reads the session directly (public route).
 router.post('/ping', async (req, res) => {
