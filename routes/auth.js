@@ -148,6 +148,47 @@ router.get('/callback', async (req, res) => {
   }
 });
 
+// GET /auth/agency-locations — list the sub-accounts the agency install can
+// actually access (so we can see whether a given Location ID is covered).
+router.get('/agency-locations', async (req, res) => {
+  try {
+    const installs = await oauthStore.findAll().catch(() => []);
+    const inst = installs.find(i => i.companyId) || installs[0];
+    if (!inst) return res.json({ error: 'No agency OAuth install found.' });
+
+    const companyId = inst.companyId;
+    const token = (await oauthStore.getAccessToken(inst.locationId).catch(() => null)) || inst.access_token;
+    if (!token) return res.json({ companyId, error: 'Could not resolve a fresh agency token.' });
+
+    try {
+      const { data } = await axios.get(`${GHL_API}/locations/search`, {
+        headers: { Authorization: `Bearer ${token}`, Version: '2021-07-28', Accept: 'application/json' },
+        params: { companyId, limit: 250 },
+        timeout: 12000,
+      });
+      const raw = data.locations || data.data || (Array.isArray(data) ? data : []);
+      const locations = raw.map(l => ({ id: l.id || l._id, name: l.name || l.businessName || '' }));
+      const target = (req.query.locationId || '').trim();
+      res.json({
+        companyId,
+        count: locations.length,
+        includesTarget: target ? locations.some(l => l.id === target) : undefined,
+        target: target || undefined,
+        locations,
+      });
+    } catch (e) {
+      res.json({
+        companyId,
+        error: e.response?.status || 0,
+        message: e.response?.data?.message || e.response?.data?.error || e.message,
+        hint: 'If this 401/403s, the agency token cannot list sub-accounts — the app likely was not installed on sub-accounts, or lacks locations.readonly scope.',
+      });
+    }
+  } catch (e) {
+    res.json({ error: e.message });
+  }
+});
+
 // GET /auth/last-callback — inspect the most recent OAuth callback attempt.
 router.get('/last-callback', async (req, res) => {
   try {
