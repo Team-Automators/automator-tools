@@ -34,6 +34,12 @@ export default function AdminConsole() {
     try { await api.revokeUserKey(u.email); setUsers(us => us.map(x => x.email === u.email ? { ...x, hasApiKey: false, keyMasked: '', provider: '' } : x)); notifySuccess('API key revoked') }
     catch (e) { notifyError(e.message || 'Failed') } finally { setBusy('') }
   }
+  async function shareKey(u) {
+    if (!(await confirmToast(`Share your AI key with ${u.email}? They’ll be able to use all AI features on your key until you revoke it.`, { confirmText: 'Share my key', danger: false }))) return
+    setBusy(u.email)
+    try { await api.shareUserKey(u.email); await load(); notifySuccess('Your key is shared — they can use all features now') }
+    catch (e) { notifyError(e.message || 'Failed') } finally { setBusy('') }
+  }
   async function toggleBlock(u) {
     const next = !u.blocked
     if (next && !(await confirmToast(`Force ${u.email} to sign out and block their access? They can’t sign back in until you restore it.`, { confirmText: 'Log out & block', danger: true }))) return
@@ -104,14 +110,20 @@ export default function AdminConsole() {
                       </td>
                       <td style={{ padding: '12px 16px', color: 'var(--sub)' }}>{u.email}</td>
                       <td style={{ padding: '12px 16px' }}>
-                        {u.hasApiKey
-                          ? <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: '.8rem' }}>{u.provider ? `${u.provider} · ` : ''}{u.keyMasked}</span>
-                          : <span style={{ color: 'var(--sub)' }}>—</span>}
+                        {u.hasApiKey ? (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: '.8rem' }}>{u.provider ? `${u.provider} · ` : ''}{u.keyMasked}</span>
+                            {u.keyShared && <span className="chip" style={{ fontSize: '.6rem', background: 'var(--accent-bg, #EFF6FF)', color: 'var(--accent)' }}>shared</span>}
+                          </span>
+                        ) : <span style={{ color: 'var(--sub)' }}>—</span>}
                       </td>
                       <td style={{ padding: '12px 16px', color: 'var(--sub)' }}>{u.locations?.length || 0}</td>
                       <td style={{ padding: '12px 16px', color: 'var(--sub)' }}>{relTime(u.lastSeen)}</td>
                       <td style={{ padding: '10px 16px' }}>
                         <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                          {!u.hasApiKey && !u.isAdmin && (
+                            <button className="btn btn-ghost btn-sm" disabled={acting} style={{ color: 'var(--accent)' }} onClick={() => shareKey(u)}>Share my key</button>
+                          )}
                           <button className="btn btn-ghost btn-sm" disabled={acting || !u.hasApiKey} style={{ color: u.hasApiKey ? 'var(--danger)' : 'var(--sub)' }} onClick={() => revokeKey(u)}>Revoke key</button>
                           {u.blocked
                             ? <button className="btn btn-secondary btn-sm" disabled={acting} onClick={() => toggleBlock(u)}>Restore access</button>

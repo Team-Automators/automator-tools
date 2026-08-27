@@ -4,6 +4,7 @@ import { getLocationId, apiFetch } from '../lib/api.js'
 const STORAGE_KEY = 'ghl_ai_config'
 
 const AI_EVENT = 'aiconfig-changed'
+const SHARED_KEY = 'ghl_ai_shared'   // marks the local key as admin-shared (revocable)
 
 function readLocal() {
   try {
@@ -11,6 +12,8 @@ function readLocal() {
     return raw ? JSON.parse(raw) : null
   } catch { return null }
 }
+function isShared() { try { return localStorage.getItem(SHARED_KEY) === '1' } catch { return false } }
+function setShared(v) { try { if (v) localStorage.setItem(SHARED_KEY, '1'); else localStorage.removeItem(SHARED_KEY) } catch {} }
 
 export function useAIConfig() {
   const [config, setConfig]             = useState(readLocal)   // { provider, apiKey, model }
@@ -28,14 +31,27 @@ export function useAIConfig() {
       setLocationName(d.locationName || '')
       setLocationLogo(d.locationLogo || '')
     } catch {}
-    // Account-level key: if this browser has none but the user saved one before,
-    // adopt it so the key never has to be re-entered after logout / on a new device.
+    // Reconcile with the account-level key on the server:
+    //  • adopt it if this browser has none (survives logout / new device), or if
+    //    our current key is an admin-SHARED one (keep it in sync).
+    //  • if our key was shared and the server no longer has one, an admin revoked
+    //    it → remove it locally.
     try {
-      if (!readLocal()?.apiKey) {
-        const kr = await apiFetch('/api/settings/ai-key').then(x => x.json()).catch(() => null)
-        if (kr?.config?.apiKey) {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(kr.config))
-          setConfig(kr.config)
+      const local = readLocal()
+      const wasShared = isShared()
+      const kr = await apiFetch('/api/settings/ai-key').then(x => x.json()).catch(() => null)
+      if (kr) {
+        if (kr.config?.apiKey) {
+          if (!local?.apiKey || wasShared) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(kr.config))
+            setShared(!!kr.shared)
+            setConfig(kr.config)
+            window.dispatchEvent(new Event(AI_EVENT))
+          }
+        } else if (wasShared && local?.apiKey) {
+          localStorage.removeItem(STORAGE_KEY)
+          setShared(false)
+          setConfig(null)
           window.dispatchEvent(new Event(AI_EVENT))
         }
       }
@@ -59,6 +75,7 @@ export function useAIConfig() {
     // AI config → localStorage (device-specific)
     const stored = { provider, apiKey, model }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(stored))
+    setShared(false)   // the user set their own key — no longer a shared one
     setConfig(stored)
     window.dispatchEvent(new Event(AI_EVENT))
 
@@ -83,6 +100,7 @@ export function useAIConfig() {
 
   function clearConfig() {
     localStorage.removeItem(STORAGE_KEY)
+    setShared(false)
     setConfig(null)
     window.dispatchEvent(new Event(AI_EVENT))
     apiFetch('/api/settings/ai-key', { method: 'DELETE' }).catch(() => {})

@@ -41,6 +41,8 @@ router.get('/users', async (req, res) => {
         hasApiKey:  !!(key && key.apiKey),
         provider:   key?.provider || '',
         keyMasked:  key?.apiKey ? maskKey(key.apiKey) : '',
+        keyShared:  !!(key && key.shared),
+        sharedBy:   key?.sharedBy || '',
       };
     }));
     rows.sort((a, b) => (b.lastSeen || 0) - (a.lastSeen || 0));
@@ -48,6 +50,19 @@ router.get('/users', async (req, res) => {
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
+});
+
+// POST /api/admin/share-key { email } — copy the admin's own AI key to a user so
+// they can use every feature on the admin's key. Marked as shared (revocable).
+router.post('/share-key', async (req, res) => {
+  const email = (req.body?.email || '').trim().toLowerCase();
+  if (!email) return res.status(400).json({ error: 'email required' });
+  try {
+    const mine = await userAiKey.get(req.userEmail);
+    if (!mine?.apiKey) return res.status(400).json({ error: 'Set your own AI key in Settings first, then share it.' });
+    await userAiKey.set(email, { provider: mine.provider, apiKey: mine.apiKey, model: mine.model, shared: true, sharedBy: (req.userEmail || '').toLowerCase() });
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // POST /api/admin/revoke-key { email } — delete the user's saved AI key.

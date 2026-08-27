@@ -30,7 +30,11 @@ router.post('/claim-legacy', async (req, res) => {
 router.get('/ai-key', async (req, res) => {
   try {
     const rec = await userAiKey.get(req.userEmail);
-    res.json({ config: rec && rec.apiKey ? { provider: rec.provider, apiKey: rec.apiKey, model: rec.model } : null });
+    res.json({
+      config: rec && rec.apiKey ? { provider: rec.provider, apiKey: rec.apiKey, model: rec.model } : null,
+      shared: !!(rec && rec.shared),
+      sharedBy: rec?.sharedBy || '',
+    });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

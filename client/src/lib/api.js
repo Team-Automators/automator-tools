@@ -560,6 +560,15 @@ export const api = {
     if (!r.ok) throw new Error(j.error || 'Failed')
     return j
   },
+  async shareUserKey(email) {
+    const r = await fetch('/api/admin/share-key', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, locationId: getLocationId() }),
+    })
+    const j = await r.json().catch(() => ({}))
+    if (!r.ok) throw new Error(j.error || 'Failed')
+    return j
+  },
 
   // Fire-and-forget: teaches the account playbook so future builds improve.
   architectLearn(payload) {
