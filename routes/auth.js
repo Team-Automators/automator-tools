@@ -148,6 +148,16 @@ router.get('/callback', async (req, res) => {
   }
 });
 
+// POST /auth/ping — heartbeat from an open app; keeps the user's online status
+// fresh in the admin console. Reads the session directly (public route).
+router.post('/ping', async (req, res) => {
+  try {
+    const claims = session.verify(readSessionToken(req));
+    if (claims?.email) userReg.touch(claims.email).catch(() => {});
+  } catch {}
+  res.json({ ok: true });
+});
+
 // GET /auth/token-info — decode the stored agency token to reveal what GHL
 // actually granted (authClass + scopes). No secrets returned.
 router.get('/token-info', async (req, res) => {

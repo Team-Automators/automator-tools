@@ -11,7 +11,8 @@ function relTime(ts) {
   if (h < 24) return `${h}h ago`
   return `${Math.floor(h / 24)}d ago`
 }
-const isActive = (ts) => ts && (Date.now() - ts) < 15 * 60 * 1000
+const ONLINE_MS = 2 * 60 * 1000   // online = heartbeat within the last 2 minutes
+const isOnline = (ts) => ts && (Date.now() - ts) < ONLINE_MS
 
 // The users table + actions. Self-fetches. Used inside the standalone admin page.
 export default function AdminConsole() {
@@ -26,7 +27,11 @@ export default function AdminConsole() {
     catch (e) { notifyError(e.message || 'Could not load users') }
     finally { setLoading(false) }
   }
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    load()
+    const id = setInterval(load, 30000) // keep online/offline fresh
+    return () => clearInterval(id)
+  }, [])
 
   async function revokeKey(u) {
     if (!(await confirmToast(`Revoke the AI key for ${u.email}? They’ll need to add a new one to use AI.`, { confirmText: 'Revoke key', danger: true }))) return
@@ -50,7 +55,7 @@ export default function AdminConsole() {
 
   const query = q.trim().toLowerCase()
   const rows = query ? users.filter(u => (u.email + ' ' + u.name).toLowerCase().includes(query)) : users
-  const activeCount = users.filter(u => isActive(u.lastSeen) && !u.blocked).length
+  const onlineCount = users.filter(u => isOnline(u.lastSeen) && !u.blocked).length
 
   const stat = (n, label, color) => (
     <div style={{ flex: '1 1 90px', minWidth: 0, textAlign: 'center', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 10, background: 'var(--card)' }}>
@@ -63,7 +68,7 @@ export default function AdminConsole() {
     <>
       <div style={{ display: 'flex', gap: 10, marginBottom: 8, flexWrap: 'wrap' }}>
         {stat(users.length, 'USERS')}
-        {stat(activeCount, 'ACTIVE', '#16A34A')}
+        {stat(onlineCount, 'ONLINE', '#16A34A')}
         {stat(users.filter(u => u.hasApiKey).length, 'WITH KEY', 'var(--accent)')}
         {stat(users.filter(u => u.blocked).length, 'BLOCKED', users.some(u => u.blocked) ? 'var(--danger)' : 'var(--sub)')}
       </div>
@@ -102,8 +107,9 @@ export default function AdminConsole() {
                     <tr key={u.email} style={{ borderTop: '1px solid var(--border)', opacity: u.blocked ? 0.6 : 1 }}>
                       <td style={{ padding: '12px 16px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <span style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: u.blocked ? 'var(--danger)' : isActive(u.lastSeen) ? '#16A34A' : 'var(--border)' }} title={u.blocked ? 'Blocked' : isActive(u.lastSeen) ? 'Active' : 'Idle'} />
+                          <span style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: u.blocked ? 'var(--danger)' : isOnline(u.lastSeen) ? '#16A34A' : 'var(--border)' }} title={u.blocked ? 'Blocked' : isOnline(u.lastSeen) ? 'Online' : 'Offline'} />
                           <span style={{ fontWeight: 600 }}>{u.name || '—'}</span>
+                          <span style={{ fontSize: '.68rem', fontWeight: 600, color: isOnline(u.lastSeen) && !u.blocked ? '#16A34A' : 'var(--sub)' }}>{u.blocked ? '' : isOnline(u.lastSeen) ? 'online' : 'offline'}</span>
                           {u.isAdmin && <span className="chip chip-green" style={{ fontSize: '.62rem' }}>admin</span>}
                           {u.blocked && <span className="chip chip-red" style={{ fontSize: '.62rem' }}>blocked</span>}
                         </div>
@@ -121,7 +127,7 @@ export default function AdminConsole() {
                       <td style={{ padding: '12px 16px', color: 'var(--sub)' }}>{relTime(u.lastSeen)}</td>
                       <td style={{ padding: '10px 16px' }}>
                         <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                          {!u.hasApiKey && !u.isAdmin && (
+                          {!u.hasApiKey && !u.isAdmin && isOnline(u.lastSeen) && !u.blocked && (
                             <button className="btn btn-ghost btn-sm" disabled={acting} style={{ color: 'var(--accent)' }} onClick={() => shareKey(u)}>Share my key</button>
                           )}
                           <button className="btn btn-ghost btn-sm" disabled={acting || !u.hasApiKey} style={{ color: u.hasApiKey ? 'var(--danger)' : 'var(--sub)' }} onClick={() => revokeKey(u)}>Revoke key</button>

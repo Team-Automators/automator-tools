@@ -79,6 +79,16 @@ export default function App() {
     return () => { alive = false }
   }, [])
 
+  // Heartbeat: tell the server we're online (drives online/offline in Admin).
+  useEffect(() => {
+    const ping = () => { try { if (getSessionClaims()?.uid) fetch('/auth/ping', { method: 'POST' }).catch(() => {}) } catch {} }
+    ping()
+    const id = setInterval(ping, 60000)
+    const onVis = () => { if (document.visibilityState === 'visible') ping() }
+    document.addEventListener('visibilitychange', onVis)
+    return () => { clearInterval(id); document.removeEventListener('visibilitychange', onVis) }
+  }, [])
+
   if (booting) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
