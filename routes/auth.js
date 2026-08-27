@@ -148,6 +148,41 @@ router.get('/callback', async (req, res) => {
   }
 });
 
+// GET /auth/token-info — decode the stored agency token to reveal what GHL
+// actually granted (authClass + scopes). No secrets returned.
+router.get('/token-info', async (req, res) => {
+  try {
+    const installs = await oauthStore.findAll().catch(() => []);
+    const inst = installs.find(i => i.companyId) || installs[0];
+    if (!inst) return res.json({ error: 'No agency OAuth install found.' });
+    const token = (await oauthStore.getAccessToken(inst.locationId).catch(() => null)) || inst.access_token;
+    if (!token) return res.json({ error: 'Could not resolve a token.' });
+
+    let payload = {};
+    try {
+      const p = String(token).split('.')[1];
+      payload = JSON.parse(Buffer.from(p.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString());
+    } catch (e) {
+      return res.json({ error: 'Token is not a decodable JWT', detail: e.message });
+    }
+    const meta = payload.oauthMeta || {};
+    const scopes = meta.scopes || (payload.scope ? String(payload.scope).split(' ') : null);
+    res.json({
+      authClass:          payload.authClass,          // "Company" (agency) vs "Location"
+      authClassId:        payload.authClassId,
+      primaryAuthClassId: payload.primaryAuthClassId,
+      hasOauthWrite:      Array.isArray(scopes) ? scopes.includes('oauth.write') : null,
+      hasOauthReadonly:   Array.isArray(scopes) ? scopes.includes('oauth.readonly') : null,
+      scopeCount:         Array.isArray(scopes) ? scopes.length : null,
+      scopes,
+      versionId:          meta.versionId,
+      exp:                payload.exp,
+    });
+  } catch (e) {
+    res.json({ error: e.message });
+  }
+});
+
 // GET /auth/agency-locations — list the sub-accounts the agency install can
 // actually access (so we can see whether a given Location ID is covered).
 router.get('/agency-locations', async (req, res) => {
