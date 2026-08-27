@@ -68,8 +68,9 @@ export default function AdminPortal() {
           </span>
           <div style={{ fontWeight: 700, letterSpacing: '-.01em' }}>Automator <span style={{ color: 'var(--sub)', fontWeight: 600 }}>Admin</span></div>
           {signedIn && (
-            <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
               <span style={{ fontSize: '.8rem', color: 'var(--sub)' }}>{claims?.email}</span>
+              <button className="btn btn-secondary btn-sm" onClick={() => navigate(`/?locationId=${getLocationId()}`)}>← Dashboard</button>
               <button className="btn btn-ghost btn-sm" onClick={signOut}>Sign out</button>
             </div>
           )}
