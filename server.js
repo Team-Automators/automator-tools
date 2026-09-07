@@ -27,8 +27,12 @@ const requireLocation    = require('./middleware/require-location');
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(express.json({ limit: '25mb' }));            // 25mb: room for base64 file uploads (Analyzer PDF/DOCX)
-app.use(express.urlencoded({ extended: true, limit: '25mb' }));
+// Large payloads (base64 file uploads, full backups) are confined to the two
+// routers that need them; everything else is capped small to limit the DoS surface.
+app.use('/copywrite',  express.json({ limit: '25mb' }));
+app.use('/api/backup', express.json({ limit: '25mb' }));
+app.use(express.json({ limit: '2mb' }));
+app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 
 // ── API / webhook routes ───────────────────────────────────────────────────────
 // ── Public / server-to-server routes (no user session) ──────────────────────────

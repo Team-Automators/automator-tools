@@ -4,6 +4,7 @@
  * Run: node scripts/auth-test.cjs
  */
 process.env.SESSION_SECRET = 'test-secret-123';
+process.env.DIAG_KEY = 'diag-test';
 process.env.VERCEL = '';            // use in-memory stores
 const PORT = 4100;
 const BASE = `http://localhost:${PORT}`;
@@ -169,17 +170,17 @@ async function run() {
   const pitTok = pitLogin.json?.token;
   const pitCall = await req('GET', '/api/tasks', { token: pitTok });
   check('PIT session can call protected API', pitCall.status === 200, `status=${pitCall.status}`);
-  const pitDiag = await req('GET', '/auth/diagnose?locationId=PITLOC');
+  const pitDiag = await req('GET', '/auth/diagnose?key=diag-test&locationId=PITLOC');
   check('diagnose: authMethod = pit', pitDiag.json?.authMethod === 'pit', `authMethod=${pitDiag.json?.authMethod}`);
   check('diagnose: fullyAuthenticates', pitDiag.json?.fullyAuthenticates === true);
   // A location with neither OAuth nor PIT is still rejected.
-  const noneDiag = await req('GET', '/auth/diagnose?locationId=BADLOC');
+  const noneDiag = await req('GET', '/auth/diagnose?key=diag-test&locationId=BADLOC');
   check('unknown location still rejected', noneDiag.json?.fullyAuthenticates === false);
 
   // PIT record present but GHL rejects it (expired/invalid) → clear verdict, login refused.
   const badPitLogin = await req('POST', '/auth/location-login', { body: { locationId: 'PITBADLOC' } });
   check('invalid PIT → login 403', badPitLogin.status === 403, `status=${badPitLogin.status}`);
-  const badPitDiag = await req('GET', '/auth/diagnose?locationId=PITBADLOC');
+  const badPitDiag = await req('GET', '/auth/diagnose?key=diag-test&locationId=PITBADLOC');
   check('diagnose flags PIT attempted + rejected', badPitDiag.json?.pitAttempted === true && badPitDiag.json?.fullyAuthenticates === false, `status=${badPitDiag.json?.ghlValidationStatus}`);
   check('verdict says PIT REJECTED', /PIT REJECTED/.test(badPitDiag.json?.verdict || ''), badPitDiag.json?.verdict);
 

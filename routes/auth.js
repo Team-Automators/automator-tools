@@ -78,6 +78,20 @@ function installedPage({ agency, companyId, locationId }) {
 const GHL_API   = 'https://services.leadconnectorhq.com';
 const SCOPES    = 'locations.readonly users.readonly users.write contacts.readonly contacts.write locations/customValues.readonly locations/customValues.write locations/tasks.readonly locations/tasks.write recurring-tasks.readonly recurring-tasks.write locations/tags.readonly locations/tags.write locations/templates.readonly oauth.write oauth.readonly conversations.readonly conversations/message.readonly conversations/message.write opportunities.readonly opportunities.write';
 
+// Gate for diagnostic endpoints — they expose install/token/location internals,
+// so they must never be public. Allowed for: a configured DIAG_KEY (?key= or
+// x-diag-key header), or a signed-in admin. Otherwise 404 (don't advertise them).
+function requireDiag(req, res, next) {
+  const provided = clean(req.query.key || req.headers['x-diag-key'] || '');
+  const gate = clean(process.env.DIAG_KEY);
+  if (gate && provided && provided === gate) return next();
+  try {
+    const claims = session.verify(readSessionToken(req));
+    if (claims && admins.isAdmin(claims.email)) return next();
+  } catch {}
+  return res.status(404).json({ error: 'not_found' });
+}
+
 // GET /auth — start OAuth flow
 router.get('/', (req, res) => {
   const clientId  = clean(process.env.GHL_CLIENT_ID);
@@ -150,7 +164,7 @@ router.get('/callback', async (req, res) => {
 
 // GET /auth/registry-count — how many users have signed in (no PII), to verify
 // the admin list is populating. Shows count + how many pinged in the last 2 min.
-router.get('/registry-count', async (req, res) => {
+router.get('/registry-count', requireDiag, async (req, res) => {
   try {
     const all = await userReg.list().catch(() => []);
     const now = Date.now();
@@ -176,7 +190,7 @@ router.post('/ping', async (req, res) => {
 
 // GET /auth/token-info — decode the stored agency token to reveal what GHL
 // actually granted (authClass + scopes). No secrets returned.
-router.get('/token-info', async (req, res) => {
+router.get('/token-info', requireDiag, async (req, res) => {
   try {
     const installs = await oauthStore.findAll().catch(() => []);
     const inst = installs.find(i => i.companyId) || installs[0];
@@ -211,7 +225,7 @@ router.get('/token-info', async (req, res) => {
 
 // GET /auth/agency-locations — list the sub-accounts the agency install can
 // actually access (so we can see whether a given Location ID is covered).
-router.get('/agency-locations', async (req, res) => {
+router.get('/agency-locations', requireDiag, async (req, res) => {
   try {
     const installs = await oauthStore.findAll().catch(() => []);
     const inst = installs.find(i => i.companyId) || installs[0];
@@ -264,7 +278,7 @@ router.get('/agency-locations', async (req, res) => {
 });
 
 // GET /auth/last-callback — inspect the most recent OAuth callback attempt.
-router.get('/last-callback', async (req, res) => {
+router.get('/last-callback', requireDiag, async (req, res) => {
   try {
     const rec = await require('../lib/redis').get('ghl:lastcallback');
     res.json(rec || { note: 'No callback recorded. GHL has not redirected to /auth/callback yet — meaning the authorize was not completed, or the app’s Redirect URL does not point here.' });
@@ -412,7 +426,7 @@ router.post('/user-login', requireLocation, async (req, res) => {
 
 // GET /auth/diagnose?locationId=xxx — public auth diagnostic (no secrets).
 // Explains WHY a location can or cannot authenticate.
-router.get('/diagnose', async (req, res) => {
+router.get('/diagnose', requireDiag, async (req, res) => {
   const locationId = (req.query.locationId || '').trim();
   if (!locationId) return res.status(400).json({ error: 'locationId query param required' });
 
@@ -490,7 +504,7 @@ router.get('/diagnose', async (req, res) => {
 // Reports (from inside the deployment, where creds live) whether the required
 // env vars are set and what Redis actually holds for a location. No secret
 // values are returned — only booleans + the public redirect URI.
-router.get('/env-check', async (req, res) => {
+router.get('/env-check', requireDiag, async (req, res) => {
   // Optional lock: if DIAG_KEY is set, require it. Otherwise open (booleans only).
   if (process.env.DIAG_KEY && req.query.key !== process.env.DIAG_KEY) {
     return res.status(403).json({ error: 'forbidden — pass ?key=<DIAG_KEY>' });
@@ -549,7 +563,7 @@ router.get('/env-check', async (req, res) => {
 // Full inventory of what's stored in Redis, grouped by namespace. Counts are
 // always shown; the actual IDs are included only when a valid key is passed
 // (DIAG_KEY, SESSION_SECRET, or GHL_CLIENT_SECRET). No secret values returned.
-router.get('/redis-dump', async (req, res) => {
+router.get('/redis-dump', requireDiag, async (req, res) => {
   const provided = req.query.key || req.headers['x-diag-key'] || '';
   const gate     = clean(process.env.DIAG_KEY) || clean(process.env.SESSION_SECRET) || clean(process.env.GHL_CLIENT_SECRET);
   const authed   = !!gate && provided === gate;
@@ -589,7 +603,7 @@ router.get('/redis-dump', async (req, res) => {
 
 // GET /auth/last-install — inspect the most recent External Auth POST from GHL
 // (field names + masked value shapes). Used to match /install to GHL's payload.
-router.get('/last-install', async (req, res) => {
+router.get('/last-install', requireDiag, async (req, res) => {
   try {
     const rec = await require('../lib/redis').get('ghl:lastinstall');
     res.json(rec || { note: 'No External Auth POST recorded yet. If install fails before this fills, GHL may not be reaching POST /install at all.' });
@@ -614,10 +628,10 @@ router.get('/session', (req, res) => {
 
 // GET|POST /auth/logout — clear the session cookie (and optionally OAuth tokens)
 router.get('/logout', async (req, res) => {
-  const { locationId } = req.query;
-  if (locationId) await oauthStore.del(locationId);
+  // Only clears the session cookie. It must NOT delete OAuth installs — doing so
+  // from an unauthenticated GET would let anyone uninstall an agency by URL.
   res.setHeader('Set-Cookie', CLEAR_COOKIE);
-  res.redirect('/');
+  res.redirect('/login');
 });
 router.post('/logout', async (req, res) => {
   // Drop the user from the registry so they leave the admin list until next login.
