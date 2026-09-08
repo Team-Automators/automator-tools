@@ -518,7 +518,7 @@ router.get('/env-check', requireDiag, async (req, res) => {
     GHL_VERSION_ID:           has('GHL_VERSION_ID'),
     UPSTASH_REDIS_REST_URL:   has('UPSTASH_REDIS_REST_URL'),
     UPSTASH_REDIS_REST_TOKEN: has('UPSTASH_REDIS_REST_TOKEN'),
-    SESSION_SECRET:           has('SESSION_SECRET'),
+    SESSION_SECRET:           has('SESSION_SECRET') || has('SESSIONS_SECRET'),
     VERCEL:                   has('VERCEL'),
   };
 
