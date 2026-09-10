@@ -8,6 +8,7 @@ const { PROVIDERS }      = require('../lib/ai-providers');
 const brandVoiceStore    = require('../lib/brand-voice-store');
 const copyStore          = require('../lib/copy-store');
 const archMem            = require('../lib/architect-memory-store');
+const designMem          = require('../lib/design-memory-store');
 
 // Map provider id → config for fast lookup
 const PROVIDER_MAP = Object.fromEntries(PROVIDERS.map(p => [p.id, p]));
@@ -1868,6 +1869,16 @@ ${copy.slice(0, 6000)}`;
 
 // ── POST /copywrite/mockup ────────────────────────────────────────────────────
 
+// POST /copywrite/mockup-feedback { style, sentiment } — teach design prefs.
+// 'up' (kept/liked) reinforces the style; 'down' (disliked/regenerated) avoids it.
+router.post('/mockup-feedback', async (req, res) => {
+  const { style, sentiment } = req.body || {};
+  if (!style) return res.json({ ok: false });
+  const delta = sentiment === 'up' ? 2 : sentiment === 'down' ? -1.5 : sentiment === 'skip' ? -0.6 : 0;
+  if (delta) await designMem.bump(req.locationId, req.userId, style, delta).catch(() => {});
+  res.json({ ok: true });
+});
+
 router.post('/mockup', async (req, res) => {
   const { copy, type = 'sales-page', mode = 'template', copyLength = 'long', provider = 'claude', apiKey, model: reqModel, seed: clientSeed } = req.body;
 
@@ -2009,10 +2020,12 @@ router.post('/mockup', async (req, res) => {
   if (!isWebinar) {
     try {
       const menu = STYLES.map((s, i) => `${i}: ${s.name} — ${s.aesthetic.split('.')[0]}`).join('\n');
+      const bias = await designMem.biasText(req.locationId, req.userId).catch(() => '');
       const analysisPrompt = `You are a conversion strategist. Analyze the marketing copy and DESIGN a funnel that fits it.
 
 CHOOSE ONE visual style (by index) whose vibe best matches the offer's audience, price tier, and tone:
 ${menu}
+${bias}
 
 CHOOSE the section order from this vocabulary — include ONLY sections the copy actually supports, in a smart persuasive order. Always start with "hero" and end with "cta-band":
 trust-bar, problem-pain, who-this-is-for, features-what-you-get, social-proof, pricing-value-stack, guarantee, faq, scarcity
@@ -2043,6 +2056,8 @@ ${copy.slice(0, 4000)}`;
   const imgSeed = clientSeed ? String(clientSeed).slice(-6) : Math.random().toString(36).slice(2, 8);
   const genId   = clientSeed || Date.now();
   if (designReason) console.log(`[mockup] design fit: ${style.name} · ${designReason}`);
+  // Record that this style was used (mild positive) so preferences build over time.
+  designMem.bump(req.locationId, req.userId, style.name, 0.25).catch(() => {});
 
   const designPrompt = `You are an elite conversion-focused web designer. Generation ID: ${genId} — produce a completely unique page.
 
@@ -2207,7 +2222,7 @@ ${copy.slice(0, 6000)}`;
     }
 
     console.log(`[mockup] SUCCESS: ${rawHtml.length} chars`);
-    sendEvent({ done: true, html: rawHtml, mode: 'ai' });
+    sendEvent({ done: true, html: rawHtml, mode: 'ai', style: style.name });
     res.write('data: [DONE]\n\n');
     res.end();
   }

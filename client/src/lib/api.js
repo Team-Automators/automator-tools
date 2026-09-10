@@ -378,7 +378,18 @@ export const api = {
     return r.json()
   },
 
-  // Streaming version for AI mode — returns { html, mode } when done
+  // Teach the account's design preferences (👍/👎/regenerate). Fire-and-forget.
+  mockupFeedback(style, sentiment) {
+    if (!style) return
+    try {
+      fetch('/copywrite/mockup-feedback', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ style, sentiment, locationId: getLocationId() }),
+      }).catch(() => {})
+    } catch {}
+  },
+
+  // Streaming version for AI mode — returns { html, mode, style } when done
   generateMockupStream({ copy, type, mode, copyLength, provider, apiKey, model }, { onChunk } = {}) {
     return new Promise((resolve, reject) => {
       fetch('/copywrite/mockup', {
@@ -407,7 +418,7 @@ export const api = {
             try {
               const parsed = JSON.parse(raw)
               if (parsed.chunk && onChunk) onChunk(parsed.chunk)
-              if (parsed.done) resolve({ html: parsed.html, mode: parsed.mode })
+              if (parsed.done) resolve({ html: parsed.html, mode: parsed.mode, style: parsed.style })
               if (parsed.error) reject(new Error(parsed.error))
             } catch {}
           }

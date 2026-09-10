@@ -309,7 +309,7 @@ export default function LibraryChat() {
           { onChunk: (chunk) => setMockupChars(n => n + chunk.length) }
         )
         if (result?.html) {
-          setMockup({ html: result.html, mode, loading: false, error: null })
+          setMockup({ html: result.html, mode, loading: false, error: null, style: result.style })
         } else {
           setMockup({ html: null, mode, loading: false, error: 'No HTML returned' })
         }
@@ -733,9 +733,11 @@ export default function LibraryChat() {
               <div className="mockup-tabs">
                 {!mockup?.loading && mockup?.html && (
                   <>
+                    <button className="mockup-tab" title="I like this design" onClick={() => { api.mockupFeedback(mockup.style, 'up'); notifySuccess('Saved — more designs like this') }}>👍</button>
                     <button
                       className="mockup-tab active"
                       onClick={() => {
+                        api.mockupFeedback(mockup.style, 'skip')
                         setAutoCycle(false)
                         clearTimeout(cycleTimerRef.current)
                         clearInterval(countdownRef.current)
