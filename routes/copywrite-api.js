@@ -2267,19 +2267,28 @@ ${copy.slice(0, 6000)}`;
       return text;
     }
 
-    // Continuation loop — if a turn hits the token cap before </html>, resume
-    // exactly where it stopped so the funnel is NEVER cut off mid-page.
+    // Continuation loop — if a turn hits the token cap before </html>, pause
+    // briefly then automatically resume from exactly where it stopped (no user
+    // command needed) so the funnel is NEVER cut off mid-page.
+    const sleep = (ms) => new Promise(r => setTimeout(r, ms));
     const convo = [{ role: 'user', content: designPrompt }];
     const MAX_TURNS = 4;
+    const PAUSE_MS = 5000;
     for (let turn = 0; turn < MAX_TURNS; turn++) {
+      if (turn > 0) {
+        // ~5s breather before auto-continuing; heartbeats keep the SSE alive.
+        sendEvent({ status: 'continuing' });
+        const hb = setInterval(() => res.write(': heartbeat\n\n'), 1000);
+        try { await sleep(PAUSE_MS); } finally { clearInterval(hb); }
+      }
       const part = stripFences(await streamTurn(convo));
       if (!part) break;
       rawHtml += part;
       if (isComplete(rawHtml)) break;
-      // Truncated — ask it to continue from exactly where it left off.
+      // Truncated — resume from exactly where it left off.
       convo.push({ role: 'assistant', content: part });
       convo.push({ role: 'user', content: 'Continue the HTML from exactly where you stopped. Do NOT repeat any earlier markup and do NOT restart — output only the remaining HTML and finish the page through to </html>.' });
-      console.log(`[mockup] continuing (turn ${turn + 1}, ${rawHtml.length} chars so far)`);
+      console.log(`[mockup] auto-continuing after ${PAUSE_MS}ms pause (turn ${turn + 1}, ${rawHtml.length} chars so far)`);
     }
 
     processAndSend(rawHtml);
