@@ -2234,37 +2234,52 @@ ${copy.slice(0, 6000)}`;
     let rawHtml = '';
 
     // Webinar reg funnels are lean → cap tokens low so they render fast. Long
-  // only raises the ceiling for full sales pages.
-  const maxTok = isWebinar ? 7000 : (copyLength === 'short' ? 6500 : 10000);
+    // raises the ceiling for full sales pages.
+    const maxTok = isWebinar ? 7000 : (copyLength === 'short' ? 6500 : 10000);
+    const isComplete = (h) => /<\/html>/i.test(h);
+    const stripFences = (t) => (t || '').replace(/^\s*```[\w]*\s*/i, '').replace(/\s*```\s*$/i, '');
 
-    if (providerCfg.type === 'anthropic') {
-      const client = new Anthropic({ apiKey: resolvedKey });
-      const stream = client.messages.stream({
-        model, max_tokens: maxTok,
-        messages: [{ role: 'user', content: designPrompt }],
-      });
-      for await (const event of stream) {
-        if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
-          rawHtml += event.delta.text;
-          sendEvent({ chunk: event.delta.text });
+    // Stream ONE turn for the given message list; returns the text (and streams
+    // chunks to the client as they arrive).
+    async function streamTurn(messages) {
+      let text = '';
+      if (providerCfg.type === 'anthropic') {
+        const client = new Anthropic({ apiKey: resolvedKey });
+        const stream = client.messages.stream({ model, max_tokens: maxTok, messages });
+        for await (const event of stream) {
+          if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
+            text += event.delta.text; sendEvent({ chunk: event.delta.text });
+          }
         }
+      } else if (providerCfg.type === 'openai-compat') {
+        const client = new OpenAI({ apiKey: resolvedKey, baseURL: providerCfg.baseUrl });
+        const stream = await client.chat.completions.create({ model, max_tokens: maxTok, messages, stream: true });
+        for await (const chunk of stream) {
+          const t = chunk.choices[0]?.delta?.content || '';
+          if (t) { text += t; sendEvent({ chunk: t }); }
+        }
+      } else {
+        // Gemini / Cohere: single-prompt; heartbeat keeps SSE alive.
+        const heartbeat = setInterval(() => res.write(': heartbeat\n\n'), 5000);
+        try { text = await callAI(providerCfg, resolvedKey, model, messages.map(m => m.content).join('\n\n'), 8000); }
+        finally { clearInterval(heartbeat); }
       }
-    } else if (providerCfg.type === 'openai-compat') {
-      const client = new OpenAI({ apiKey: resolvedKey, baseURL: providerCfg.baseUrl });
-      const stream = await client.chat.completions.create({
-        model, max_tokens: maxTok,
-        messages: [{ role: 'user', content: designPrompt }],
-        stream: true,
-      });
-      for await (const chunk of stream) {
-        const text = chunk.choices[0]?.delta?.content || '';
-        if (text) { rawHtml += text; sendEvent({ chunk: text }); }
-      }
-    } else {
-      // Gemini / Cohere: heartbeat keeps SSE alive while callAI does the work
-      const heartbeat = setInterval(() => res.write(': heartbeat\n\n'), 5000);
-      try { rawHtml = await callAI(providerCfg, resolvedKey, model, designPrompt, 8000); }
-      finally { clearInterval(heartbeat); }
+      return text;
+    }
+
+    // Continuation loop — if a turn hits the token cap before </html>, resume
+    // exactly where it stopped so the funnel is NEVER cut off mid-page.
+    const convo = [{ role: 'user', content: designPrompt }];
+    const MAX_TURNS = 4;
+    for (let turn = 0; turn < MAX_TURNS; turn++) {
+      const part = stripFences(await streamTurn(convo));
+      if (!part) break;
+      rawHtml += part;
+      if (isComplete(rawHtml)) break;
+      // Truncated — ask it to continue from exactly where it left off.
+      convo.push({ role: 'assistant', content: part });
+      convo.push({ role: 'user', content: 'Continue the HTML from exactly where you stopped. Do NOT repeat any earlier markup and do NOT restart — output only the remaining HTML and finish the page through to </html>.' });
+      console.log(`[mockup] continuing (turn ${turn + 1}, ${rawHtml.length} chars so far)`);
     }
 
     processAndSend(rawHtml);
