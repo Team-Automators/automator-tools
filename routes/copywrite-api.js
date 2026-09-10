@@ -1999,12 +1999,50 @@ router.post('/mockup', async (req, res) => {
   // presenter, proof, final CTA) — so generate it at "short" depth even when the
   // user picked Long, so the preview isn't slow. Long only bulks up sales pages.
   const depthLen = isWebinar ? 'short' : copyLength;
-  const style  = STYLES[Math.floor(Math.random() * STYLES.length)];
+
+  // Analyze the copy so the DESIGN fits the offer instead of being random: pick
+  // the best-matching visual style, and include only the sections the copy
+  // actually supports (proof only if there are testimonials, guarantee only if
+  // one is mentioned, etc.). One small fast call; falls back to random on any
+  // failure. Skipped for webinar (fixed lean reg-funnel, kept fast).
+  let chosenStyle = null, chosenLayout = null, designReason = '';
+  if (!isWebinar) {
+    try {
+      const menu = STYLES.map((s, i) => `${i}: ${s.name} — ${s.aesthetic.split('.')[0]}`).join('\n');
+      const analysisPrompt = `You are a conversion strategist. Analyze the marketing copy and DESIGN a funnel that fits it.
+
+CHOOSE ONE visual style (by index) whose vibe best matches the offer's audience, price tier, and tone:
+${menu}
+
+CHOOSE the section order from this vocabulary — include ONLY sections the copy actually supports, in a smart persuasive order. Always start with "hero" and end with "cta-band":
+trust-bar, problem-pain, who-this-is-for, features-what-you-get, social-proof, pricing-value-stack, guarantee, faq, scarcity
+
+Rules: include social-proof only if testimonials/results exist in the copy; guarantee only if a guarantee is mentioned; pricing-value-stack only if there's a price/offer; faq only if there are objections to answer. 5–9 sections total.
+
+Return ONLY JSON (no prose): {"styleIndex": <0-${STYLES.length - 1}>, "sections": ["hero", ...], "reason": "one short line"}
+
+MARKETING COPY:
+${copy.slice(0, 4000)}`;
+      const raw = await callAI(providerCfg, resolvedKey, model, analysisPrompt, 500);
+      const j = parseModelJSON(raw);
+      if (Number.isInteger(j.styleIndex) && STYLES[j.styleIndex]) chosenStyle = STYLES[j.styleIndex];
+      if (Array.isArray(j.sections) && j.sections.length >= 4) {
+        let secs = j.sections.filter(s => typeof s === 'string');
+        if (secs[0] !== 'hero') secs = ['hero', ...secs.filter(s => s !== 'hero')];
+        if (secs[secs.length - 1] !== 'cta-band') secs = [...secs.filter(s => s !== 'cta-band'), 'cta-band'];
+        chosenLayout = secs.join(' → ');
+      }
+      designReason = typeof j.reason === 'string' ? j.reason : '';
+    } catch { /* fall back to random below */ }
+  }
+
+  const style  = chosenStyle || STYLES[Math.floor(Math.random() * STYLES.length)];
   const layout = isWebinar
     ? WEBINAR_LAYOUTS[Math.floor(Math.random() * WEBINAR_LAYOUTS.length)]
-    : LAYOUTS[Math.floor(Math.random() * LAYOUTS.length)];
+    : (chosenLayout || LAYOUTS[Math.floor(Math.random() * LAYOUTS.length)]);
   const imgSeed = clientSeed ? String(clientSeed).slice(-6) : Math.random().toString(36).slice(2, 8);
   const genId   = clientSeed || Date.now();
+  if (designReason) console.log(`[mockup] design fit: ${style.name} · ${designReason}`);
 
   const designPrompt = `You are an elite conversion-focused web designer. Generation ID: ${genId} — produce a completely unique page.
 
