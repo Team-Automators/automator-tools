@@ -239,9 +239,10 @@ export default function LibraryChat() {
           return c - 1
         })
       }, 1000)
+      const prevStyle = mockup.style
       cycleTimerRef.current = setTimeout(() => {
         const lastAiMsg = [...messages].reverse().find(m => m.role === 'assistant')
-        if (lastAiMsg) handleMockup(cleanDisplayText(lastAiMsg.content), 'ai')
+        if (lastAiMsg) handleMockup(cleanDisplayText(lastAiMsg.content), 'ai', prevStyle)
       }, DELAY * 1000)
     }
     return () => {
@@ -294,7 +295,7 @@ export default function LibraryChat() {
     setTimeout(() => setSaveStatus(''), 2000)
   }
 
-  async function handleMockup(content, mode) {
+  async function handleMockup(content, mode, avoidStyle = null) {
     if ((copy?.type || '') === 'webinar') {
       const landing = webinarLandingContent(messages)
       if (landing) content = landing
@@ -305,7 +306,7 @@ export default function LibraryChat() {
     try {
       if (mode === 'ai') {
         const result = await api.generateMockupStream(
-          { copy: content, type: copy?.type || 'general', mode, copyLength, provider: config?.provider, apiKey: config?.apiKey, model: config?.model },
+          { copy: content, type: copy?.type || 'general', mode, copyLength, provider: config?.provider, apiKey: config?.apiKey, model: config?.model, avoidStyle },
           { onChunk: (chunk) => setMockupChars(n => n + chunk.length) }
         )
         if (result?.html) {
@@ -742,7 +743,7 @@ export default function LibraryChat() {
                         clearTimeout(cycleTimerRef.current)
                         clearInterval(countdownRef.current)
                         const lastAiMsg = [...messages].reverse().find(m => m.role === 'assistant')
-                        handleMockup(lastAiMsg?.content || '', 'ai')
+                        handleMockup(lastAiMsg?.content || '', 'ai', mockup.style)
                       }}
                     >
                       ↺ New Design

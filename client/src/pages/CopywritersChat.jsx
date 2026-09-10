@@ -249,9 +249,10 @@ export default function CopywritersChat() {
           return c - 1
         })
       }, 1000)
+      const prevStyle = mockup.style
       cycleTimerRef.current = setTimeout(() => {
         const lastAiMsg = [...messages].reverse().find(m => m.role === 'assistant')
-        if (lastAiMsg) handleMockup(cleanDisplayText(lastAiMsg.content), 'ai')
+        if (lastAiMsg) handleMockup(cleanDisplayText(lastAiMsg.content), 'ai', prevStyle)
       }, DELAY * 1000)
     }
     return () => {
@@ -438,7 +439,7 @@ export default function CopywritersChat() {
     }
   }
 
-  async function handleMockup(content, mode) {
+  async function handleMockup(content, mode, avoidStyle = null) {
     // Webinar preview must render ONLY the landing page — not the emails, pitch,
     // or offer stack that the staged flow adds to the conversation.
     if (type === 'webinar') {
@@ -451,7 +452,7 @@ export default function CopywritersChat() {
     try {
       if (mode === 'ai') {
         const result = await api.generateMockupStream(
-          { copy: content, type, mode, copyLength, provider: config?.provider, apiKey: config?.apiKey, model: config?.model },
+          { copy: content, type, mode, copyLength, provider: config?.provider, apiKey: config?.apiKey, model: config?.model, avoidStyle },
           { onChunk: (chunk) => setMockupChars(n => n + chunk.length) }
         )
         if (result?.html) {
@@ -794,7 +795,7 @@ export default function CopywritersChat() {
                         setAutoCycle(false)
                         clearTimeout(cycleTimerRef.current)
                         clearInterval(countdownRef.current)
-                        handleMockup(lastAi?.content || '', 'ai')
+                        handleMockup(lastAi?.content || '', 'ai', mockup.style)
                       }}
                     >
                       ↺ New Design

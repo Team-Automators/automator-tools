@@ -1880,7 +1880,7 @@ router.post('/mockup-feedback', async (req, res) => {
 });
 
 router.post('/mockup', async (req, res) => {
-  const { copy, type = 'sales-page', mode = 'template', copyLength = 'long', provider = 'claude', apiKey, model: reqModel, seed: clientSeed } = req.body;
+  const { copy, type = 'sales-page', mode = 'template', copyLength = 'long', provider = 'claude', apiKey, model: reqModel, seed: clientSeed, avoidStyle } = req.body;
 
   if (!copy) return res.status(400).json({ error: 'copy is required' });
 
@@ -2020,14 +2020,19 @@ router.post('/mockup', async (req, res) => {
   // one is mentioned, etc.). One small fast call; falls back to random on any
   // failure. Runs for webinar too, with a registration-funnel vocabulary that
   // always keeps the opt-in form.
-  let chosenStyle = null, chosenLayout = null, designReason = '';
+  // Variety + fit: instead of locking to the single best style (which makes every
+  // regeneration look identical for the same copy), the analysis returns a RANKED
+  // SHORTLIST of styles that all fit — then we rotate among them using the seed and
+  // skip the previously-shown style, so "New Design" genuinely changes each time
+  // while staying on-brand for the offer.
+  let styleShortlist = [], chosenLayout = null, designReason = '';
   try {
     const menu = STYLES.map((s, i) => `${i}: ${s.name} — ${s.aesthetic.split('.')[0]}`).join('\n');
     const bias = await designMem.biasText(req.locationId, req.userId).catch(() => '');
     const analysisPrompt = isWebinar
       ? `You are a conversion strategist. Analyze the webinar copy and DESIGN a registration funnel that fits it.
 
-CHOOSE ONE visual style (by index) whose vibe best matches the webinar's audience, topic, and tone:
+RANK the 3 visual styles (by index) that best match the webinar's audience, topic, and tone — best first. All three must genuinely fit; the system will rotate among them for variety.
 ${menu}
 ${bias}
 
@@ -2036,28 +2041,35 @@ what-you-will-learn, presenter-bio, agenda, social-proof, bonuses, countdown, fa
 
 Rules: include social-proof only if testimonials/results are in the copy; presenter-bio only if a host/speaker is described; agenda only if the copy lays out a timeline/segments; bonuses only if free gifts/resources are promised to attendees; countdown only if there's a fixed date/deadline or urgency; faq only if there are objections to answer. Never include pricing or a value stack — a webinar registration is free. 4–7 sections total (including the two mandatory form sections).
 
-Return ONLY JSON (no prose): {"styleIndex": <0-${STYLES.length - 1}>, "sections": ["hero-with-registration-form", ...], "reason": "one short line"}
+Return ONLY JSON (no prose): {"styleShortlist": [<3 distinct indexes 0-${STYLES.length - 1}, best first>], "sections": ["hero-with-registration-form", ...], "reason": "one short line"}
 
 WEBINAR COPY:
 ${copy.slice(0, 4000)}`
-      : `You are a conversion strategist. Analyze the marketing copy and DESIGN a funnel that fits it.
+      : `You are a conversion strategist. Analyze the marketing copy and DESIGN a high-converting funnel that fits it.
 
-CHOOSE ONE visual style (by index) whose vibe best matches the offer's audience, price tier, and tone:
+RANK the 3 visual styles (by index) that best match the offer's audience, price tier, and tone — best first. All three must genuinely fit; the system will rotate among them for variety.
 ${menu}
 ${bias}
 
-CHOOSE the section order from this vocabulary — include ONLY sections the copy actually supports, in a smart persuasive order. Always start with "hero" and end with "cta-band":
+STRUCTURE the page as a real conversion funnel that moves the reader through TOFU → MOFU → BOFU:
+• TOFU (awareness — hook & agitate): hero, trust-bar, problem-pain, who-this-is-for
+• MOFU (consideration — prove & build desire): features-what-you-get, social-proof
+• BOFU (decision — offer & close): pricing-value-stack, guarantee, faq, scarcity, cta-band
+Order the chosen sections so they flow TOFU first, then MOFU, then BOFU. Always start with "hero" and end with "cta-band".
+
+CHOOSE the section order from this vocabulary — include ONLY sections the copy actually supports:
 trust-bar, problem-pain, who-this-is-for, features-what-you-get, social-proof, pricing-value-stack, guarantee, faq, scarcity
 
 Rules: include social-proof only if testimonials/results exist in the copy; guarantee only if a guarantee is mentioned; pricing-value-stack only if there's a price/offer; faq only if there are objections to answer. 5–9 sections total.
 
-Return ONLY JSON (no prose): {"styleIndex": <0-${STYLES.length - 1}>, "sections": ["hero", ...], "reason": "one short line"}
+Return ONLY JSON (no prose): {"styleShortlist": [<3 distinct indexes 0-${STYLES.length - 1}, best first>], "sections": ["hero", ...], "reason": "one short line"}
 
 MARKETING COPY:
 ${copy.slice(0, 4000)}`;
     const raw = await callAI(providerCfg, resolvedKey, model, analysisPrompt, 500);
     const j = parseModelJSON(raw);
-    if (Number.isInteger(j.styleIndex) && STYLES[j.styleIndex]) chosenStyle = STYLES[j.styleIndex];
+    let list = Array.isArray(j.styleShortlist) ? j.styleShortlist : (Number.isInteger(j.styleIndex) ? [j.styleIndex] : []);
+    styleShortlist = [...new Set(list)].filter(i => Number.isInteger(i) && STYLES[i]).map(i => STYLES[i]);
     if (Array.isArray(j.sections) && j.sections.length >= 3) {
       let secs = j.sections.filter(s => typeof s === 'string');
       if (isWebinar) {
@@ -2074,7 +2086,15 @@ ${copy.slice(0, 4000)}`;
     designReason = typeof j.reason === 'string' ? j.reason : '';
   } catch { /* fall back to random below */ }
 
-  const style  = chosenStyle || STYLES[Math.floor(Math.random() * STYLES.length)];
+  // Pick from the fitting shortlist: drop the previously-shown style when we can,
+  // then rotate by the seed so each regeneration lands on a different fitting look.
+  let pool = styleShortlist.length ? styleShortlist : STYLES;
+  if (avoidStyle && pool.length > 1) {
+    const filtered = pool.filter(s => s.name !== avoidStyle);
+    if (filtered.length) pool = filtered;
+  }
+  const rot = clientSeed ? Math.abs(String(clientSeed).split('').reduce((a, c) => a + c.charCodeAt(0), 0)) : Math.floor(Math.random() * 997);
+  const style = pool[rot % pool.length];
   const layout = chosenLayout || (isWebinar
     ? WEBINAR_LAYOUTS[Math.floor(Math.random() * WEBINAR_LAYOUTS.length)]
     : LAYOUTS[Math.floor(Math.random() * LAYOUTS.length)]);
@@ -2100,7 +2120,14 @@ Hero gradient: ${style.hero}
 
 ━━━ SECTION ORDER ━━━
 Build in this exact sequence: ${layout}
-${isWebinar ? `
+${!isWebinar ? `
+━━━ HIGH-CONVERTING FUNNEL FLOW (TOFU → MOFU → BOFU) ━━━
+This page is a conversion funnel, not a brochure. Write the copy and design so the reader is carried through three stages, in this order:
+• TOFU (Top — Awareness): the hero, trust-bar, problem-pain and who-this-is-for sections. GOAL: hook attention, name the reader's pain/desire, and make them feel "this is for me." Emotion and curiosity lead here.
+• MOFU (Middle — Consideration): the features-what-you-get and social-proof sections. GOAL: prove the solution works and build desire — mechanism, benefits, transformation, and real proof (testimonials, results, numbers).
+• BOFU (Bottom — Decision): the pricing-value-stack, guarantee, faq, scarcity and cta-band sections. GOAL: present the offer, stack the value, crush risk (guarantee), answer last objections (faq), add urgency (scarcity), and drive the final action.
+Each stage should hand off naturally to the next (agitate → prove → close). Escalate commitment as the reader moves down. Only the sections present in the SECTION ORDER above should appear.
+` : ''}${isWebinar ? `
 ━━━ WEBINAR REGISTRATION FUNNEL — REGISTRATION FORM REQUIRED ━━━
 This is a WEBINAR REGISTRATION page (opt-in funnel), NOT a sales page. Build it accordingly:
 Build ONLY the sections listed in the SECTION ORDER above — do not add sections that aren't listed, and don't skip any that are. Section guide:

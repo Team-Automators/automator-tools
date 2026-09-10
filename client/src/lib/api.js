@@ -390,12 +390,12 @@ export const api = {
   },
 
   // Streaming version for AI mode — returns { html, mode, style } when done
-  generateMockupStream({ copy, type, mode, copyLength, provider, apiKey, model }, { onChunk } = {}) {
+  generateMockupStream({ copy, type, mode, copyLength, provider, apiKey, model, avoidStyle }, { onChunk } = {}) {
     return new Promise((resolve, reject) => {
       fetch('/copywrite/mockup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ copy, type, mode, copyLength, provider, apiKey, model, seed: Date.now() }),
+        body: JSON.stringify({ copy, type, mode, copyLength, provider, apiKey, model, seed: Date.now(), avoidStyle }),
       }).then(async resp => {
         if (!resp.ok) {
           const j = await resp.json().catch(() => ({}))
