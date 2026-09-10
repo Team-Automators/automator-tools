@@ -2002,7 +2002,10 @@ router.post('/mockup', async (req, res) => {
   // short so the preview generates quickly.
   const WEBINAR_LAYOUTS = [
     'hero-with-registration-form → what-you-will-learn → presenter-bio → social-proof → final-cta-with-form',
-    'hero-with-registration-form → what-you-will-learn → social-proof → final-cta-with-form',
+    'hero-with-registration-form → countdown → what-you-will-learn → presenter-bio → final-cta-with-form',
+    'hero-with-registration-form → what-you-will-learn → agenda → presenter-bio → bonuses → final-cta-with-form',
+    'hero-with-registration-form → what-you-will-learn → social-proof → faq → final-cta-with-form',
+    'hero-with-registration-form → what-you-will-learn → final-cta-with-form',
   ];
 
   const isWebinar = type === 'webinar';
@@ -2015,13 +2018,29 @@ router.post('/mockup', async (req, res) => {
   // the best-matching visual style, and include only the sections the copy
   // actually supports (proof only if there are testimonials, guarantee only if
   // one is mentioned, etc.). One small fast call; falls back to random on any
-  // failure. Skipped for webinar (fixed lean reg-funnel, kept fast).
+  // failure. Runs for webinar too, with a registration-funnel vocabulary that
+  // always keeps the opt-in form.
   let chosenStyle = null, chosenLayout = null, designReason = '';
-  if (!isWebinar) {
-    try {
-      const menu = STYLES.map((s, i) => `${i}: ${s.name} — ${s.aesthetic.split('.')[0]}`).join('\n');
-      const bias = await designMem.biasText(req.locationId, req.userId).catch(() => '');
-      const analysisPrompt = `You are a conversion strategist. Analyze the marketing copy and DESIGN a funnel that fits it.
+  try {
+    const menu = STYLES.map((s, i) => `${i}: ${s.name} — ${s.aesthetic.split('.')[0]}`).join('\n');
+    const bias = await designMem.biasText(req.locationId, req.userId).catch(() => '');
+    const analysisPrompt = isWebinar
+      ? `You are a conversion strategist. Analyze the webinar copy and DESIGN a registration funnel that fits it.
+
+CHOOSE ONE visual style (by index) whose vibe best matches the webinar's audience, topic, and tone:
+${menu}
+${bias}
+
+CHOOSE the section order from this vocabulary — include ONLY sections the copy actually supports, in a smart persuasive order. ALWAYS start with "hero-with-registration-form" and ALWAYS end with "final-cta-with-form" (both contain the opt-in form and are mandatory):
+what-you-will-learn, presenter-bio, agenda, social-proof, bonuses, countdown, faq
+
+Rules: include social-proof only if testimonials/results are in the copy; presenter-bio only if a host/speaker is described; agenda only if the copy lays out a timeline/segments; bonuses only if free gifts/resources are promised to attendees; countdown only if there's a fixed date/deadline or urgency; faq only if there are objections to answer. Never include pricing or a value stack — a webinar registration is free. 4–7 sections total (including the two mandatory form sections).
+
+Return ONLY JSON (no prose): {"styleIndex": <0-${STYLES.length - 1}>, "sections": ["hero-with-registration-form", ...], "reason": "one short line"}
+
+WEBINAR COPY:
+${copy.slice(0, 4000)}`
+      : `You are a conversion strategist. Analyze the marketing copy and DESIGN a funnel that fits it.
 
 CHOOSE ONE visual style (by index) whose vibe best matches the offer's audience, price tier, and tone:
 ${menu}
@@ -2036,23 +2055,29 @@ Return ONLY JSON (no prose): {"styleIndex": <0-${STYLES.length - 1}>, "sections"
 
 MARKETING COPY:
 ${copy.slice(0, 4000)}`;
-      const raw = await callAI(providerCfg, resolvedKey, model, analysisPrompt, 500);
-      const j = parseModelJSON(raw);
-      if (Number.isInteger(j.styleIndex) && STYLES[j.styleIndex]) chosenStyle = STYLES[j.styleIndex];
-      if (Array.isArray(j.sections) && j.sections.length >= 4) {
-        let secs = j.sections.filter(s => typeof s === 'string');
+    const raw = await callAI(providerCfg, resolvedKey, model, analysisPrompt, 500);
+    const j = parseModelJSON(raw);
+    if (Number.isInteger(j.styleIndex) && STYLES[j.styleIndex]) chosenStyle = STYLES[j.styleIndex];
+    if (Array.isArray(j.sections) && j.sections.length >= 3) {
+      let secs = j.sections.filter(s => typeof s === 'string');
+      if (isWebinar) {
+        // Enforce the two mandatory form sections at the ends; drop any pricing the model slipped in.
+        const FORBID = new Set(['pricing-value-stack', 'pricing', 'value-stack', 'guarantee']);
+        secs = secs.filter(s => !FORBID.has(s) && s !== 'hero-with-registration-form' && s !== 'final-cta-with-form');
+        secs = ['hero-with-registration-form', ...secs, 'final-cta-with-form'];
+      } else {
         if (secs[0] !== 'hero') secs = ['hero', ...secs.filter(s => s !== 'hero')];
         if (secs[secs.length - 1] !== 'cta-band') secs = [...secs.filter(s => s !== 'cta-band'), 'cta-band'];
-        chosenLayout = secs.join(' → ');
       }
-      designReason = typeof j.reason === 'string' ? j.reason : '';
-    } catch { /* fall back to random below */ }
-  }
+      chosenLayout = secs.join(' → ');
+    }
+    designReason = typeof j.reason === 'string' ? j.reason : '';
+  } catch { /* fall back to random below */ }
 
   const style  = chosenStyle || STYLES[Math.floor(Math.random() * STYLES.length)];
-  const layout = isWebinar
+  const layout = chosenLayout || (isWebinar
     ? WEBINAR_LAYOUTS[Math.floor(Math.random() * WEBINAR_LAYOUTS.length)]
-    : (chosenLayout || LAYOUTS[Math.floor(Math.random() * LAYOUTS.length)]);
+    : LAYOUTS[Math.floor(Math.random() * LAYOUTS.length)]);
   const imgSeed = clientSeed ? String(clientSeed).slice(-6) : Math.random().toString(36).slice(2, 8);
   const genId   = clientSeed || Date.now();
   if (designReason) console.log(`[mockup] design fit: ${style.name} · ${designReason}`);
@@ -2078,12 +2103,16 @@ Build in this exact sequence: ${layout}
 ${isWebinar ? `
 ━━━ WEBINAR REGISTRATION FUNNEL — REGISTRATION FORM REQUIRED ━━━
 This is a WEBINAR REGISTRATION page (opt-in funnel), NOT a sales page. Build it accordingly:
-• HERO: transformation headline + subheadline, then the webinar DATE & TIME shown prominently, then a REGISTRATION FORM placed directly in the hero — a clean card (max-width 440px) containing a "First Name" text input and an "Email Address" input stacked vertically, and a large full-width submit button using the accent color (e.g. "Reserve My Free Spot"). Add a small "100% free · limited seats" reassurance under the button.
-• Include a COUNTDOWN / urgency element near the form (CSS only — static numbers styled as DD : HH : MM : SS boxes). No JavaScript.
-• WHAT YOU'LL LEARN: 3–5 curiosity bullets ("Secret #1: …"), each as its own row with a check/number marker.
-• PRESENTER BIO: presenter photo (https://picsum.photos/seed/${imgSeed}P/300/300), name, and a short authority paragraph.
-• AGENDA (if in layout): 3–4 timestamped points of what happens on the webinar.
-• Repeat the SAME registration form in the FINAL CTA section.
+Build ONLY the sections listed in the SECTION ORDER above — do not add sections that aren't listed, and don't skip any that are. Section guide:
+• hero-with-registration-form (always first): transformation headline + subheadline, then the webinar DATE & TIME shown prominently, then a REGISTRATION FORM placed directly in the hero — a clean card (max-width 440px) containing a "First Name" text input and an "Email Address" input stacked vertically, and a large full-width submit button using the accent color (e.g. "Reserve My Free Spot"). Add a small "100% free · limited seats" reassurance under the button.
+• countdown (only if listed): a CSS-only urgency element near the form — static numbers styled as DD : HH : MM : SS boxes. No JavaScript.
+• what-you-will-learn: 3–5 curiosity bullets ("Secret #1: …"), each as its own row with a check/number marker.
+• presenter-bio: presenter photo (https://picsum.photos/seed/${imgSeed}P/300/300), name, and a short authority paragraph.
+• agenda (only if listed): 3–4 timestamped points of what happens on the webinar.
+• bonuses (only if listed): 2–3 free attendee gifts/resources, each as a card with a short name + one-line benefit — framed as free for showing up live, never sold.
+• social-proof (only if listed): 2–3 testimonials/result quotes with a name and optional avatar (https://picsum.photos/seed/${imgSeed}T/80/80).
+• faq (only if listed): 3–5 objection-handling Q&A rows.
+• final-cta-with-form (always last): repeat the SAME registration form from the hero, with a final urgency headline.
 • Do NOT include pricing or a value stack — a webinar registration is FREE. Where a sales page would show pricing, instead reassure "It's 100% free to attend — just save your seat."
 • Style the form inputs cleanly: full width inside the card, padding ~12px, 1px borders, rounded 8px, readable labels/placeholders. The form is VISUAL ONLY — no JavaScript, no real submission, no action attribute needed.
 FORM BUTTON EXCEPTION: the registration form's submit button SHOULD be full-width inside its form card (this overrides the general 'CTA buttons never full-width' rule, which still applies to non-form buttons).
