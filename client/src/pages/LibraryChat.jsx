@@ -15,13 +15,13 @@ const STATUS_META = Object.fromEntries(STATUS_OPTS.map(s => [s.value, s]))
 
 function mockupEstimate(mode, type, copyLength) {
   if (mode !== 'ai') return null
-  let base = type === 'webinar' ? 45 : 30
-  if (copyLength === 'short') base = Math.round(base * 0.65)
+  // Webinar reg funnels generate lean/fast — don't quote a long ETA.
+  let base = type === 'webinar' ? 22 : (copyLength === 'short' ? Math.round(30 * 0.65) : 30)
   return { low: Math.max(8, Math.round(base * 0.6)), high: Math.round(base * 1.6) }
 }
 function mockupTargetChars(type, copyLength) {
-  if (copyLength === 'short') return 8000
-  return 14000
+  if (type === 'webinar') return 9000
+  return copyLength === 'short' ? 8000 : 14000
 }
 
 // The landing-page reply in a webinar conversation (not the intake/emails/pitch/offer).

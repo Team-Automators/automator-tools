@@ -1995,6 +1995,10 @@ router.post('/mockup', async (req, res) => {
   ];
 
   const isWebinar = type === 'webinar';
+  // A webinar registration funnel is inherently lean (hero+form, what-you'll-learn,
+  // presenter, proof, final CTA) — so generate it at "short" depth even when the
+  // user picked Long, so the preview isn't slow. Long only bulks up sales pages.
+  const depthLen = isWebinar ? 'short' : copyLength;
   const style  = STYLES[Math.floor(Math.random() * STYLES.length)];
   const layout = isWebinar
     ? WEBINAR_LAYOUTS[Math.floor(Math.random() * WEBINAR_LAYOUTS.length)]
@@ -2054,8 +2058,8 @@ SCARCITY: Bold urgency section before final CTA — contrasting background, larg
 FINAL CTA BAND: urgent full-width section, strong headline, primary CTA button, guarantee note.
 FOOTER: Do NOT generate a footer — it is automatically appended by the server. End with </body></html> immediately after the cta-band.
 
-━━━ COPY DEPTH: ${copyLength === 'short' ? 'SHORT-FORM (same structure as long — just concise text)' : 'LONG-FORM (rich & detailed)'} ━━━
-${copyLength === 'short' ? `Build the SAME sections in the SAME order as the SECTION ORDER above — do NOT drop or skip any section. Keep the full page structure (hero, features, social proof, and every other section in the layout: trust bar, problem/pain, who-this-is-for, pricing/value stack, guarantee, FAQ, scarcity, final CTA). The ONLY difference from a long page is the amount of text per section — keep every section tight, punchy, and scannable:
+━━━ COPY DEPTH: ${depthLen === 'short' ? 'SHORT-FORM (same structure as long — just concise text)' : 'LONG-FORM (rich & detailed)'} ━━━
+${depthLen === 'short' ? `Build the SAME sections in the SAME order as the SECTION ORDER above — do NOT drop or skip any section. Keep the full page structure (hero, features, social proof, and every other section in the layout: trust bar, problem/pain, who-this-is-for, pricing/value stack, guarantee, FAQ, scarcity, final CTA). The ONLY difference from a long page is the amount of text per section — keep every section tight, punchy, and scannable:
 • Hero: 6–10 word headline + ONE short subheadline (≤15 words) + 1 CTA button
 • Features: same count as the layout calls for, each = bold 2–4 word name + ONE short sentence (no multi-sentence descriptions)
 • Social proof: 2–3 testimonials, ONE short sentence each + name/role
@@ -2176,7 +2180,9 @@ ${copy.slice(0, 6000)}`;
 
     let rawHtml = '';
 
-    const maxTok = copyLength === 'short' ? 6500 : (isWebinar ? 14000 : 10000);
+    // Webinar reg funnels are lean → cap tokens low so they render fast. Long
+  // only raises the ceiling for full sales pages.
+  const maxTok = isWebinar ? 7000 : (copyLength === 'short' ? 6500 : 10000);
 
     if (providerCfg.type === 'anthropic') {
       const client = new Anthropic({ apiKey: resolvedKey });
