@@ -1466,7 +1466,10 @@ Return ONLY valid JSON (no prose, no code fences) in this exact shape:
     // exactly 3 options
   ]
 }
-Choose website pages appropriate to the business, offer, and goal (Home, About, Services/Products, Pricing, Testimonials/Case Studies, FAQ, Contact, Blog, Portfolio, etc.). Fit scores must differ and be honest.`
+HARD RULES:
+- These are WEBSITE pages, NOT funnel steps. NEVER use funnel names like "Opt-in", "VSL", "Calendar", "Application", "Thank You", "Upsell", "Order Form". Use real website pages: Home, About, Services, Products, Pricing, Portfolio, Case Studies, Testimonials, FAQ, Blog, Contact, Team, Careers, Gallery, Process, Locations, etc.
+- Every option's "pages" MUST be a SUPERSET of its "corePages" — include at least 2-3 optional add-on pages beyond the core so the user has real choices to add. 5-9 pages per option.
+- The THREE options must have genuinely DIFFERENT page sets and page counts (e.g. a lean 3-4 page site, a fuller 6-7 page marketing site, a content/SEO site with a blog + resources). Fit scores must differ and be honest.`
     : `You are a senior funnel architect. Given the offer below, propose THREE distinct funnel approaches to build it, ranked best-fit first.
 
 ${architectContext(req.body)}${memory}
