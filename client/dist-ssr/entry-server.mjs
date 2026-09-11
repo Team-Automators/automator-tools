@@ -783,7 +783,7 @@ function withPreload(factory) {
   Component.preload = factory;
   return Component;
 }
-const Dashboard = withPreload(() => import("./assets/Dashboard-Dwjws8MU.js"));
+const Dashboard = withPreload(() => import("./assets/Dashboard-COd4smff.js"));
 const CopywritersList = withPreload(() => import("./assets/CopywritersList-CkV70USI.js"));
 const CopywritersChat = withPreload(() => import("./assets/CopywritersChat-I5skgXay.js"));
 const Library = withPreload(() => import("./assets/Library-BiIltWSU.js"));
@@ -795,7 +795,7 @@ const Hooks = withPreload(() => import("./assets/Hooks-3dkCEcup.js"));
 const Workflows = withPreload(() => import("./assets/Workflows-D3oblaJ6.js"));
 const Archive = withPreload(() => import("./assets/Archive-BxVK8TGk.js"));
 const Analyzer = withPreload(() => import("./assets/Analyzer-CK5ufbtR.js"));
-const FunnelArchitect = withPreload(() => import("./assets/FunnelArchitect-Djz6Zz6E.js"));
+const FunnelArchitect = withPreload(() => import("./assets/FunnelArchitect-CiBVhwXd.js"));
 const Pipeline = withPreload(() => import("./assets/Pipeline-l5LmIG25.js"));
 const Admin = withPreload(() => import("./assets/Admin-uieHiv6y.js"));
 const prefetchByKey = {

@@ -147,6 +147,7 @@ function FunnelArchitect({ kind = "funnel" }) {
   const [pb, setPb] = useState(null);
   const [pbText, setPbText] = useState("");
   const [pbBusy, setPbBusy] = useState(false);
+  const [preview, setPreview] = useState(null);
   const notesFileRef = useRef(null);
   const ctx = { offer, price, traffic, goal };
   const aiArgs = () => ({ offer, pricePoint: price, traffic, goal, notes, kind, provider: config.provider, apiKey: config.apiKey, model: config.model });
@@ -326,6 +327,31 @@ function FunnelArchitect({ kind = "funnel" }) {
       notifyError(e.message || "Rewrite failed");
     } finally {
       setRewriting(false);
+    }
+  }
+  async function previewPage(p) {
+    if (!(config == null ? void 0 : config.apiKey)) {
+      notifyError("Connect an AI provider in Settings first");
+      return;
+    }
+    const copyText = [
+      p.headline,
+      p.subhead,
+      ...(p.bullets || []).map((b) => `• ${b}`),
+      p.button ? `Primary button: ${p.button}` : "",
+      p.testimonial ? `Testimonial: ${p.testimonial}` : ""
+    ].filter(Boolean).join("\n");
+    setPreview({ page: p.page, loading: true, chars: 0, html: null, error: null });
+    try {
+      const r = await api.generateMockupStream(
+        { copy: `${p.badge || p.page}
+
+${copyText}`, type: "sales-page", mode: "ai", copyLength: "short", provider: config.provider, apiKey: config.apiKey, model: config.model },
+        { onChunk: (c) => setPreview((pv) => pv ? { ...pv, chars: (pv.chars || 0) + c.length } : pv) }
+      );
+      setPreview((pv) => pv ? { ...pv, loading: false, html: (r == null ? void 0 : r.html) || null } : pv);
+    } catch (e) {
+      setPreview((pv) => pv ? { ...pv, loading: false, error: e.message || "Preview failed" } : pv);
     }
   }
   function copySheet() {
@@ -629,7 +655,8 @@ Price: ${price} · Traffic: ${traffic} · Goal: ${goal}` },
               /* @__PURE__ */ jsxs("div", { style: { display: "flex", gap: 8, alignItems: "center" }, children: [
                 /* @__PURE__ */ jsx("button", { className: "btn btn-ghost btn-sm", disabled: idx === 0, onClick: () => setCopyIdx(idx - 1), children: "‹ Prev" }),
                 /* @__PURE__ */ jsx("button", { className: "btn btn-ghost btn-sm", disabled: idx >= total - 1, onClick: () => setCopyIdx(idx + 1), children: "Next ›" }),
-                /* @__PURE__ */ jsx("button", { className: "btn btn-secondary btn-sm", onClick: rewriteCopy, disabled: rewriting, children: rewriting ? "Rewriting…" : "↻ Rewrite copy" })
+                /* @__PURE__ */ jsx("button", { className: "btn btn-secondary btn-sm", onClick: rewriteCopy, disabled: rewriting, children: rewriting ? "Rewriting…" : "↻ Rewrite copy" }),
+                /* @__PURE__ */ jsx("button", { className: "btn btn-primary btn-sm", onClick: () => previewPage(p), disabled: preview == null ? void 0 : preview.loading, children: (preview == null ? void 0 : preview.loading) && (preview == null ? void 0 : preview.page) === p.page ? "Rendering…" : "🖥 Preview page" })
               ] })
             ] }),
             /* @__PURE__ */ jsxs("div", { className: "card", style: { padding: 0, overflow: "hidden", marginBottom: 14, opacity: rewriting ? 0.55 : 1, transition: "opacity .15s" }, children: [
@@ -700,7 +727,41 @@ Price: ${price} · Traffic: ${traffic} · Goal: ${goal}` },
         /* @__PURE__ */ jsx("div", { className: "spinner" }),
         " Working…"
       ] })
-    ] })
+    ] }),
+    preview && /* @__PURE__ */ jsx(
+      "div",
+      {
+        onClick: () => setPreview(null),
+        style: { position: "fixed", inset: 0, background: "rgba(2,6,23,.55)", zIndex: 60, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 },
+        children: /* @__PURE__ */ jsxs(
+          "div",
+          {
+            onClick: (e) => e.stopPropagation(),
+            style: { background: "var(--card)", borderRadius: 14, width: "min(1040px, 96vw)", height: "min(88vh, 940px)", display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 24px 70px rgba(0,0,0,.45)" },
+            children: [
+              /* @__PURE__ */ jsxs("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, padding: "12px 16px", borderBottom: "1px solid var(--border)" }, children: [
+                /* @__PURE__ */ jsxs("div", { style: { fontWeight: 700 }, children: [
+                  preview.page,
+                  " ",
+                  /* @__PURE__ */ jsx("span", { style: { fontSize: ".76rem", color: "var(--sub)", fontWeight: 500 }, children: "· page preview" })
+                ] }),
+                /* @__PURE__ */ jsxs("div", { style: { display: "flex", gap: 10, alignItems: "center" }, children: [
+                  preview.loading && /* @__PURE__ */ jsxs("span", { style: { fontSize: ".78rem", color: "var(--sub)" }, children: [
+                    (preview.chars || 0).toLocaleString(),
+                    " chars…"
+                  ] }),
+                  /* @__PURE__ */ jsx("button", { className: "btn btn-ghost btn-sm", onClick: () => setPreview(null), children: "Close" })
+                ] })
+              ] }),
+              /* @__PURE__ */ jsx("div", { style: { flex: 1, minHeight: 0, background: "#fff" }, children: preview.error ? /* @__PURE__ */ jsx("div", { style: { padding: 24, color: "var(--danger)" }, children: preview.error }) : preview.loading && !preview.html ? /* @__PURE__ */ jsxs("div", { style: { height: "100%", display: "flex", flexDirection: "column", gap: 12, alignItems: "center", justifyContent: "center", color: "var(--sub)" }, children: [
+                /* @__PURE__ */ jsx("div", { className: "spinner" }),
+                " Rendering the page…"
+              ] }) : /* @__PURE__ */ jsx("iframe", { title: "page preview", srcDoc: preview.html || "", style: { width: "100%", height: "100%", border: "none" }, sandbox: "allow-same-origin" }) })
+            ]
+          }
+        )
+      }
+    )
   ] });
 }
 function Stepper({ stage }) {

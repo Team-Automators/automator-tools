@@ -161,6 +161,7 @@ export default function FunnelArchitect({ kind = 'funnel' }) {
   const [pb, setPb]           = useState(null)     // { playbook, count, examples }
   const [pbText, setPbText]   = useState('')
   const [pbBusy, setPbBusy]   = useState(false)
+  const [preview, setPreview] = useState(null)   // { page, loading, chars, html, error }
   const notesFileRef = useRef(null)
 
   const ctx = { offer, price, traffic, goal }
@@ -308,6 +309,27 @@ export default function FunnelArchitect({ kind = 'funnel' }) {
         notifySuccess('Page copy rewritten')
       }
     } catch (e) { notifyError(e.message || 'Rewrite failed') } finally { setRewriting(false) }
+  }
+
+  // Render a real visual mockup of one page from its copy (reuses the mockup engine).
+  async function previewPage(p) {
+    if (!config?.apiKey) { notifyError('Connect an AI provider in Settings first'); return }
+    const copyText = [
+      p.headline, p.subhead,
+      ...(p.bullets || []).map(b => `• ${b}`),
+      p.button ? `Primary button: ${p.button}` : '',
+      p.testimonial ? `Testimonial: ${p.testimonial}` : '',
+    ].filter(Boolean).join('\n')
+    setPreview({ page: p.page, loading: true, chars: 0, html: null, error: null })
+    try {
+      const r = await api.generateMockupStream(
+        { copy: `${p.badge || p.page}\n\n${copyText}`, type: 'sales-page', mode: 'ai', copyLength: 'short', provider: config.provider, apiKey: config.apiKey, model: config.model },
+        { onChunk: (c) => setPreview(pv => pv ? { ...pv, chars: (pv.chars || 0) + c.length } : pv) },
+      )
+      setPreview(pv => pv ? { ...pv, loading: false, html: r?.html || null } : pv)
+    } catch (e) {
+      setPreview(pv => pv ? { ...pv, loading: false, error: e.message || 'Preview failed' } : pv)
+    }
   }
 
   function copySheet() {
@@ -603,6 +625,9 @@ export default function FunnelArchitect({ kind = 'funnel' }) {
                       <button className="btn btn-secondary btn-sm" onClick={rewriteCopy} disabled={rewriting}>
                         {rewriting ? 'Rewriting…' : '↻ Rewrite copy'}
                       </button>
+                      <button className="btn btn-primary btn-sm" onClick={() => previewPage(p)} disabled={preview?.loading}>
+                        {preview?.loading && preview?.page === p.page ? 'Rendering…' : '🖥 Preview page'}
+                      </button>
                     </div>
                   </div>
 
@@ -696,6 +721,34 @@ export default function FunnelArchitect({ kind = 'funnel' }) {
           </div>
         )}
       </div>
+
+      {/* Per-page visual preview */}
+      {preview && (
+        <div onClick={() => setPreview(null)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(2,6,23,.55)', zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <div onClick={e => e.stopPropagation()}
+            style={{ background: 'var(--card)', borderRadius: 14, width: 'min(1040px, 96vw)', height: 'min(88vh, 940px)', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 24px 70px rgba(0,0,0,.45)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
+              <div style={{ fontWeight: 700 }}>{preview.page} <span style={{ fontSize: '.76rem', color: 'var(--sub)', fontWeight: 500 }}>· page preview</span></div>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                {preview.loading && <span style={{ fontSize: '.78rem', color: 'var(--sub)' }}>{(preview.chars || 0).toLocaleString()} chars…</span>}
+                <button className="btn btn-ghost btn-sm" onClick={() => setPreview(null)}>Close</button>
+              </div>
+            </div>
+            <div style={{ flex: 1, minHeight: 0, background: '#fff' }}>
+              {preview.error ? (
+                <div style={{ padding: 24, color: 'var(--danger)' }}>{preview.error}</div>
+              ) : preview.loading && !preview.html ? (
+                <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center', justifyContent: 'center', color: 'var(--sub)' }}>
+                  <div className="spinner" /> Rendering the page…
+                </div>
+              ) : (
+                <iframe title="page preview" srcDoc={preview.html || ''} style={{ width: '100%', height: '100%', border: 'none' }} sandbox="allow-same-origin" />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }

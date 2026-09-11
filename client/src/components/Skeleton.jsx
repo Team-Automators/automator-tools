@@ -11,7 +11,7 @@ export function SkeletonStats({ count = 4 }) {
   return (
     <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
       {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="card p-[18px]">
+        <div key={i} className="card p-4.5">
           <Skeleton w="40%" h={12} />
           <Skeleton w="60%" h={26} style={{ marginTop: 12 }} />
         </div>
@@ -25,7 +25,7 @@ export function SkeletonList({ rows = 5 }) {
   return (
     <div className="flex flex-col gap-2.5">
       {Array.from({ length: rows }).map((_, i) => (
-        <div key={i} className="card flex items-center gap-3.5 px-[18px] py-4">
+        <div key={i} className="card flex items-center gap-3.5 px-4.5 py-4">
           <Skeleton w={38} h={38} r={10} />
           <div className="min-w-0 flex-1">
             <Skeleton w="45%" h={13} />
