@@ -188,7 +188,12 @@ export default function Layout() {
         </nav>
 
         <div className="sb-ai-status">
-          {config?.apiKey ? (
+          {/* While config loads (and during SSR, where localStorage isn't visible)
+              show a neutral chip so the server and first client render match —
+              only after it resolves do we show the real Active / not-configured state. */}
+          {configLoading ? (
+            <span className="chip" style={{ fontSize: '.72rem' }}>AI …</span>
+          ) : config?.apiKey ? (
             <span className="chip chip-green" style={{ fontSize: '.72rem', gap: 5 }}>
               <svg width="7" height="7" viewBox="0 0 8 8"><circle cx="4" cy="4" r="4" fill="currentColor"/></svg>
               AI Active

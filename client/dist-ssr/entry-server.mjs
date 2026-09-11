@@ -1,8 +1,11 @@
+var __defProp = Object.defineProperty;
+var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
+var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
 import { jsxs, jsx, Fragment } from "react/jsx-runtime";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { renderToPipeableStream } from "react-dom/server";
 import { StaticRouter } from "react-router-dom/server.mjs";
-import { useEffect, useState, useCallback, useRef, lazy, Suspense } from "react";
+import React, { useEffect, useState, useCallback, useRef, lazy, Suspense } from "react";
 import { useSearchParams, useNavigate, useLocation, NavLink, Outlet, Routes, Route, Navigate, useParams } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
 let resolver = null;
@@ -1022,7 +1025,7 @@ function Layout() {
           item.key
         ))
       ] }),
-      /* @__PURE__ */ jsx("div", { className: "sb-ai-status", children: (config == null ? void 0 : config.apiKey) ? /* @__PURE__ */ jsxs("span", { className: "chip chip-green", style: { fontSize: ".72rem", gap: 5 }, children: [
+      /* @__PURE__ */ jsx("div", { className: "sb-ai-status", children: configLoading ? /* @__PURE__ */ jsx("span", { className: "chip", style: { fontSize: ".72rem" }, children: "AI …" }) : (config == null ? void 0 : config.apiKey) ? /* @__PURE__ */ jsxs("span", { className: "chip chip-green", style: { fontSize: ".72rem", gap: 5 }, children: [
         /* @__PURE__ */ jsx("svg", { width: "7", height: "7", viewBox: "0 0 8 8", children: /* @__PURE__ */ jsx("circle", { cx: "4", cy: "4", r: "4", fill: "currentColor" }) }),
         "AI Active"
       ] }) : /* @__PURE__ */ jsx("span", { className: "chip chip-red", style: { fontSize: ".72rem" }, children: "AI not configured" }) }),
@@ -1085,6 +1088,40 @@ function Layout() {
       item.key
     )) })
   ] });
+}
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    __publicField(this, "handleReload", () => {
+      try {
+        window.location.reload();
+      } catch {
+      }
+    });
+    this.state = { error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+  componentDidCatch(error, info) {
+    console.error("[app] render error:", error, info == null ? void 0 : info.componentStack);
+  }
+  render() {
+    if (!this.state.error) return this.props.children;
+    return /* @__PURE__ */ jsx("div", { style: { minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, background: "var(--bg, #0F172A)", color: "var(--text, #F1F5F9)" }, children: /* @__PURE__ */ jsxs("div", { style: { maxWidth: 460, textAlign: "center" }, children: [
+      /* @__PURE__ */ jsx("div", { style: { fontSize: "2.5rem", marginBottom: 8 }, children: "⚠️" }),
+      /* @__PURE__ */ jsx("h1", { style: { fontSize: "1.25rem", margin: "0 0 8px" }, children: "Something went wrong" }),
+      /* @__PURE__ */ jsx("p", { style: { opacity: 0.75, fontSize: ".95rem", lineHeight: 1.5, margin: "0 0 20px" }, children: "This page hit an unexpected error. Reloading usually fixes it — your saved work isn’t affected." }),
+      /* @__PURE__ */ jsx(
+        "button",
+        {
+          onClick: this.handleReload,
+          style: { background: "var(--accent, #6366F1)", color: "#fff", border: "none", borderRadius: 8, padding: "10px 22px", fontSize: ".95rem", fontWeight: 600, cursor: "pointer" },
+          children: "Reload"
+        }
+      )
+    ] }) });
+  }
 }
 function Login() {
   const navigate = useNavigate();
@@ -1375,7 +1412,7 @@ function App() {
   if (booting) return Loading;
   return /* @__PURE__ */ jsxs(Fragment, { children: [
     /* @__PURE__ */ jsx(ToastContainer, { position: "bottom-right", autoClose: 3e3, newestOnTop: true, theme: "colored", pauseOnFocusLoss: false }),
-    /* @__PURE__ */ jsx(Suspense, { fallback: Loading, children: /* @__PURE__ */ jsxs(Routes, { children: [
+    /* @__PURE__ */ jsx(ErrorBoundary, { children: /* @__PURE__ */ jsx(Suspense, { fallback: Loading, children: /* @__PURE__ */ jsxs(Routes, { children: [
       /* @__PURE__ */ jsx(Route, { path: "login", element: /* @__PURE__ */ jsx(Login, {}) }),
       /* @__PURE__ */ jsx(Route, { path: "admin", element: /* @__PURE__ */ jsx(Admin, {}) }),
       /* @__PURE__ */ jsxs(Route, { element: /* @__PURE__ */ jsx(RequireLocation, { children: /* @__PURE__ */ jsx(Layout, {}) }), children: [
@@ -1396,7 +1433,7 @@ function App() {
         /* @__PURE__ */ jsx(Route, { path: "settings", element: /* @__PURE__ */ jsx(Settings, {}) }),
         /* @__PURE__ */ jsx(Route, { path: "*", element: /* @__PURE__ */ jsx(Navigate, { to: "/", replace: true }) })
       ] })
-    ] }) })
+    ] }) }) })
   ] });
 }
 const als = new AsyncLocalStorage();

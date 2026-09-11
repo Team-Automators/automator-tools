@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useState } from 'react'
 import { Routes, Route, Navigate, useParams } from 'react-router-dom'
 import { ToastContainer } from 'react-toastify'
 import Layout from './components/Layout.jsx'
+import ErrorBoundary from './components/ErrorBoundary.jsx'
 import Login from './pages/Login.jsx'
 import { getLocationId, persistLocationId } from './lib/api.js'
 import { getSessionToken, setSessionToken, getSessionClaims, reauth } from './lib/session.js'
@@ -117,6 +118,7 @@ export default function App() {
   return (
     <>
       <ToastContainer position="bottom-right" autoClose={3000} newestOnTop theme="colored" pauseOnFocusLoss={false} />
+      <ErrorBoundary>
       <Suspense fallback={Loading}>
       <Routes>
       <Route path="login" element={<Login />} />
@@ -141,6 +143,7 @@ export default function App() {
       </Route>
     </Routes>
     </Suspense>
+    </ErrorBoundary>
     </>
   )
 }

@@ -2,6 +2,10 @@ require('dotenv').config();
 const express = require('express');
 const path    = require('path');
 
+// Default timeout for every raw axios call (GHL REST, OAuth, PIT flows) so none
+// can hang the serverless function. Per-call/per-instance timeouts still win.
+require('axios').defaults.timeout = 30000;
+
 const actionRouter      = require('./routes/action');
 const installRouter     = require('./routes/install');
 const verifyRouter      = require('./routes/verify');
