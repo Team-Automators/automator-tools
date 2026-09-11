@@ -6,6 +6,15 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        // Keep the rarely-changing framework code in its own long-cached chunk,
+        // separate from app code, so app-only deploys don't force a vendor re-download.
+        manualChunks: {
+          vendor: ['react', 'react-dom', 'react-router-dom', 'react-toastify'],
+        },
+      },
+    },
   },
   server: {
     port: 5173,

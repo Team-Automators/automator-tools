@@ -1,25 +1,29 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { Routes, Route, Navigate, useParams } from 'react-router-dom'
 import { ToastContainer } from 'react-toastify'
 import Layout from './components/Layout.jsx'
-import Dashboard from './pages/Dashboard.jsx'
-import CopywritersList from './pages/CopywritersList.jsx'
-import CopywritersChat from './pages/CopywritersChat.jsx'
-import Library from './pages/Library.jsx'
-import CustomerDetail from './pages/CustomerDetail.jsx'
-import LibraryChat from './pages/LibraryChat.jsx'
-import Settings from './pages/Settings.jsx'
-import Tasks from './pages/Tasks.jsx'
-import Hooks from './pages/Hooks.jsx'
-import Workflows from './pages/Workflows.jsx'
-import Archive from './pages/Archive.jsx'
-import Analyzer from './pages/Analyzer.jsx'
-import FunnelArchitect from './pages/FunnelArchitect.jsx'
-import Pipeline from './pages/Pipeline.jsx'
-import Admin from './pages/Admin.jsx'
 import Login from './pages/Login.jsx'
 import { getLocationId, persistLocationId } from './lib/api.js'
 import { getSessionToken, setSessionToken, getSessionClaims, reauth } from './lib/session.js'
+
+// Route-level code splitting: each page ships as its own chunk that loads only
+// when its route is visited, so the initial bundle stays small and the app
+// paints fast. Layout + Login are eager (they're on the critical first paint).
+const Dashboard       = lazy(() => import('./pages/Dashboard.jsx'))
+const CopywritersList = lazy(() => import('./pages/CopywritersList.jsx'))
+const CopywritersChat = lazy(() => import('./pages/CopywritersChat.jsx'))
+const Library         = lazy(() => import('./pages/Library.jsx'))
+const CustomerDetail  = lazy(() => import('./pages/CustomerDetail.jsx'))
+const LibraryChat     = lazy(() => import('./pages/LibraryChat.jsx'))
+const Settings        = lazy(() => import('./pages/Settings.jsx'))
+const Tasks           = lazy(() => import('./pages/Tasks.jsx'))
+const Hooks           = lazy(() => import('./pages/Hooks.jsx'))
+const Workflows       = lazy(() => import('./pages/Workflows.jsx'))
+const Archive         = lazy(() => import('./pages/Archive.jsx'))
+const Analyzer        = lazy(() => import('./pages/Analyzer.jsx'))
+const FunnelArchitect = lazy(() => import('./pages/FunnelArchitect.jsx'))
+const Pipeline        = lazy(() => import('./pages/Pipeline.jsx'))
+const Admin           = lazy(() => import('./pages/Admin.jsx'))
 
 function hasAIConfig() {
   try { return !!JSON.parse(localStorage.getItem('ghl_ai_config'))?.apiKey } catch { return false }
@@ -89,17 +93,18 @@ export default function App() {
     return () => { clearInterval(id); document.removeEventListener('visibilitychange', onVis) }
   }, [])
 
-  if (booting) {
-    return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
-        <div className="spinner" />
-      </div>
-    )
-  }
+  const Loading = (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
+      <div className="spinner" />
+    </div>
+  )
+
+  if (booting) return Loading
 
   return (
     <>
       <ToastContainer position="bottom-right" autoClose={3000} newestOnTop theme="colored" pauseOnFocusLoss={false} />
+      <Suspense fallback={Loading}>
       <Routes>
       <Route path="login" element={<Login />} />
       <Route path="admin" element={<Admin />} />
@@ -122,6 +127,7 @@ export default function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
+    </Suspense>
     </>
   )
 }

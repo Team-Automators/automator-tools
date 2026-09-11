@@ -65,11 +65,25 @@ app.use('/api/admin',     requireLocation, adminRouter);
 app.use('/api',           requireLocation, apiCopyRouter);
 
 // ── React SPA (serve built client) ────────────────────────────────────────────
+// Every request (assets included) is routed through this serverless function —
+// there's no CDN in front — so set caching explicitly. The build's /assets/ files
+// are content-hashed and immutable → cache them for a year so repeat loads never
+// re-fetch them. index.html and the service worker must stay fresh so new deploys
+// propagate, so they're marked no-cache.
 const clientDist = path.join(__dirname, 'client', 'dist');
-app.use(express.static(clientDist));
+app.use(express.static(clientDist, {
+  setHeaders(res, filePath) {
+    if (filePath.includes(`${path.sep}assets${path.sep}`)) {
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    } else if (/(?:index\.html|sw\.js)$/.test(filePath)) {
+      res.setHeader('Cache-Control', 'no-cache');
+    }
+  },
+}));
 
 // SPA catch-all — any path not matched above serves the React app
 app.get('*', (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache');
   res.sendFile(path.join(clientDist, 'index.html'));
 });
 
