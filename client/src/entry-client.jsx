@@ -49,5 +49,8 @@ if (rootEl.hasChildNodes()) {
   createRoot(rootEl).render(app)
 }
 
-// First render used the server-injected auth; from here on, read localStorage.
-clearSsrState()
+// The hydration render must read the SAME server-injected auth the server used,
+// or React discards the server HTML and remounts (a visible flash). Hydration is
+// deferred, so clear the injected state only AFTER it has committed — from then
+// on the auth libs read localStorage.
+requestAnimationFrame(() => requestAnimationFrame(clearSsrState))
