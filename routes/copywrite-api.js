@@ -2054,13 +2054,13 @@ ${bias}
 STRUCTURE the page as a real conversion funnel that moves the reader through TOFU → MOFU → BOFU:
 • TOFU (awareness — hook & agitate): hero, trust-bar, problem-pain, who-this-is-for
 • MOFU (consideration — prove & build desire): features-what-you-get, social-proof
-• BOFU (decision — offer & close): pricing-value-stack, guarantee, faq, scarcity, cta-band
+• BOFU (decision — offer & close): pricing-value-stack OR pricing-tiers, guarantee, faq, scarcity, cta-band
 Order the chosen sections so they flow TOFU first, then MOFU, then BOFU. Always start with "hero" and end with "cta-band".
 
 CHOOSE the section order from this vocabulary — include ONLY sections the copy actually supports:
-trust-bar, problem-pain, who-this-is-for, features-what-you-get, social-proof, pricing-value-stack, guarantee, faq, scarcity
+trust-bar, problem-pain, who-this-is-for, features-what-you-get, social-proof, pricing-value-stack, pricing-tiers, guarantee, faq, scarcity
 
-Rules: include social-proof only if testimonials/results exist in the copy; guarantee only if a guarantee is mentioned; pricing-value-stack only if there's a price/offer; faq only if there are objections to answer. 5–9 sections total.
+Rules: include social-proof only if testimonials/results exist in the copy; guarantee only if a guarantee is mentioned; faq only if there are objections to answer. For the offer, pick EXACTLY ONE pricing section (never both): use "pricing-tiers" when the copy describes multiple plans/packages/tiers (e.g. Basic/Pro/Premium), otherwise use "pricing-value-stack" for a single offer — and omit both if there is no price/offer. 5–9 sections total.
 
 Return ONLY JSON (no prose): {"styleShortlist": [<3 distinct indexes 0-${STYLES.length - 1}, best first>], "sections": ["hero", ...], "reason": "one short line"}
 
@@ -2078,6 +2078,8 @@ ${copy.slice(0, 4000)}`;
         secs = secs.filter(s => !FORBID.has(s) && s !== 'hero-with-registration-form' && s !== 'final-cta-with-form');
         secs = ['hero-with-registration-form', ...secs, 'final-cta-with-form'];
       } else {
+        // Only one pricing section — if the model returned both, keep pricing-tiers (the richer one).
+        if (secs.includes('pricing-tiers')) secs = secs.filter(s => s !== 'pricing-value-stack');
         if (secs[0] !== 'hero') secs = ['hero', ...secs.filter(s => s !== 'hero')];
         if (secs[secs.length - 1] !== 'cta-band') secs = [...secs.filter(s => s !== 'cta-band'), 'cta-band'];
       }
@@ -2137,7 +2139,7 @@ Build ONLY the sections listed in the SECTION ORDER above — do not add section
 • presenter-bio: presenter photo (https://picsum.photos/seed/${imgSeed}P/300/300), name, and a short authority paragraph.
 • agenda (only if listed): 3–4 timestamped points of what happens on the webinar.
 • bonuses (only if listed): 2–3 free attendee gifts/resources, each as a card with a short name + one-line benefit — framed as free for showing up live, never sold.
-• social-proof (only if listed): 2–3 testimonials/result quotes with a name and optional avatar (https://picsum.photos/seed/${imgSeed}T/80/80).
+• social-proof (only if listed): testimonials/result quotes with a name and optional avatar (https://picsum.photos/seed/${imgSeed}T/80/80). Use 2–3 as a static row; if 4+ are available, use the swipeable CSS carousel described in the SOCIAL PROOF pattern below (no JavaScript).
 • faq (only if listed): 3–5 objection-handling Q&A rows.
 • final-cta-with-form (always last): repeat the SAME registration form from the hero, with a final urgency headline.
 • Do NOT include pricing or a value stack — a webinar registration is FREE. Where a sales page would show pricing, instead reassure "It's 100% free to attend — just save your seat."
@@ -2152,9 +2154,12 @@ HERO — ${style.structure.hero}
 FEATURES/WHAT YOU GET — ${style.structure.features}
 
 SOCIAL PROOF — ${style.structure.proof}
+CAROUSEL OPTION: when there are 4 OR MORE testimonials, present them as a horizontal swipeable carousel instead of a static grid — a flex row in a container with overflow-x:auto, scroll-snap-type:x mandatory, and each card scroll-snap-align:center flex:0 0 ~320px; hide the scrollbar and add a subtle "‹ swipe ›" hint below. Pure CSS scroll-snap only — NO JavaScript. With 3 or fewer testimonials, keep the static layout described above.
 
 PRICING/VALUE STACK — ${style.structure.pricing}
 Standard content: urgency strip at top, each item with crossed-out value, "Total Value: $X,XXX", "Only $XXX" in large text.
+
+PRICING TIERS (if in layout — use INSTEAD of value stack when the copy has multiple plans): a 3-COLUMN comparison of plans/tiers as cards in a responsive grid (stack to 1 column under 768px). Each card has: the tier name, the price (and billing period), a short one-line positioning ("Best for…"), and a DIFFERENT feature checklist per tier (lower tiers list fewer ✓ items; higher tiers add more — show what each unlocks), then its own CTA button. Highlight the MIDDLE tier as the recommended plan — lift it slightly (scale/shadow/accent border) with a "Most Popular" ribbon in the accent color. Use ONLY plan names, prices, and features found in the copy; if the copy names fewer than 3 tiers, build a sensible Basic / Pro / Premium ladder from the offer. CTA buttons here follow their tier card width but must not exceed the card.
 
 SECTION TRANSITIONS — ${style.structure.dividers}
 
