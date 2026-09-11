@@ -1367,7 +1367,8 @@ router.post('/architect/from-notes', async (req, res) => {
   if (!providerCfg) return res.status(400).json({ error: `Unknown provider: ${provider}` });
   const model = reqModel || providerCfg.defaultModel;
 
-  const prompt = `Read these meeting notes / call summary and extract the inputs needed to architect a funnel. Return ONLY valid JSON (no prose, no code fences):
+  const isWebsite = req.body.kind === 'website';
+  const prompt = `Read these meeting notes / call summary and extract the inputs needed to architect a ${isWebsite ? 'website' : 'funnel'}. Return ONLY valid JSON (no prose, no code fences):
 {
   "offer": "a crisp 1-3 sentence description: what they sell, who it's for, and the core promise/result",
   "pricePoint": one of ${JSON.stringify(ARCH_PRICE)},
@@ -1440,8 +1441,33 @@ router.post('/architect/options', async (req, res) => {
   if (!providerCfg) return res.status(400).json({ error: `Unknown provider: ${provider}` });
   const model = reqModel || providerCfg.defaultModel;
 
+  const isWebsite = req.body.kind === 'website';
   const memory = await architectMemoryBlock(req.locationId, req.userId);
-  const prompt = `You are a senior funnel architect. Given the offer below, propose THREE distinct funnel approaches to build it, ranked best-fit first.
+  const prompt = isWebsite
+    ? `You are a senior web designer & conversion strategist. Given the business/offer below, propose THREE distinct WEBSITE STRUCTURES to build it, ranked best-fit first (e.g. a lean conversion site, a content/SEO-led site, a one-page site).
+
+${architectContext(req.body)}${memory}
+
+Return ONLY valid JSON (no prose, no code fences) in this exact shape:
+{
+  "options": [
+    {
+      "id": "conversion-site",
+      "badge": "Best Fit",                    // "Best Fit", "Option 2", "Option 3"
+      "name": "Lean Conversion Website",
+      "tagline": "TRUST THEN CONVERT",         // 2-3 word ALL-CAPS strategy
+      "fit": 94,                               // 0-100 fit score for THIS business
+      "description": "1-2 sentences on why/when this structure works for this business.",
+      "mvpFlow": ["Home", "Services", "Contact"],                 // core pages in nav order
+      "pages": ["Home","About","Services","Pricing","Testimonials","FAQ","Contact","Blog"], // all relevant pages (core + add-ons)
+      "corePages": ["Home","Services","Contact"],                 // which of pages are essential (rest are add-ons)
+      "watchOut": "1 sentence on the main risk/failure mode of this structure for this business."
+    }
+    // exactly 3 options
+  ]
+}
+Choose website pages appropriate to the business, offer, and goal (Home, About, Services/Products, Pricing, Testimonials/Case Studies, FAQ, Contact, Blog, Portfolio, etc.). Fit scores must differ and be honest.`
+    : `You are a senior funnel architect. Given the offer below, propose THREE distinct funnel approaches to build it, ranked best-fit first.
 
 ${architectContext(req.body)}${memory}
 
@@ -1485,10 +1511,51 @@ router.post('/architect/build', async (req, res) => {
   const providerCfg = PROVIDER_MAP[provider];
   if (!providerCfg) return res.status(400).json({ error: `Unknown provider: ${provider}` });
   const model = reqModel || providerCfg.defaultModel;
-  const pageList = Array.isArray(pages) && pages.length ? pages : ['Opt-in', 'Calendar', 'Thank You'];
+  const isWebsite = req.body.kind === 'website';
+  const pageList = Array.isArray(pages) && pages.length ? pages : (isWebsite ? ['Home', 'Services', 'Contact'] : ['Opt-in', 'Calendar', 'Thank You']);
 
   const memory = await architectMemoryBlock(req.locationId, req.userId);
-  const prompt = `You are a senior funnel architect building in GoHighLevel. Produce the COMPLETE build sheet for the "${funnelName}" using ONLY these pages, in this order: ${pageList.join(' → ')}.
+  const prompt = isWebsite
+    ? `You are a senior web strategist & direct-response copywriter. Produce the COMPLETE build sheet for the website "${funnelName}" using ONLY these pages, in this navigation order: ${pageList.join(' → ')}.
+
+${architectContext(req.body)}${memory}
+
+Return ONLY valid JSON (no prose, no code fences) in this exact shape:
+{
+  "funnelName": "${funnelName}",
+  "flow": "${pageList.join(' → ')}",
+  "watchOut": "the single biggest risk for this website",
+  "journey": [
+    {
+      "page": "Home",
+      "mindset": "what the visitor is thinking/feeling on this page (1-2 sentences, first person)",
+      "pageJob": "the ONE job this page does",
+      "mustHave": ["3-6 concrete sections/elements this page must include"],
+      "button": "the primary CTA button label on this page",
+      "dropOff": "why visitors leave this page without acting"
+    }
+    // one entry per page, in nav order
+  ],
+  "pageCopy": [
+    {
+      "page": "Home",
+      "badge": "01 · HOME",
+      "headline": "the actual hero headline",
+      "subhead": "the actual hero subhead",
+      "bullets": ["3-5 section/benefit lines written as real copy"],
+      "formFields": [],
+      "button": "primary CTA label",
+      "testimonial": "one short proof line in quotes (or empty string)"
+    }
+    // one per page, in nav order
+  ],
+  "workflows": [],
+  "tagsToCreate": [],
+  "customFields": [],
+  "pipelineStages": []
+}
+This is a WEBSITE, not a funnel — there is NO marketing automation. Leave workflows, tagsToCreate, customFields, and pipelineStages as empty arrays. Make every line specific to THIS business — real headlines, real sections. No placeholders.`
+    : `You are a senior funnel architect building in GoHighLevel. Produce the COMPLETE build sheet for the "${funnelName}" using ONLY these pages, in this order: ${pageList.join(' → ')}.
 
 ${architectContext(req.body)}${memory}
 
@@ -1562,10 +1629,11 @@ router.post('/architect/page-copy', async (req, res) => {
   const providerCfg = PROVIDER_MAP[provider];
   if (!providerCfg) return res.status(400).json({ error: `Unknown provider: ${provider}` });
   const model = reqModel || providerCfg.defaultModel;
-  const pageList = Array.isArray(pages) && pages.length ? pages : ['Opt-in', 'Calendar', 'Thank You'];
+  const isWebsite = req.body.kind === 'website';
+  const pageList = Array.isArray(pages) && pages.length ? pages : (isWebsite ? ['Home', 'Services', 'Contact'] : ['Opt-in', 'Calendar', 'Thank You']);
 
   const memory = await architectMemoryBlock(req.locationId, req.userId);
-  const prompt = `You are a direct-response copywriter. Write the actual on-page copy for each page of the "${funnelName || 'funnel'}" (${pageList.join(' → ')}).
+  const prompt = `You are a direct-response copywriter. Write the actual on-page copy for each page of the ${isWebsite ? 'website' : 'funnel'} "${funnelName || (isWebsite ? 'website' : 'funnel')}" (${pageList.join(' → ')}).
 
 ${architectContext(req.body)}${memory}
 

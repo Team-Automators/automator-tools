@@ -34,6 +34,7 @@ export const prefetchByKey = {
   copywriters: () => { CopywritersList.preload(); CopywritersChat.preload() },
   library:     () => { Library.preload(); CustomerDetail.preload(); LibraryChat.preload() },
   architect:   () => FunnelArchitect.preload(),
+  website:     () => FunnelArchitect.preload(),
   hooks:       () => Hooks.preload(),
   tasks:       () => Tasks.preload(),
   pipeline:    () => Pipeline.preload(),

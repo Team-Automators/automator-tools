@@ -41,9 +41,9 @@ function Flow({ pages }) {
 }
 
 // Plain-text build sheet (Copy) + printable HTML (Download PDF).
-function buildToText(ctx, b) {
+function buildToText(ctx, b, isWeb) {
   const L = []
-  L.push(`FUNNEL BUILD SHEET`, b.funnelName || '', b.flow || '', '')
+  L.push(`${isWeb ? 'WEBSITE' : 'FUNNEL'} BUILD SHEET`, b.funnelName || '', b.flow || '', '')
   L.push(`OFFER: ${ctx.offer}`)
   L.push(`PRICE POINT: ${ctx.price}`, `TRAFFIC: ${ctx.traffic}`, `GOAL: ${ctx.goal}`)
   if (b.watchOut) L.push(`WATCH OUT: ${b.watchOut}`)
@@ -68,7 +68,7 @@ function buildToText(ctx, b) {
       if (p.testimonial) L.push(`   ${p.testimonial}`)
     })
   }
-  L.push('', '== GHL AUTOMATION MAP ==')
+  if ((b.workflows || []).length) L.push('', '== GHL AUTOMATION MAP ==')
   ;(b.workflows || []).forEach(w => {
     L.push('', `${w.name}  (Trigger: ${w.trigger})`)
     ;(w.steps || []).forEach(s => L.push(`   [${String(s.type).toUpperCase()}] ${s.text}`))
@@ -81,9 +81,10 @@ function buildToText(ctx, b) {
 
 function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') }
 
-function downloadPDF(ctx, b) {
+function downloadPDF(ctx, b, isWeb) {
   const w = window.open('', '_blank')
   if (!w) { notifyError('Allow pop-ups to download the PDF'); return }
+  const sheetLabel = isWeb ? 'Website Build Sheet' : 'Funnel Build Sheet'
   const row = (label, val) => `<tr><td class="lbl">${esc(label)}</td><td>${val}</td></tr>`
   const journey = (b.journey || []).map((j, i) => `
     <div class="blk"><h3>${i + 1}. ${esc(j.page)}</h3><table>
@@ -96,7 +97,7 @@ function downloadPDF(ctx, b) {
   const wf = (b.workflows || []).map(wf => `
     <div class="blk"><h3>${esc(wf.name)}</h3><div class="trg">Trigger: ${esc(wf.trigger)}</div>
       <table>${(wf.steps || []).map(s => `<tr><td class="lbl">${esc(String(s.type).toUpperCase())}</td><td>${esc(s.text)}</td></tr>`).join('')}</table></div>`).join('')
-  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(b.funnelName || 'Funnel Build Sheet')}</title>
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(b.funnelName || sheetLabel)}</title>
     <style>
       *{box-sizing:border-box} body{font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#0f172a;margin:32px;font-size:12px;line-height:1.5}
       h1{font-size:20px;margin:0 0 2px} h2{font-size:13px;letter-spacing:.06em;background:#0f172a;color:#fff;padding:6px 10px;border-radius:6px;margin:22px 0 10px}
@@ -107,7 +108,7 @@ function downloadPDF(ctx, b) {
       .blk{border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;margin:0 0 12px} .trg{font-size:10px;color:#334155;margin:0 0 6px}
       .meta td.lbl{width:120px} @media print{body{margin:12mm}}
     </style></head><body>
-    <div class="sub">Funnel Build Sheet</div>
+    <div class="sub">${esc(sheetLabel)}</div>
     <h1>${esc(b.funnelName || '')}</h1>
     <div class="flow">${esc(b.flow || '')}</div>
     <table class="meta">
@@ -117,15 +118,19 @@ function downloadPDF(ctx, b) {
       ${row('GOAL', esc(ctx.goal))}
       ${b.watchOut ? row('WATCH OUT', esc(b.watchOut)) : ''}
     </table>
-    <h2>CUSTOMER JOURNEY</h2>${journey}
-    <h2>GHL AUTOMATION MAP</h2>${wf}
+    <h2>${isWeb ? 'PAGE-BY-PAGE PLAN' : 'CUSTOMER JOURNEY'}</h2>${journey}
+    ${(b.workflows || []).length ? `<h2>GHL AUTOMATION MAP</h2>${wf}` : ''}
     ${(b.tagsToCreate || []).length ? `<h2>SETUP</h2><table>${row('TAGS', (b.tagsToCreate || []).map(esc).join(', '))}${row('CUSTOM FIELDS', (b.customFields || []).map(esc).join(', '))}${row('PIPELINE', (b.pipelineStages || []).map(esc).join(' → '))}</table>` : ''}
     <script>window.onload=function(){window.print()}</script>
     </body></html>`)
   w.document.close()
 }
 
-export default function FunnelArchitect() {
+export default function FunnelArchitect({ kind = 'funnel' }) {
+  const isWeb = kind === 'website'
+  const T = isWeb
+    ? { title: 'Website Architect', noun: 'website', sub: 'Start with your business, or drop in a meeting transcript — one website build sheet out.', recommend: 'Recommend site structures', options: 'Three ways to build this site', map: 'Map this website' }
+    : { title: 'Funnel Architect', noun: 'funnel', sub: 'Start with your offer, or drop in a meeting transcript — one build sheet out.', recommend: 'Recommend funnels', options: 'Three ways to build this', map: 'Map this funnel' }
   const navigate = useNavigate()
   const location = useLocation()
   const locationId = getLocationId()
@@ -159,7 +164,7 @@ export default function FunnelArchitect() {
   const notesFileRef = useRef(null)
 
   const ctx = { offer, price, traffic, goal }
-  const aiArgs = () => ({ offer, pricePoint: price, traffic, goal, notes, provider: config.provider, apiKey: config.apiKey, model: config.model })
+  const aiArgs = () => ({ offer, pricePoint: price, traffic, goal, notes, kind, provider: config.provider, apiKey: config.apiKey, model: config.model })
 
   const TEXT_EXTS = ['txt', 'vtt', 'srt', 'md', 'csv', 'rtf', 'json', 'html', 'htm', 'log']
   async function onNotesFile(e) {
@@ -187,7 +192,7 @@ export default function FunnelArchitect() {
     if (!config?.apiKey) { notifyError('Connect an AI provider in Settings first'); return }
     setAnalyzing(true)
     try {
-      const d = await api.architectFromNotes({ notes, provider: config.provider, apiKey: config.apiKey, model: config.model })
+      const d = await api.architectFromNotes({ notes, kind, provider: config.provider, apiKey: config.apiKey, model: config.model })
       if (d.offer) setOffer(d.offer)
       if (d.pricePoint) setPrice(d.pricePoint)
       if (d.traffic) setTraffic(d.traffic)
@@ -203,14 +208,14 @@ export default function FunnelArchitect() {
     setAnalyzing(true)
     let derived = { offer: '', pricePoint: price, traffic, goal }
     try {
-      const d = await api.architectFromNotes({ notes: text, provider: config.provider, apiKey: config.apiKey, model: config.model })
+      const d = await api.architectFromNotes({ notes: text, kind, provider: config.provider, apiKey: config.apiKey, model: config.model })
       derived = { offer: d.offer || '', pricePoint: d.pricePoint || price, traffic: d.traffic || traffic, goal: d.goal || goal }
       setOffer(derived.offer); setPrice(derived.pricePoint); setTraffic(derived.traffic); setGoal(derived.goal)
     } catch (e) { setAnalyzing(false); notifyError(e.message || 'Could not read the notes'); return }
     setAnalyzing(false)
     setLoading(true)
     try {
-      const j = await api.architectOptions({ ...derived, notes: text, provider: config.provider, apiKey: config.apiKey, model: config.model })
+      const j = await api.architectOptions({ ...derived, notes: text, kind, provider: config.provider, apiKey: config.apiKey, model: config.model })
       setOptions(j.options || []); setStage('options')
     } catch (e) { notifyError(e.message || 'Failed') } finally { setLoading(false) }
   }
@@ -306,18 +311,18 @@ export default function FunnelArchitect() {
   }
 
   function copySheet() {
-    navigator.clipboard?.writeText(buildToText(ctx, build)).then(() => notifySuccess('Build sheet copied')).catch(() => {})
+    navigator.clipboard?.writeText(buildToText(ctx, build, isWeb)).then(() => notifySuccess('Build sheet copied')).catch(() => {})
   }
   async function saveToLibrary() {
     setSaving(true)
     try {
-      const title = `Funnel Build — ${build.funnelName || offer.slice(0, 40)}`
+      const title = `${isWeb ? 'Website' : 'Funnel'} Build — ${build.funnelName || offer.slice(0, 40)}`
       const copy = await api.saveCopy({
         customerId: '_unsorted', customerName: '', type: 'general', title,
         preview: (build.flow || '').slice(0, 120),
         messages: [
           { role: 'user', content: `Offer: ${offer}\nPrice: ${price} · Traffic: ${traffic} · Goal: ${goal}` },
-          { role: 'assistant', content: buildToText(ctx, build) },
+          { role: 'assistant', content: buildToText(ctx, build, isWeb) },
         ],
       })
       notifySuccess('Saved to Library')
@@ -336,7 +341,7 @@ export default function FunnelArchitect() {
   return (
     <>
       <div className="topnav">
-        <div className="topnav-left"><span className="breadcrumb-current">Funnel Architect</span></div>
+        <div className="topnav-left"><span className="breadcrumb-current">{T.title}</span></div>
         <div className="topnav-right" style={{ display: 'flex', gap: 8 }}>
           <button className={`btn btn-sm ${showPB ? 'btn-secondary' : 'btn-ghost'}`} onClick={openPlaybook} title="What the Architect has learned for this account">
             ✦ Playbook
@@ -398,8 +403,8 @@ export default function FunnelArchitect() {
           <>
             <div className="page-header">
               <div>
-                <div className="page-title">Funnel Architect</div>
-                <div className="page-sub">Start with your offer, or drop in a meeting transcript — one build sheet out.</div>
+                <div className="page-title">{T.title}</div>
+                <div className="page-sub">{T.sub}</div>
               </div>
             </div>
 
@@ -427,9 +432,9 @@ export default function FunnelArchitect() {
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                   <button className="btn btn-primary" onClick={getOptions} disabled={loading || configLoading || !offer.trim()}>
-                    {loading ? 'Thinking…' : 'Recommend funnels'}
+                    {loading ? 'Thinking…' : T.recommend}
                   </button>
-                  <span style={{ fontSize: '.75rem', color: 'var(--sub)' }}>funnel type · page flow · customer journey · GHL workflows</span>
+                  <span style={{ fontSize: '.75rem', color: 'var(--sub)' }}>{isWeb ? 'site structure · page list · visitor journey · page copy' : 'funnel type · page flow · customer journey · GHL workflows'}</span>
                 </div>
               </div>
             ) : (
@@ -460,7 +465,7 @@ export default function FunnelArchitect() {
         {stage === 'options' && (
           <>
             <div style={{ marginBottom: 16 }}>
-              <div className="page-title" style={{ display: 'inline' }}>Three ways to build this</div><Kicker>PICK ONE TO MAP IT</Kicker>
+              <div className="page-title" style={{ display: 'inline' }}>{T.options}</div><Kicker>PICK ONE TO MAP IT</Kicker>
               <div className="page-sub" style={{ marginTop: 6 }}>Based on your offer, price point, traffic, and goal.</div>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: 14 }}>
@@ -522,7 +527,7 @@ export default function FunnelArchitect() {
               </div>
               <div style={{ display: 'flex', gap: 10, marginTop: 16, flexWrap: 'wrap' }}>
                 <button className="btn btn-primary" onClick={mapFunnel} disabled={loading || !orderedSelected().length}>
-                  {loading ? 'Mapping the funnel…' : 'Map this funnel'}
+                  {loading ? (isWeb ? 'Mapping the website…' : 'Mapping the funnel…') : T.map}
                 </button>
                 <button className="btn btn-secondary" onClick={() => setSelPages(chosen.corePages || chosen.mvpFlow || [])}>Reset to MVP</button>
                 <button className="btn btn-ghost" onClick={() => setStage('options')}>← Back</button>
@@ -548,7 +553,7 @@ export default function FunnelArchitect() {
                 </div>
                 <button className="btn btn-ghost btn-sm" onClick={() => setStage('pages')}>← Pages</button>
                 <button className="btn btn-secondary btn-sm" onClick={copySheet}>Copy as text</button>
-                <button className="btn btn-secondary btn-sm" onClick={() => downloadPDF(ctx, build)}>Download PDF</button>
+                <button className="btn btn-secondary btn-sm" onClick={() => downloadPDF(ctx, build, isWeb)}>Download PDF</button>
                 <button className="btn btn-primary btn-sm" onClick={saveToLibrary} disabled={saving}>{saving ? 'Saving…' : 'Save to Library'}</button>
               </div>
             </div>
@@ -561,7 +566,7 @@ export default function FunnelArchitect() {
             )}
 
             {/* Customer journey */}
-            <div className="section-title" style={{ marginTop: 4 }}>Customer journey</div>
+            <div className="section-title" style={{ marginTop: 4 }}>{isWeb ? 'Page-by-page plan' : 'Customer journey'}</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 24 }}>
               {(build.journey || []).map((j, i) => (
                 <div key={i} className="card" style={{ padding: 16 }}>
@@ -678,7 +683,7 @@ export default function FunnelArchitect() {
               </div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 <button className="btn btn-secondary" onClick={copySheet}>Copy as text</button>
-                <button className="btn btn-primary" onClick={() => downloadPDF(ctx, build)}>Download the PDF</button>
+                <button className="btn btn-primary" onClick={() => downloadPDF(ctx, build, isWeb)}>Download the PDF</button>
               </div>
             </div>
           </>

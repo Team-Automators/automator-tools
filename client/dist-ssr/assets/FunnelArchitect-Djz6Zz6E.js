@@ -29,9 +29,9 @@ function Flow({ pages }) {
     i < pages.length - 1 && /* @__PURE__ */ jsx("span", { style: { color: "var(--sub)" }, children: "→" })
   ] }, i)) });
 }
-function buildToText(ctx, b) {
+function buildToText(ctx, b, isWeb) {
   const L = [];
-  L.push(`FUNNEL BUILD SHEET`, b.funnelName || "", b.flow || "", "");
+  L.push(`${isWeb ? "WEBSITE" : "FUNNEL"} BUILD SHEET`, b.funnelName || "", b.flow || "", "");
   L.push(`OFFER: ${ctx.offer}`);
   L.push(`PRICE POINT: ${ctx.price}`, `TRAFFIC: ${ctx.traffic}`, `GOAL: ${ctx.goal}`);
   if (b.watchOut) L.push(`WATCH OUT: ${b.watchOut}`);
@@ -56,7 +56,7 @@ function buildToText(ctx, b) {
       if (p.testimonial) L.push(`   ${p.testimonial}`);
     });
   }
-  L.push("", "== GHL AUTOMATION MAP ==");
+  if ((b.workflows || []).length) L.push("", "== GHL AUTOMATION MAP ==");
   (b.workflows || []).forEach((w) => {
     L.push("", `${w.name}  (Trigger: ${w.trigger})`);
     (w.steps || []).forEach((s) => L.push(`   [${String(s.type).toUpperCase()}] ${s.text}`));
@@ -69,12 +69,13 @@ function buildToText(ctx, b) {
 function esc(s) {
   return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
-function downloadPDF(ctx, b) {
+function downloadPDF(ctx, b, isWeb) {
   const w = window.open("", "_blank");
   if (!w) {
     notifyError("Allow pop-ups to download the PDF");
     return;
   }
+  const sheetLabel = isWeb ? "Website Build Sheet" : "Funnel Build Sheet";
   const row = (label, val) => `<tr><td class="lbl">${esc(label)}</td><td>${val}</td></tr>`;
   const journey = (b.journey || []).map((j, i) => `
     <div class="blk"><h3>${i + 1}. ${esc(j.page)}</h3><table>
@@ -87,7 +88,7 @@ function downloadPDF(ctx, b) {
   const wf = (b.workflows || []).map((wf2) => `
     <div class="blk"><h3>${esc(wf2.name)}</h3><div class="trg">Trigger: ${esc(wf2.trigger)}</div>
       <table>${(wf2.steps || []).map((s) => `<tr><td class="lbl">${esc(String(s.type).toUpperCase())}</td><td>${esc(s.text)}</td></tr>`).join("")}</table></div>`).join("");
-  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(b.funnelName || "Funnel Build Sheet")}</title>
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(b.funnelName || sheetLabel)}</title>
     <style>
       *{box-sizing:border-box} body{font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#0f172a;margin:32px;font-size:12px;line-height:1.5}
       h1{font-size:20px;margin:0 0 2px} h2{font-size:13px;letter-spacing:.06em;background:#0f172a;color:#fff;padding:6px 10px;border-radius:6px;margin:22px 0 10px}
@@ -98,7 +99,7 @@ function downloadPDF(ctx, b) {
       .blk{border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;margin:0 0 12px} .trg{font-size:10px;color:#334155;margin:0 0 6px}
       .meta td.lbl{width:120px} @media print{body{margin:12mm}}
     </style></head><body>
-    <div class="sub">Funnel Build Sheet</div>
+    <div class="sub">${esc(sheetLabel)}</div>
     <h1>${esc(b.funnelName || "")}</h1>
     <div class="flow">${esc(b.flow || "")}</div>
     <table class="meta">
@@ -108,14 +109,16 @@ function downloadPDF(ctx, b) {
       ${row("GOAL", esc(ctx.goal))}
       ${b.watchOut ? row("WATCH OUT", esc(b.watchOut)) : ""}
     </table>
-    <h2>CUSTOMER JOURNEY</h2>${journey}
-    <h2>GHL AUTOMATION MAP</h2>${wf}
+    <h2>${isWeb ? "PAGE-BY-PAGE PLAN" : "CUSTOMER JOURNEY"}</h2>${journey}
+    ${(b.workflows || []).length ? `<h2>GHL AUTOMATION MAP</h2>${wf}` : ""}
     ${(b.tagsToCreate || []).length ? `<h2>SETUP</h2><table>${row("TAGS", (b.tagsToCreate || []).map(esc).join(", "))}${row("CUSTOM FIELDS", (b.customFields || []).map(esc).join(", "))}${row("PIPELINE", (b.pipelineStages || []).map(esc).join(" → "))}</table>` : ""}
     <script>window.onload=function(){window.print()}<\/script>
     </body></html>`);
   w.document.close();
 }
-function FunnelArchitect() {
+function FunnelArchitect({ kind = "funnel" }) {
+  const isWeb = kind === "website";
+  const T = isWeb ? { title: "Website Architect", sub: "Start with your business, or drop in a meeting transcript — one website build sheet out.", recommend: "Recommend site structures", options: "Three ways to build this site", map: "Map this website" } : { title: "Funnel Architect", sub: "Start with your offer, or drop in a meeting transcript — one build sheet out.", recommend: "Recommend funnels", options: "Three ways to build this", map: "Map this funnel" };
   const navigate = useNavigate();
   const location = useLocation();
   const locationId = getLocationId();
@@ -146,7 +149,7 @@ function FunnelArchitect() {
   const [pbBusy, setPbBusy] = useState(false);
   const notesFileRef = useRef(null);
   const ctx = { offer, price, traffic, goal };
-  const aiArgs = () => ({ offer, pricePoint: price, traffic, goal, notes, provider: config.provider, apiKey: config.apiKey, model: config.model });
+  const aiArgs = () => ({ offer, pricePoint: price, traffic, goal, notes, kind, provider: config.provider, apiKey: config.apiKey, model: config.model });
   const TEXT_EXTS = ["txt", "vtt", "srt", "md", "csv", "rtf", "json", "html", "htm", "log"];
   async function onNotesFile(e) {
     var _a;
@@ -179,7 +182,7 @@ function FunnelArchitect() {
     setAnalyzing(true);
     let derived = { offer: "", pricePoint: price, traffic, goal };
     try {
-      const d = await api.architectFromNotes({ notes: text, provider: config.provider, apiKey: config.apiKey, model: config.model });
+      const d = await api.architectFromNotes({ notes: text, kind, provider: config.provider, apiKey: config.apiKey, model: config.model });
       derived = { offer: d.offer || "", pricePoint: d.pricePoint || price, traffic: d.traffic || traffic, goal: d.goal || goal };
       setOffer(derived.offer);
       setPrice(derived.pricePoint);
@@ -193,7 +196,7 @@ function FunnelArchitect() {
     setAnalyzing(false);
     setLoading(true);
     try {
-      const j = await api.architectOptions({ ...derived, notes: text, provider: config.provider, apiKey: config.apiKey, model: config.model });
+      const j = await api.architectOptions({ ...derived, notes: text, kind, provider: config.provider, apiKey: config.apiKey, model: config.model });
       setOptions(j.options || []);
       setStage("options");
     } catch (e) {
@@ -327,13 +330,13 @@ function FunnelArchitect() {
   }
   function copySheet() {
     var _a;
-    (_a = navigator.clipboard) == null ? void 0 : _a.writeText(buildToText(ctx, build)).then(() => notifySuccess("Build sheet copied")).catch(() => {
+    (_a = navigator.clipboard) == null ? void 0 : _a.writeText(buildToText(ctx, build, isWeb)).then(() => notifySuccess("Build sheet copied")).catch(() => {
     });
   }
   async function saveToLibrary() {
     setSaving(true);
     try {
-      const title = `Funnel Build — ${build.funnelName || offer.slice(0, 40)}`;
+      const title = `${isWeb ? "Website" : "Funnel"} Build — ${build.funnelName || offer.slice(0, 40)}`;
       const copy = await api.saveCopy({
         customerId: "_unsorted",
         customerName: "",
@@ -343,7 +346,7 @@ function FunnelArchitect() {
         messages: [
           { role: "user", content: `Offer: ${offer}
 Price: ${price} · Traffic: ${traffic} · Goal: ${goal}` },
-          { role: "assistant", content: buildToText(ctx, build) }
+          { role: "assistant", content: buildToText(ctx, build, isWeb) }
         ]
       });
       notifySuccess("Saved to Library");
@@ -362,7 +365,7 @@ Price: ${price} · Traffic: ${traffic} · Goal: ${goal}` },
   const Kicker = ({ children }) => /* @__PURE__ */ jsx("span", { style: { fontSize: ".66rem", fontWeight: 700, letterSpacing: ".1em", color: "var(--sub)", marginLeft: 10 }, children });
   return /* @__PURE__ */ jsxs(Fragment, { children: [
     /* @__PURE__ */ jsxs("div", { className: "topnav", children: [
-      /* @__PURE__ */ jsx("div", { className: "topnav-left", children: /* @__PURE__ */ jsx("span", { className: "breadcrumb-current", children: "Funnel Architect" }) }),
+      /* @__PURE__ */ jsx("div", { className: "topnav-left", children: /* @__PURE__ */ jsx("span", { className: "breadcrumb-current", children: T.title }) }),
       /* @__PURE__ */ jsxs("div", { className: "topnav-right", style: { display: "flex", gap: 8 }, children: [
         /* @__PURE__ */ jsx("button", { className: `btn btn-sm ${showPB ? "btn-secondary" : "btn-ghost"}`, onClick: openPlaybook, title: "What the Architect has learned for this account", children: "✦ Playbook" }),
         stage !== "intake" && /* @__PURE__ */ jsx("button", { className: "btn btn-ghost btn-sm", onClick: () => {
@@ -417,8 +420,8 @@ Price: ${price} · Traffic: ${traffic} · Goal: ${goal}` },
       ] }),
       stage === "intake" && /* @__PURE__ */ jsxs(Fragment, { children: [
         /* @__PURE__ */ jsx("div", { className: "page-header", children: /* @__PURE__ */ jsxs("div", { children: [
-          /* @__PURE__ */ jsx("div", { className: "page-title", children: "Funnel Architect" }),
-          /* @__PURE__ */ jsx("div", { className: "page-sub", children: "Start with your offer, or drop in a meeting transcript — one build sheet out." })
+          /* @__PURE__ */ jsx("div", { className: "page-title", children: T.title }),
+          /* @__PURE__ */ jsx("div", { className: "page-sub", children: T.sub })
         ] }) }),
         /* @__PURE__ */ jsxs("div", { style: { display: "inline-flex", gap: 4, background: "var(--surface)", borderRadius: 10, padding: 4, marginBottom: 14 }, children: [
           /* @__PURE__ */ jsx("button", { className: `btn btn-sm ${inputMode === "offer" ? "btn-primary" : "btn-ghost"}`, onClick: () => setInputMode("offer"), children: "I have the offer" }),
@@ -453,8 +456,8 @@ Price: ${price} · Traffic: ${traffic} · Goal: ${goal}` },
             ] })
           ] }),
           /* @__PURE__ */ jsxs("div", { style: { display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }, children: [
-            /* @__PURE__ */ jsx("button", { className: "btn btn-primary", onClick: getOptions, disabled: loading || configLoading || !offer.trim(), children: loading ? "Thinking…" : "Recommend funnels" }),
-            /* @__PURE__ */ jsx("span", { style: { fontSize: ".75rem", color: "var(--sub)" }, children: "funnel type · page flow · customer journey · GHL workflows" })
+            /* @__PURE__ */ jsx("button", { className: "btn btn-primary", onClick: getOptions, disabled: loading || configLoading || !offer.trim(), children: loading ? "Thinking…" : T.recommend }),
+            /* @__PURE__ */ jsx("span", { style: { fontSize: ".75rem", color: "var(--sub)" }, children: isWeb ? "site structure · page list · visitor journey · page copy" : "funnel type · page flow · customer journey · GHL workflows" })
           ] })
         ] }) : /* @__PURE__ */ jsxs("div", { className: "card", style: { padding: 20, display: "flex", flexDirection: "column", gap: 12 }, children: [
           /* @__PURE__ */ jsxs("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }, children: [
@@ -484,7 +487,7 @@ Price: ${price} · Traffic: ${traffic} · Goal: ${goal}` },
       ] }),
       stage === "options" && /* @__PURE__ */ jsxs(Fragment, { children: [
         /* @__PURE__ */ jsxs("div", { style: { marginBottom: 16 }, children: [
-          /* @__PURE__ */ jsx("div", { className: "page-title", style: { display: "inline" }, children: "Three ways to build this" }),
+          /* @__PURE__ */ jsx("div", { className: "page-title", style: { display: "inline" }, children: T.options }),
           /* @__PURE__ */ jsx(Kicker, { children: "PICK ONE TO MAP IT" }),
           /* @__PURE__ */ jsx("div", { className: "page-sub", style: { marginTop: 6 }, children: "Based on your offer, price point, traffic, and goal." })
         ] }),
@@ -550,7 +553,7 @@ Price: ${price} · Traffic: ${traffic} · Goal: ${goal}` },
             /* @__PURE__ */ jsx(Flow, { pages: orderedSelected() })
           ] }),
           /* @__PURE__ */ jsxs("div", { style: { display: "flex", gap: 10, marginTop: 16, flexWrap: "wrap" }, children: [
-            /* @__PURE__ */ jsx("button", { className: "btn btn-primary", onClick: mapFunnel, disabled: loading || !orderedSelected().length, children: loading ? "Mapping the funnel…" : "Map this funnel" }),
+            /* @__PURE__ */ jsx("button", { className: "btn btn-primary", onClick: mapFunnel, disabled: loading || !orderedSelected().length, children: loading ? isWeb ? "Mapping the website…" : "Mapping the funnel…" : T.map }),
             /* @__PURE__ */ jsx("button", { className: "btn btn-secondary", onClick: () => setSelPages(chosen.corePages || chosen.mvpFlow || []), children: "Reset to MVP" }),
             /* @__PURE__ */ jsx("button", { className: "btn btn-ghost", onClick: () => setStage("options"), children: "← Back" })
           ] })
@@ -585,7 +588,7 @@ Price: ${price} · Traffic: ${traffic} · Goal: ${goal}` },
             ] }),
             /* @__PURE__ */ jsx("button", { className: "btn btn-ghost btn-sm", onClick: () => setStage("pages"), children: "← Pages" }),
             /* @__PURE__ */ jsx("button", { className: "btn btn-secondary btn-sm", onClick: copySheet, children: "Copy as text" }),
-            /* @__PURE__ */ jsx("button", { className: "btn btn-secondary btn-sm", onClick: () => downloadPDF(ctx, build), children: "Download PDF" }),
+            /* @__PURE__ */ jsx("button", { className: "btn btn-secondary btn-sm", onClick: () => downloadPDF(ctx, build, isWeb), children: "Download PDF" }),
             /* @__PURE__ */ jsx("button", { className: "btn btn-primary btn-sm", onClick: saveToLibrary, disabled: saving, children: saving ? "Saving…" : "Save to Library" })
           ] })
         ] }),
@@ -593,7 +596,7 @@ Price: ${price} · Traffic: ${traffic} · Goal: ${goal}` },
           /* @__PURE__ */ jsx("span", { style: { fontSize: ".66rem", fontWeight: 700, letterSpacing: ".08em", color: "var(--danger)" }, children: "WATCH OUT" }),
           /* @__PURE__ */ jsx("div", { style: { fontSize: ".86rem", marginTop: 2 }, children: build.watchOut })
         ] }),
-        /* @__PURE__ */ jsx("div", { className: "section-title", style: { marginTop: 4 }, children: "Customer journey" }),
+        /* @__PURE__ */ jsx("div", { className: "section-title", style: { marginTop: 4 }, children: isWeb ? "Page-by-page plan" : "Customer journey" }),
         /* @__PURE__ */ jsx("div", { style: { display: "flex", flexDirection: "column", gap: 12, marginBottom: 24 }, children: (build.journey || []).map((j, i) => /* @__PURE__ */ jsxs("div", { className: "card", style: { padding: 16 }, children: [
           /* @__PURE__ */ jsxs("div", { style: { display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }, children: [
             /* @__PURE__ */ jsx("span", { style: { width: 24, height: 24, borderRadius: "50%", background: "var(--accent)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: ".75rem", fontWeight: 800, flexShrink: 0 }, children: i + 1 }),
@@ -689,7 +692,7 @@ Price: ${price} · Traffic: ${traffic} · Goal: ${goal}` },
           ] }),
           /* @__PURE__ */ jsxs("div", { style: { display: "flex", gap: 8, flexWrap: "wrap" }, children: [
             /* @__PURE__ */ jsx("button", { className: "btn btn-secondary", onClick: copySheet, children: "Copy as text" }),
-            /* @__PURE__ */ jsx("button", { className: "btn btn-primary", onClick: () => downloadPDF(ctx, build), children: "Download the PDF" })
+            /* @__PURE__ */ jsx("button", { className: "btn btn-primary", onClick: () => downloadPDF(ctx, build, isWeb), children: "Download the PDF" })
           ] })
         ] })
       ] }),

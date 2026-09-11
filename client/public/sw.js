@@ -1,4 +1,4 @@
-const CACHE = 'automator-v24';
+const CACHE = 'automator-v25';
 
 const PRECACHE = [
   '/',

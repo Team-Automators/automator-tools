@@ -125,6 +125,7 @@ export default function App() {
         <Route path="archive" element={<Archive />} />
         <Route path="analyzer" element={<Analyzer />} />
         <Route path="architect" element={<FunnelArchitect />} />
+        <Route path="website" element={<FunnelArchitect kind="website" />} />
         <Route path="pipeline" element={<Pipeline />} />
         <Route path="settings" element={<Settings />} />
         <Route path="*" element={<Navigate to="/" replace />} />

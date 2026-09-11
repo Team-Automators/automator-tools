@@ -477,41 +477,41 @@ const api = {
       }).catch(reject);
     });
   },
-  async architectFromNotes({ notes, provider, apiKey, model }) {
+  async architectFromNotes({ notes, provider, apiKey, model, kind }) {
     const r = await fetch("/copywrite/architect/from-notes", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ notes, provider, apiKey, model })
+      body: JSON.stringify({ notes, provider, apiKey, model, kind })
     });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(j.error || `Request failed (${r.status})`);
     return j;
   },
-  async architectOptions({ offer, pricePoint, traffic, goal, notes, provider, apiKey, model }) {
+  async architectOptions({ offer, pricePoint, traffic, goal, notes, provider, apiKey, model, kind }) {
     const r = await fetch("/copywrite/architect/options", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ offer, pricePoint, traffic, goal, notes, provider, apiKey, model })
+      body: JSON.stringify({ offer, pricePoint, traffic, goal, notes, provider, apiKey, model, kind })
     });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(j.error || `Request failed (${r.status})`);
     return j;
   },
-  async architectBuild({ offer, pricePoint, traffic, goal, notes, funnelName, pages, provider, apiKey, model }) {
+  async architectBuild({ offer, pricePoint, traffic, goal, notes, funnelName, pages, provider, apiKey, model, kind }) {
     const r = await fetch("/copywrite/architect/build", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ offer, pricePoint, traffic, goal, notes, funnelName, pages, provider, apiKey, model })
+      body: JSON.stringify({ offer, pricePoint, traffic, goal, notes, funnelName, pages, provider, apiKey, model, kind })
     });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(j.error || `Request failed (${r.status})`);
     return j;
   },
-  async architectPageCopy({ offer, pricePoint, traffic, goal, notes, funnelName, pages, provider, apiKey, model }) {
+  async architectPageCopy({ offer, pricePoint, traffic, goal, notes, funnelName, pages, provider, apiKey, model, kind }) {
     const r = await fetch("/copywrite/architect/page-copy", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ offer, pricePoint, traffic, goal, notes, funnelName, pages, provider, apiKey, model })
+      body: JSON.stringify({ offer, pricePoint, traffic, goal, notes, funnelName, pages, provider, apiKey, model, kind })
     });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(j.error || `Request failed (${r.status})`);
@@ -795,7 +795,7 @@ const Hooks = withPreload(() => import("./assets/Hooks-3dkCEcup.js"));
 const Workflows = withPreload(() => import("./assets/Workflows-D3oblaJ6.js"));
 const Archive = withPreload(() => import("./assets/Archive-BxVK8TGk.js"));
 const Analyzer = withPreload(() => import("./assets/Analyzer-CK5ufbtR.js"));
-const FunnelArchitect = withPreload(() => import("./assets/FunnelArchitect-XNCHFlGU.js"));
+const FunnelArchitect = withPreload(() => import("./assets/FunnelArchitect-Djz6Zz6E.js"));
 const Pipeline = withPreload(() => import("./assets/Pipeline-l5LmIG25.js"));
 const Admin = withPreload(() => import("./assets/Admin-uieHiv6y.js"));
 const prefetchByKey = {
@@ -810,6 +810,7 @@ const prefetchByKey = {
     LibraryChat.preload();
   },
   architect: () => FunnelArchitect.preload(),
+  website: () => FunnelArchitect.preload(),
   hooks: () => Hooks.preload(),
   tasks: () => Tasks.preload(),
   pipeline: () => Pipeline.preload(),
@@ -976,6 +977,16 @@ const NAV_ITEMS = [
       /* @__PURE__ */ jsx("path", { d: "M5 21V7l7-4 7 4v14" }),
       /* @__PURE__ */ jsx("path", { d: "M9 21v-6h6v6" }),
       /* @__PURE__ */ jsx("path", { d: "M9 10h.01M15 10h.01" })
+    ] })
+  },
+  {
+    key: "website",
+    label: "Website Architect",
+    path: "/website",
+    icon: /* @__PURE__ */ jsxs("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", width: "18", height: "18", children: [
+      /* @__PURE__ */ jsx("rect", { x: "3", y: "4", width: "18", height: "16", rx: "2" }),
+      /* @__PURE__ */ jsx("path", { d: "M3 9h18" }),
+      /* @__PURE__ */ jsx("path", { d: "M7 6.5h.01M10 6.5h.01" })
     ] })
   },
   {
@@ -1500,6 +1511,7 @@ function App() {
         /* @__PURE__ */ jsx(Route, { path: "archive", element: /* @__PURE__ */ jsx(Archive, {}) }),
         /* @__PURE__ */ jsx(Route, { path: "analyzer", element: /* @__PURE__ */ jsx(Analyzer, {}) }),
         /* @__PURE__ */ jsx(Route, { path: "architect", element: /* @__PURE__ */ jsx(FunnelArchitect, {}) }),
+        /* @__PURE__ */ jsx(Route, { path: "website", element: /* @__PURE__ */ jsx(FunnelArchitect, { kind: "website" }) }),
         /* @__PURE__ */ jsx(Route, { path: "pipeline", element: /* @__PURE__ */ jsx(Pipeline, {}) }),
         /* @__PURE__ */ jsx(Route, { path: "settings", element: /* @__PURE__ */ jsx(Settings, {}) }),
         /* @__PURE__ */ jsx(Route, { path: "*", element: /* @__PURE__ */ jsx(Navigate, { to: "/", replace: true }) })
