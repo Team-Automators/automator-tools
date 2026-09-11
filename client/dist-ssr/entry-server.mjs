@@ -5,7 +5,7 @@ import { jsxs, jsx, Fragment } from "react/jsx-runtime";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { renderToPipeableStream } from "react-dom/server";
 import { StaticRouter } from "react-router-dom/server.mjs";
-import React, { useEffect, useState, useCallback, useRef, lazy, Suspense } from "react";
+import React, { useEffect, useState, useCallback, lazy, useRef, Suspense } from "react";
 import { useSearchParams, useNavigate, useLocation, NavLink, Outlet, Routes, Route, Navigate, useParams } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
 let resolver = null;
@@ -775,6 +775,71 @@ function useAIConfig() {
   }
   return { config, loading, locationName, locationLogo, saveConfig, clearConfig, refresh };
 }
+function withPreload(factory) {
+  const Component = lazy(factory);
+  Component.preload = factory;
+  return Component;
+}
+const Dashboard = withPreload(() => import("./assets/Dashboard-_s47Mg-0.js"));
+const CopywritersList = withPreload(() => import("./assets/CopywritersList-CkV70USI.js"));
+const CopywritersChat = withPreload(() => import("./assets/CopywritersChat-I5skgXay.js"));
+const Library = withPreload(() => import("./assets/Library-C8Se1Kfm.js"));
+const CustomerDetail = withPreload(() => import("./assets/CustomerDetail-74-vXkQu.js"));
+const LibraryChat = withPreload(() => import("./assets/LibraryChat-fdh054zA.js"));
+const Settings = withPreload(() => import("./assets/Settings-OcO6Wapc.js"));
+const Tasks = withPreload(() => import("./assets/Tasks-BDAFsCpe.js"));
+const Hooks = withPreload(() => import("./assets/Hooks-3dkCEcup.js"));
+const Workflows = withPreload(() => import("./assets/Workflows-D3oblaJ6.js"));
+const Archive = withPreload(() => import("./assets/Archive-DGMLrToe.js"));
+const Analyzer = withPreload(() => import("./assets/Analyzer-CK5ufbtR.js"));
+const FunnelArchitect = withPreload(() => import("./assets/FunnelArchitect-XNCHFlGU.js"));
+const Pipeline = withPreload(() => import("./assets/Pipeline-Dz9VfzXF.js"));
+const Admin = withPreload(() => import("./assets/Admin-uieHiv6y.js"));
+const prefetchByKey = {
+  dashboard: () => Dashboard.preload(),
+  copywriters: () => {
+    CopywritersList.preload();
+    CopywritersChat.preload();
+  },
+  library: () => {
+    Library.preload();
+    CustomerDetail.preload();
+    LibraryChat.preload();
+  },
+  architect: () => FunnelArchitect.preload(),
+  hooks: () => Hooks.preload(),
+  tasks: () => Tasks.preload(),
+  pipeline: () => Pipeline.preload(),
+  archive: () => Archive.preload(),
+  analyzer: () => Analyzer.preload(),
+  workflows: () => Workflows.preload(),
+  admin: () => Admin.preload(),
+  settings: () => Settings.preload()
+};
+function prefetchAll() {
+  [
+    Dashboard,
+    CopywritersList,
+    CopywritersChat,
+    Library,
+    CustomerDetail,
+    LibraryChat,
+    Settings,
+    Tasks,
+    Hooks,
+    Workflows,
+    Archive,
+    Analyzer,
+    FunnelArchitect,
+    Pipeline,
+    Admin
+  ].forEach((c) => {
+    try {
+      c.preload();
+    } catch {
+    }
+  });
+}
 const KEY = "ghl_session";
 const EMAIL_KEY = "ghl_user_email";
 function getSessionToken() {
@@ -992,6 +1057,16 @@ function Layout() {
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
+  useEffect(() => {
+    const idle = window.requestIdleCallback || ((cb) => setTimeout(cb, 200));
+    const id = idle(() => prefetchAll());
+    return () => {
+      try {
+        (window.cancelIdleCallback || clearTimeout)(id);
+      } catch {
+      }
+    };
+  }, []);
   const locationId = getLocationId();
   const user = getSessionClaims();
   const navItems = NAV_ITEMS.filter((i) => !i.adminOnly || (user == null ? void 0 : user.adm));
@@ -1016,6 +1091,14 @@ function Layout() {
           {
             to: navPath(item.path),
             end: item.path === "/",
+            onMouseEnter: () => {
+              var _a;
+              return (_a = prefetchByKey[item.key]) == null ? void 0 : _a.call(prefetchByKey);
+            },
+            onFocus: () => {
+              var _a;
+              return (_a = prefetchByKey[item.key]) == null ? void 0 : _a.call(prefetchByKey);
+            },
             className: ({ isActive: ra }) => `nav-item ${ra || isActive(item) ? "active" : ""}`,
             children: [
               item.icon,
@@ -1330,21 +1413,6 @@ function Login() {
     ] })
   ] }) });
 }
-const Dashboard = lazy(() => import("./assets/Dashboard-_s47Mg-0.js"));
-const CopywritersList = lazy(() => import("./assets/CopywritersList-CkV70USI.js"));
-const CopywritersChat = lazy(() => import("./assets/CopywritersChat-I5skgXay.js"));
-const Library = lazy(() => import("./assets/Library-C8Se1Kfm.js"));
-const CustomerDetail = lazy(() => import("./assets/CustomerDetail-74-vXkQu.js"));
-const LibraryChat = lazy(() => import("./assets/LibraryChat-fdh054zA.js"));
-const Settings = lazy(() => import("./assets/Settings-OcO6Wapc.js"));
-const Tasks = lazy(() => import("./assets/Tasks-BDAFsCpe.js"));
-const Hooks = lazy(() => import("./assets/Hooks-3dkCEcup.js"));
-const Workflows = lazy(() => import("./assets/Workflows-D3oblaJ6.js"));
-const Archive = lazy(() => import("./assets/Archive-DGMLrToe.js"));
-const Analyzer = lazy(() => import("./assets/Analyzer-CK5ufbtR.js"));
-const FunnelArchitect = lazy(() => import("./assets/FunnelArchitect-XNCHFlGU.js"));
-const Pipeline = lazy(() => import("./assets/Pipeline-Dz9VfzXF.js"));
-const Admin = lazy(() => import("./assets/Admin-uieHiv6y.js"));
 async function bootstrapAuth() {
   if (window.location.pathname === "/login") return;
   const claims = getSessionClaims();

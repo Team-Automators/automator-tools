@@ -2,6 +2,7 @@ import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useState, useRef, useEffect } from 'react'
 import { useLocationId } from '../hooks/useLocationId.js'
 import { useAIConfig } from '../hooks/useAIConfig.js'
+import { prefetchByKey, prefetchAll } from '../routes.jsx'
 import { getLocationId } from '../lib/api.js'
 import { getSessionClaims } from '../lib/session.js'
 
@@ -146,6 +147,15 @@ export default function Layout() {
     return () => document.removeEventListener('mousedown', handleClick)
   }, [])
 
+  // After first paint, warm every page chunk during idle time so switching to any
+  // page is instant. Runs once, off the critical path, and hover prefetch already
+  // covers whatever the user reaches for first.
+  useEffect(() => {
+    const idle = window.requestIdleCallback || ((cb) => setTimeout(cb, 200))
+    const id = idle(() => prefetchAll())
+    return () => { try { (window.cancelIdleCallback || clearTimeout)(id) } catch {} }
+  }, [])
+
   const locationId = getLocationId()
   const user = getSessionClaims()
   const navItems = NAV_ITEMS.filter(i => !i.adminOnly || user?.adm)
@@ -179,6 +189,8 @@ export default function Layout() {
               key={item.key}
               to={navPath(item.path)}
               end={item.path === '/'}
+              onMouseEnter={() => prefetchByKey[item.key]?.()}
+              onFocus={() => prefetchByKey[item.key]?.()}
               className={({ isActive: ra }) => `nav-item ${(ra || isActive(item)) ? 'active' : ''}`}
             >
               {item.icon}

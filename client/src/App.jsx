@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { Routes, Route, Navigate, useParams } from 'react-router-dom'
 import { ToastContainer } from 'react-toastify'
 import Layout from './components/Layout.jsx'
@@ -7,24 +7,12 @@ import Login from './pages/Login.jsx'
 import { getLocationId, persistLocationId } from './lib/api.js'
 import { getSessionToken, setSessionToken, getSessionClaims, reauth } from './lib/session.js'
 
-// Route-level code splitting: each page ships as its own chunk that loads only
-// when its route is visited, so the initial bundle stays small and the app
-// paints fast. Layout + Login are eager (they're on the critical first paint).
-const Dashboard       = lazy(() => import('./pages/Dashboard.jsx'))
-const CopywritersList = lazy(() => import('./pages/CopywritersList.jsx'))
-const CopywritersChat = lazy(() => import('./pages/CopywritersChat.jsx'))
-const Library         = lazy(() => import('./pages/Library.jsx'))
-const CustomerDetail  = lazy(() => import('./pages/CustomerDetail.jsx'))
-const LibraryChat     = lazy(() => import('./pages/LibraryChat.jsx'))
-const Settings        = lazy(() => import('./pages/Settings.jsx'))
-const Tasks           = lazy(() => import('./pages/Tasks.jsx'))
-const Hooks           = lazy(() => import('./pages/Hooks.jsx'))
-const Workflows       = lazy(() => import('./pages/Workflows.jsx'))
-const Archive         = lazy(() => import('./pages/Archive.jsx'))
-const Analyzer        = lazy(() => import('./pages/Analyzer.jsx'))
-const FunnelArchitect = lazy(() => import('./pages/FunnelArchitect.jsx'))
-const Pipeline        = lazy(() => import('./pages/Pipeline.jsx'))
-const Admin           = lazy(() => import('./pages/Admin.jsx'))
+// Route-level code splitting lives in ./routes.jsx — each page is its own chunk,
+// loaded on demand, and preloadable on hover/idle so navigation feels instant.
+import {
+  Dashboard, CopywritersList, CopywritersChat, Library, CustomerDetail, LibraryChat,
+  Settings, Tasks, Hooks, Workflows, Archive, Analyzer, FunnelArchitect, Pipeline, Admin,
+} from './routes.jsx'
 
 function hasAIConfig() {
   try { return !!JSON.parse(localStorage.getItem('ghl_ai_config'))?.apiKey } catch { return false }
