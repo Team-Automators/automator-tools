@@ -15,16 +15,21 @@ function readLocal() {
 function isShared() { try { return localStorage.getItem(SHARED_KEY) === '1' } catch { return false } }
 function setShared(v) { try { if (v) localStorage.setItem(SHARED_KEY, '1'); else localStorage.removeItem(SHARED_KEY) } catch {} }
 
+// Session-level flag: once the server reconciliation has finished once, later
+// mounts (e.g. revisiting Settings) start with the cached config shown instantly
+// and refresh in the background — no blocking spinner on every navigation.
+let loadedOnce = false
+
 export function useAIConfig() {
   const [config, setConfig]             = useState(readLocal)   // { provider, apiKey, model }
   const [locationName, setLocationName] = useState('')
   const [locationLogo, setLocationLogo] = useState('')
-  const [loading, setLoading]           = useState(true)
+  const [loading, setLoading]           = useState(!loadedOnce)
 
   const locationId = getLocationId()
 
   const refresh = useCallback(async () => {
-    if (!locationId) { setLoading(false); return }
+    if (!locationId) { loadedOnce = true; setLoading(false); return }
     try {
       const r = await apiFetch('/api/settings')
       const d = await r.json()
@@ -56,7 +61,7 @@ export function useAIConfig() {
         }
       }
     } catch {}
-    finally { setLoading(false) }
+    finally { loadedOnce = true; setLoading(false) }
   }, [locationId])
 
   useEffect(() => { refresh() }, [refresh])

@@ -689,15 +689,17 @@ function setShared(v) {
   } catch {
   }
 }
+let loadedOnce = false;
 function useAIConfig() {
   const [config, setConfig] = useState(readLocal);
   const [locationName, setLocationName] = useState("");
   const [locationLogo, setLocationLogo] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!loadedOnce);
   const locationId = getLocationId();
   const refresh = useCallback(async () => {
     var _a;
     if (!locationId) {
+      loadedOnce = true;
       setLoading(false);
       return;
     }
@@ -729,6 +731,7 @@ function useAIConfig() {
       }
     } catch {
     } finally {
+      loadedOnce = true;
       setLoading(false);
     }
   }, [locationId]);
