@@ -140,13 +140,21 @@ function splitTemplate(tmpl, ssr) {
   return { head, tail };
 }
 
+// Server-side rendering is opt-in (ENABLE_SSR=1). It's OFF by default: this app
+// is authenticated and loads its data client-side, so SSR only paints the shell
+// a little sooner while adding hydration complexity that can interfere with
+// client-side navigation. With it off, the server sends the plain SPA shell and
+// the browser renders + routes entirely client-side (instant, reload-free
+// navigation), with route prefetching keeping page switches fast.
+const SSR_ENABLED = process.env.ENABLE_SSR === '1';
+
 // SPA catch-all — stream the server-rendered React app, hydrate on the client.
 app.get('*', async (req, res) => {
   const tmpl = template();
-  const mod = await loadSSR();
+  const mod = SSR_ENABLED ? await loadSSR() : null;
   const parts = tmpl ? splitTemplate(tmpl, null) : null;
 
-  // No SSR build (or unexpected template) → plain client-side render.
+  // SSR disabled, no SSR build, or unexpected template → plain client-side render.
   if (!mod || !mod.renderStream || !parts) {
     res.setHeader('Cache-Control', 'no-cache');
     return res.sendFile(path.join(clientDist, 'index.html'));
