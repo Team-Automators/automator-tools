@@ -2,6 +2,7 @@ import { jsxs, Fragment, jsx } from "react/jsx-runtime";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { g as getLocationId, a as api } from "../entry-server.mjs";
+import { g as getCached, s as setCached } from "./useCachedResource-la3fKty1.js";
 import { s as stageOf, T as TaskModal, a as TaskDetail } from "./TaskModals-CJ215kkH.js";
 import { c as confirmToast, n as notifySuccess } from "./toast-DrUOosTv.js";
 import "node:async_hooks";
@@ -38,11 +39,12 @@ function StatusPills({ counts }) {
 function Library() {
   const navigate = useNavigate();
   const locationId = getLocationId();
-  const [customers, setCustomers] = useState([]);
+  const cacheKey = `library:${locationId}`;
+  const [customers, setCustomers] = useState(() => getCached(cacheKey) || []);
   const [counts, setCounts] = useState({});
   const [statusMap, setStatusMap] = useState({});
   const [unsortedCount, setUnsortedCount] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !getCached(cacheKey));
   const [showForm, setShowForm] = useState(false);
   const [newName, setNewName] = useState("");
   const [newEmail, setNewEmail] = useState("");
@@ -60,7 +62,9 @@ function Library() {
       api.getCopies(),
       api.getTasks()
     ]);
-    setCustomers(Array.isArray(custs) ? custs : []);
+    const custArr = Array.isArray(custs) ? custs : [];
+    setCustomers(custArr);
+    setCached(cacheKey, custArr);
     const cmap = {};
     const smap = {};
     let unsorted = 0;

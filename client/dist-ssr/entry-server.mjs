@@ -780,20 +780,20 @@ function withPreload(factory) {
   Component.preload = factory;
   return Component;
 }
-const Dashboard = withPreload(() => import("./assets/Dashboard-_s47Mg-0.js"));
+const Dashboard = withPreload(() => import("./assets/Dashboard-CR2oswdc.js"));
 const CopywritersList = withPreload(() => import("./assets/CopywritersList-CkV70USI.js"));
 const CopywritersChat = withPreload(() => import("./assets/CopywritersChat-I5skgXay.js"));
-const Library = withPreload(() => import("./assets/Library-C8Se1Kfm.js"));
+const Library = withPreload(() => import("./assets/Library-BiIltWSU.js"));
 const CustomerDetail = withPreload(() => import("./assets/CustomerDetail-74-vXkQu.js"));
 const LibraryChat = withPreload(() => import("./assets/LibraryChat-fdh054zA.js"));
 const Settings = withPreload(() => import("./assets/Settings-OcO6Wapc.js"));
-const Tasks = withPreload(() => import("./assets/Tasks-BDAFsCpe.js"));
+const Tasks = withPreload(() => import("./assets/Tasks-0sJwHNpV.js"));
 const Hooks = withPreload(() => import("./assets/Hooks-3dkCEcup.js"));
 const Workflows = withPreload(() => import("./assets/Workflows-D3oblaJ6.js"));
-const Archive = withPreload(() => import("./assets/Archive-DGMLrToe.js"));
+const Archive = withPreload(() => import("./assets/Archive-BxVK8TGk.js"));
 const Analyzer = withPreload(() => import("./assets/Analyzer-CK5ufbtR.js"));
 const FunnelArchitect = withPreload(() => import("./assets/FunnelArchitect-XNCHFlGU.js"));
-const Pipeline = withPreload(() => import("./assets/Pipeline-Dz9VfzXF.js"));
+const Pipeline = withPreload(() => import("./assets/Pipeline-l5LmIG25.js"));
 const Admin = withPreload(() => import("./assets/Admin-uieHiv6y.js"));
 const prefetchByKey = {
   dashboard: () => Dashboard.preload(),

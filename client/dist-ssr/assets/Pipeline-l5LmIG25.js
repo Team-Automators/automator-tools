@@ -1,6 +1,7 @@
 import { jsxs, Fragment, jsx } from "react/jsx-runtime";
 import { useState, useRef, useEffect, useMemo, Fragment as Fragment$1 } from "react";
-import { a as api } from "../entry-server.mjs";
+import { g as getLocationId, a as api } from "../entry-server.mjs";
+import { g as getCached, s as setCached } from "./useCachedResource-la3fKty1.js";
 import { n as notifySuccess, c as confirmToast, a as notifyError } from "./toast-DrUOosTv.js";
 import { b as SVC, c as SERVICES, s as stageOf, T as TaskModal } from "./TaskModals-CJ215kkH.js";
 import "node:async_hooks";
@@ -50,9 +51,11 @@ function isOverdue(e) {
   return e.status === "active" && e.dueDate && (/* @__PURE__ */ new Date(e.dueDate + "T23:59:59")).getTime() < Date.now();
 }
 function Pipeline() {
-  const [tasks, setTasks] = useState([]);
-  const [customers, setCustomers] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const cacheKey = `pipeline:${getLocationId()}`;
+  const cached0 = getCached(cacheKey);
+  const [tasks, setTasks] = useState(() => (cached0 == null ? void 0 : cached0.tasks) || []);
+  const [customers, setCustomers] = useState(() => (cached0 == null ? void 0 : cached0.customers) || []);
+  const [loading, setLoading] = useState(() => !cached0);
   const [view, setView] = useState("board");
   const [search, setSearch] = useState("");
   const [addCol, setAddCol] = useState(null);
@@ -66,10 +69,12 @@ function Pipeline() {
   const [dragOver, setDragOver] = useState(null);
   const fileRef = useRef(null);
   async function load() {
-    setLoading(true);
+    if (!getCached(cacheKey)) setLoading(true);
     const [t, c] = await Promise.all([api.getTasks(), api.getCustomers()]);
-    setTasks(Array.isArray(t) ? t : []);
-    setCustomers(Array.isArray(c) ? c : []);
+    const tArr = Array.isArray(t) ? t : [], cArr = Array.isArray(c) ? c : [];
+    setTasks(tArr);
+    setCustomers(cArr);
+    setCached(cacheKey, { tasks: tArr, customers: cArr });
     setLoading(false);
   }
   useEffect(() => {

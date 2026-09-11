@@ -2,6 +2,7 @@ import { jsxs, Fragment, jsx } from "react/jsx-runtime";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { g as getLocationId, a as api } from "../entry-server.mjs";
+import { g as getCached, s as setCached } from "./useCachedResource-la3fKty1.js";
 import { n as notifySuccess, c as confirmToast } from "./toast-DrUOosTv.js";
 import "node:async_hooks";
 import "react-dom/server";
@@ -18,14 +19,17 @@ function fmtDate(ts) {
 function Archive() {
   const navigate = useNavigate();
   const locationId = getLocationId();
-  const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const cacheKey = `archive:${locationId}`;
+  const [items, setItems] = useState(() => getCached(cacheKey) || []);
+  const [loading, setLoading] = useState(() => !getCached(cacheKey));
   const [busyId, setBusyId] = useState(null);
   const [selected, setSelected] = useState(() => /* @__PURE__ */ new Set());
   async function load() {
-    setLoading(true);
+    if (!getCached(cacheKey)) setLoading(true);
     const list = await api.getArchivedCopies();
-    setItems(Array.isArray(list) ? list : []);
+    const arr = Array.isArray(list) ? list : [];
+    setItems(arr);
+    setCached(cacheKey, arr);
     setSelected(/* @__PURE__ */ new Set());
     setLoading(false);
   }

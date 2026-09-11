@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo, Fragment } from 'react'
-import { api } from '../lib/api.js'
+import { api, getLocationId } from '../lib/api.js'
+import { getCached, setCached } from '../hooks/useCachedResource.js'
 import { confirmToast, notifySuccess, notifyError } from '../lib/toast.jsx'
 import { SERVICES, SVC } from '../lib/services.js'
 import { stageOf, TaskModal } from '../components/TaskModals.jsx'
@@ -48,9 +49,11 @@ function isOverdue(e) {
 }
 
 export default function Pipeline() {
-  const [tasks, setTasks]     = useState([])
-  const [customers, setCustomers] = useState([])
-  const [loading, setLoading] = useState(true)
+  const cacheKey = `pipeline:${getLocationId()}`
+  const cached0 = getCached(cacheKey)
+  const [tasks, setTasks]     = useState(() => cached0?.tasks || [])
+  const [customers, setCustomers] = useState(() => cached0?.customers || [])
+  const [loading, setLoading] = useState(() => !cached0)
   const [view, setView]       = useState('board')     // 'board' | 'completed'
   const [search, setSearch]   = useState('')
   const [addCol, setAddCol]   = useState(null)         // service key being added to
@@ -65,10 +68,12 @@ export default function Pipeline() {
   const fileRef = useRef(null)
 
   async function load() {
-    setLoading(true)
+    if (!getCached(cacheKey)) setLoading(true)
     const [t, c] = await Promise.all([api.getTasks(), api.getCustomers()])
-    setTasks(Array.isArray(t) ? t : [])
-    setCustomers(Array.isArray(c) ? c : [])
+    const tArr = Array.isArray(t) ? t : [], cArr = Array.isArray(c) ? c : []
+    setTasks(tArr)
+    setCustomers(cArr)
+    setCached(cacheKey, { tasks: tArr, customers: cArr })
     setLoading(false)
   }
   useEffect(() => { load() }, [])

@@ -1,7 +1,8 @@
 import { jsxs, Fragment, jsx } from "react/jsx-runtime";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { g as getLocationId, u as useAIConfig, a as api } from "../entry-server.mjs";
+import { u as useCachedResource } from "./useCachedResource-la3fKty1.js";
 import { T as TYPE_ORDER, a as TYPES } from "./types-nNhWZ2i7.js";
 import { c as confirmToast, n as notifySuccess } from "./toast-DrUOosTv.js";
 import "node:async_hooks";
@@ -54,17 +55,8 @@ function Dashboard() {
   const navigate = useNavigate();
   const locationId = getLocationId();
   const { config } = useAIConfig();
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
-  useEffect(() => {
-    api.getDashboard().then((d) => {
-      setData(d);
-      setLoading(false);
-    }).catch(() => {
-      setLoading(false);
-    });
-  }, []);
+  const { data, loading, setData } = useCachedResource(`dashboard:${locationId}`, () => api.getDashboard());
   function goTo(path) {
     const u = new URL(path, window.location.origin);
     if (locationId) u.searchParams.set("locationId", locationId);

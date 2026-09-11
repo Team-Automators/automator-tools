@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, getLocationId } from '../lib/api.js'
 import { useAIConfig } from '../hooks/useAIConfig.js'
+import { useCachedResource } from '../hooks/useCachedResource.js'
 import { TYPES, TYPE_ORDER } from '../lib/types.js'
 import { confirmToast, notifySuccess } from '../lib/toast.jsx'
 
@@ -48,15 +49,9 @@ export default function Dashboard() {
   const navigate = useNavigate()
   const locationId = getLocationId()
   const { config } = useAIConfig()
-  const [data, setData] = useState(null)
-  const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(0) // recent-copy page (5 per page, all categories)
-
-  useEffect(() => {
-    api.getDashboard()
-      .then(d => { setData(d); setLoading(false) })
-      .catch(() => { setLoading(false) })
-  }, [])
+  // Cached: first visit fetches, later visits show instantly + refresh in the background.
+  const { data, loading, setData } = useCachedResource(`dashboard:${locationId}`, () => api.getDashboard())
 
   function goTo(path) {
     const u = new URL(path, window.location.origin)

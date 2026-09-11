@@ -2,6 +2,7 @@ import { jsxs, Fragment, jsx } from "react/jsx-runtime";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { a as api, g as getLocationId } from "../entry-server.mjs";
+import { g as getCached, s as setCached } from "./useCachedResource-la3fKty1.js";
 import { S as STAGES, T as TaskModal, a as TaskDetail, s as stageOf, g as getNotes, b as SVC } from "./TaskModals-CJ215kkH.js";
 import "node:async_hooks";
 import "react-dom/server";
@@ -45,14 +46,14 @@ function ProgressBar({ tasks }) {
 }
 function TaskCard({ task, onDragStart, onOpenDetail, onEdit, onDelete }) {
   const navigate = useNavigate();
-  const locationId = getLocationId();
+  const locationId2 = getLocationId();
   const stage = stageOf(task.stage);
   const notes = getNotes(task);
   const lastNote = notes[notes.length - 1];
   function goToLibrary(e) {
     e.stopPropagation();
     if (!task.customerId) return;
-    navigate(`/library/${task.customerId}${locationId ? `?locationId=${locationId}` : ""}`);
+    navigate(`/library/${task.customerId}${locationId2 ? `?locationId=${locationId2}` : ""}`);
   }
   return /* @__PURE__ */ jsxs(
     "div",
@@ -152,17 +153,21 @@ function Column({ stage, tasks, onDragStart, onDragOver, onDrop, isDragOver, onA
   );
 }
 function Tasks() {
-  const [tasks, setTasks] = useState([]);
-  const [customers, setCustomers] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const cacheKey = `tasks:${locationId}`;
+  const cached = getCached(cacheKey);
+  const [tasks, setTasks] = useState(() => (cached == null ? void 0 : cached.tasks) || []);
+  const [customers, setCustomers] = useState(() => (cached == null ? void 0 : cached.customers) || []);
+  const [loading, setLoading] = useState(() => !cached);
   const [modal, setModal] = useState(null);
   const [detail, setDetail] = useState(null);
   const [dragId, setDragId] = useState(null);
   const [dragOver, setDragOver] = useState(null);
   useEffect(() => {
     Promise.all([api.getTasks(), api.getCustomers()]).then(([t, c]) => {
-      setTasks(Array.isArray(t) ? t : []);
-      setCustomers(Array.isArray(c) ? c : []);
+      const tArr = Array.isArray(t) ? t : [], cArr = Array.isArray(c) ? c : [];
+      setTasks(tArr);
+      setCustomers(cArr);
+      setCached(cacheKey, { tasks: tArr, customers: cArr });
       setLoading(false);
     }).catch(() => setLoading(false));
   }, []);

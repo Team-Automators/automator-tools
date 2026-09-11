@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, getLocationId } from '../lib/api.js'
+import { getCached, setCached } from '../hooks/useCachedResource.js'
 import { confirmToast, notifySuccess } from '../lib/toast.jsx'
 
 function fmtDate(ts) {
@@ -13,15 +14,18 @@ export default function Archive() {
   const navigate = useNavigate()
   const locationId = getLocationId()
 
-  const [items, setItems]     = useState([])
-  const [loading, setLoading] = useState(true)
+  const cacheKey = `archive:${locationId}`
+  const [items, setItems]     = useState(() => getCached(cacheKey) || [])
+  const [loading, setLoading] = useState(() => !getCached(cacheKey))
   const [busyId, setBusyId]   = useState(null)
   const [selected, setSelected] = useState(() => new Set())
 
   async function load() {
-    setLoading(true)
+    if (!getCached(cacheKey)) setLoading(true)   // show spinner only when nothing cached
     const list = await api.getArchivedCopies()
-    setItems(Array.isArray(list) ? list : [])
+    const arr = Array.isArray(list) ? list : []
+    setItems(arr)
+    setCached(cacheKey, arr)
     setSelected(new Set())
     setLoading(false)
   }

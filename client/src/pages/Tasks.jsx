@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, getLocationId } from '../lib/api.js'
+import { getCached, setCached } from '../hooks/useCachedResource.js'
 import { STAGES, stageOf, getNotes, TaskModal, TaskDetail } from '../components/TaskModals.jsx'
 import { SVC } from '../lib/services.js'
 
@@ -161,9 +162,11 @@ function Column({ stage, tasks, onDragStart, onDragOver, onDrop, isDragOver, onA
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function Tasks() {
-  const [tasks,     setTasks]     = useState([])
-  const [customers, setCustomers] = useState([])
-  const [loading,   setLoading]   = useState(true)
+  const cacheKey = `tasks:${locationId}`
+  const cached = getCached(cacheKey)
+  const [tasks,     setTasks]     = useState(() => cached?.tasks || [])
+  const [customers, setCustomers] = useState(() => cached?.customers || [])
+  const [loading,   setLoading]   = useState(() => !cached)
   const [modal,     setModal]     = useState(null)   // { mode: 'new'|'edit', stage?, task? }
   const [detail,    setDetail]    = useState(null)   // task being viewed in detail panel
   const [dragId,    setDragId]    = useState(null)
@@ -171,8 +174,10 @@ export default function Tasks() {
 
   useEffect(() => {
     Promise.all([api.getTasks(), api.getCustomers()]).then(([t, c]) => {
-      setTasks(Array.isArray(t) ? t : [])
-      setCustomers(Array.isArray(c) ? c : [])
+      const tArr = Array.isArray(t) ? t : [], cArr = Array.isArray(c) ? c : []
+      setTasks(tArr)
+      setCustomers(cArr)
+      setCached(cacheKey, { tasks: tArr, customers: cArr })
       setLoading(false)
     }).catch(() => setLoading(false))
   }, [])

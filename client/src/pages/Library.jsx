@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, getLocationId } from '../lib/api.js'
+import { getCached, setCached } from '../hooks/useCachedResource.js'
 import { TaskModal, TaskDetail, stageOf } from '../components/TaskModals.jsx'
 import { confirmToast, notifySuccess } from '../lib/toast.jsx'
 
@@ -41,11 +42,12 @@ export default function Library() {
   const navigate = useNavigate()
   const locationId = getLocationId()
 
-  const [customers, setCustomers] = useState([])
+  const cacheKey = `library:${locationId}`
+  const [customers, setCustomers] = useState(() => getCached(cacheKey) || [])
   const [counts, setCounts] = useState({})
   const [statusMap, setStatusMap] = useState({})   // customerId -> { status: count }
   const [unsortedCount, setUnsortedCount] = useState(0)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(() => !getCached(cacheKey))
   const [showForm, setShowForm] = useState(false)
   const [newName, setNewName] = useState('')
   const [newEmail, setNewEmail] = useState('')
@@ -69,7 +71,9 @@ export default function Library() {
       api.getCopies(),
       api.getTasks(),
     ])
-    setCustomers(Array.isArray(custs) ? custs : [])
+    const custArr = Array.isArray(custs) ? custs : []
+    setCustomers(custArr)
+    setCached(cacheKey, custArr)   // seeds the folder list instantly on the next visit
 
     const cmap = {}
     const smap = {}
