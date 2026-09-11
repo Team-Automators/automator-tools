@@ -89,6 +89,7 @@ app.use(express.static(clientDist, {
 // plain client-side rendering, so SSR can never take the app down.
 const fs = require('fs');
 const { pathToFileURL } = require('url');
+const { PassThrough } = require('stream');
 const { verify: verifySession } = require('./lib/session');
 
 const ssrEntry = path.join(__dirname, 'client', 'dist-ssr', 'entry-server.mjs');
@@ -123,27 +124,69 @@ function readCookie(req, name) {
 // Escape '<' so the injected state can't break out of the <script> tag.
 const encodeState = (s) => JSON.stringify(s).replace(/</g, '\\u003c');
 
-// SPA catch-all — render the React app on the server, hydrate on the client.
+// Split the built HTML around the #root div so we can stream React's output
+// between the head (with the injected auth state) and the closing tags.
+const ROOT_MARKER = '<div id="root"></div>';
+function splitTemplate(tmpl, ssr) {
+  const i = tmpl.indexOf(ROOT_MARKER);
+  if (i < 0) return null;
+  const stateScript = ssr ? `<script>window.__SSR_STATE__=${encodeState(ssr)}</script>` : '';
+  const head = tmpl.slice(0, i).replace('</head>', `${stateScript}</head>`) + '<div id="root">';
+  const tail = '</div>' + tmpl.slice(i + ROOT_MARKER.length);
+  return { head, tail };
+}
+
+// SPA catch-all — stream the server-rendered React app, hydrate on the client.
 app.get('*', async (req, res) => {
-  res.setHeader('Cache-Control', 'no-cache');
   const tmpl = template();
   const mod = await loadSSR();
-  if (mod && mod.render && tmpl) {
-    try {
-      const token = readCookie(req, 'ghl_session');
-      const claims = token ? verifySession(token) : null;
-      const ssr = claims ? { token, claims, locationId: claims.lid || '' } : null;
-      const { html } = mod.render(req.originalUrl, ssr);
-      const stateScript = ssr ? `<script>window.__SSR_STATE__=${encodeState(ssr)}</script>` : '';
-      const page = tmpl
-        .replace('<div id="root"></div>', `<div id="root">${html}</div>`)
-        .replace('</head>', `${stateScript}</head>`);
-      return res.send(page);
-    } catch (e) {
-      console.warn('[ssr] render failed, serving CSR:', e.message);
-    }
+  const parts = tmpl ? splitTemplate(tmpl, null) : null;
+
+  // No SSR build (or unexpected template) → plain client-side render.
+  if (!mod || !mod.renderStream || !parts) {
+    res.setHeader('Cache-Control', 'no-cache');
+    return res.sendFile(path.join(clientDist, 'index.html'));
   }
-  return res.sendFile(path.join(clientDist, 'index.html'));
+
+  const token = readCookie(req, 'ghl_session');
+  const claims = token ? verifySession(token) : null;
+  const ssr = claims ? { token, claims, locationId: claims.lid || '' } : null;
+  const { head, tail } = splitTemplate(tmpl, ssr);
+
+  let responded = false;
+  let shellErrored = false;
+  const stream = mod.renderStream(req.originalUrl, ssr, {
+    onShellReady() {
+      responded = true;
+      res.status(200);
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.write(head);
+      const pass = new PassThrough();
+      pass.on('data', (c) => res.write(c));
+      pass.on('end', () => { res.write(tail); res.end(); });
+      stream.pipe(pass);
+    },
+    onShellError(err) {
+      // Couldn't render the shell → fall back to client-side rendering.
+      shellErrored = true;
+      console.warn('[ssr] shell error, serving CSR:', err && err.message);
+      if (!responded) {
+        res.status(200);
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.send(tmpl);
+      }
+    },
+    onError(err) {
+      // A non-shell (Suspense boundary) error — React recovers on the client;
+      // just log it so streaming continues.
+      if (!shellErrored) console.warn('[ssr] render error:', err && err.message);
+    },
+  });
+
+  // Safety valve: never let a stuck render hold the connection open.
+  setTimeout(() => { try { stream.abort(); } catch {} }, 10000);
 });
 
 // ── Error handler ──────────────────────────────────────────────────────────────
