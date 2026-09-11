@@ -2177,26 +2177,15 @@ SCARCITY: Bold urgency section before final CTA — contrasting background, larg
 FINAL CTA BAND: urgent full-width section, strong headline, primary CTA button, guarantee note.
 FOOTER: Do NOT generate a footer — it is automatically appended by the server. End with </body></html> immediately after the cta-band.
 
-━━━ COPY DEPTH: ${depthLen === 'short' ? 'SHORT-FORM (same structure as long — just concise text)' : 'LONG-FORM (rich & detailed)'} ━━━
-${depthLen === 'short' ? `Build the SAME sections in the SAME order as the SECTION ORDER above — do NOT drop or skip any section. Keep the full page structure (hero, features, social proof, and every other section in the layout: trust bar, problem/pain, who-this-is-for, pricing/value stack, guarantee, FAQ, scarcity, final CTA). The ONLY difference from a long page is the amount of text per section — keep every section tight, punchy, and scannable:
-• Hero: 6–10 word headline + ONE short subheadline (≤15 words) + 1 CTA button
-• Features: same count as the layout calls for, each = bold 2–4 word name + ONE short sentence (no multi-sentence descriptions)
-• Social proof: 2–3 testimonials, ONE short sentence each + name/role
-• Problem/pain, who-this-is-for, guarantee, FAQ, pricing, scarcity (whichever are in the layout): KEEP the section, but 1–2 lines only — a short headline plus a sentence or two, never paragraphs
-• Final CTA band: 1 bold headline + 1 button + 1 trust line
-Same visual structure and section count as a long page — just far less copy in each. Aim for ~150–220 lines of HTML.` : `Write thorough, persuasive, detailed copy throughout:
-• Hero: compelling multi-line headline + rich subheadline up to 30 words
-• Features: 5–7 items · each has a bold name + 2–3 sentence description
-• Social proof: 3 testimonials · each quote 3–5 sentences with specific results
-• FAQ: 5 questions · detailed 3–4 sentence answers addressing real objections
-• Guarantee: full paragraph explaining the promise and process
-• Scarcity: compelling 3–5 line urgency section with specific scarcity reason
-• Problem/pain: vivid, empathetic descriptions that agitate the pain
-Aim for 450–600 lines total — a fully fleshed-out, high-converting page.`}
+━━━ COMPLETENESS (non-negotiable) ━━━
+Render EVERY piece of the provided marketing copy IN FULL — every headline, paragraph, bullet, feature, step, price, and testimonial must appear complete inside the design. NEVER summarize, shorten, merge, drop, or truncate the provided copy. Your job is to LAY OUT and style the copy, not to edit or condense it. Do NOT invent extra filler beyond what the copy supports — let the amount of copy you were given determine the page length. This keeps generation fast (no padding) AND guarantees nothing is cut.
+
+━━━ COPY DEPTH: ${depthLen === 'short' ? 'CONCISE FORMATTING' : 'RICH FORMATTING'} ━━━
+${depthLen === 'short' ? `Build the SAME sections in the SAME order as the SECTION ORDER above — do NOT drop or skip any section. Render all provided copy in full, formatted tight and scannable; where the copy is brief keep the styling clean and don't pad it out. One feature row per feature in the copy; every testimonial the copy provides; a short headline + the copy's own supporting lines per section. Lean, well-formatted markup — no invented filler.` : `Format the full provided copy into a rich, persuasive, well-designed layout using the section patterns above — headlines, subheadlines, feature blocks, testimonials, FAQ, guarantee, scarcity, all present exactly as the copy provides them. Do not expand with invented prose; style what's there beautifully. Keep the markup lean (reusable classes) so the entire copy renders efficiently without the page getting cut off.`}
 
 ━━━ COPY RULES ━━━
-• Use ONLY content from the provided marketing copy — extract real product name, prices, features, testimonials
-• If testimonials are absent, write 3 realistic ones that fit the product
+• Use ONLY content from the provided marketing copy — extract real product name, prices, features, testimonials, and render ALL of it
+• If testimonials are entirely absent from the copy, write 3 realistic ones that fit the product
 • No [brackets], no placeholders — finished copy only
 • Image seed for picsum.photos: ${imgSeed} (use ${imgSeed}H for hero, ${imgSeed}T1/${imgSeed}T2/${imgSeed}T3 for avatars)
 
@@ -2213,8 +2202,8 @@ Aim for 450–600 lines total — a fully fleshed-out, high-converting page.`}
 
 OUTPUT: Return ONLY the HTML document. No preamble, no markdown fences. Start with <!DOCTYPE html>.
 
-━━━ MARKETING COPY ━━━
-${copy.slice(0, 6000)}`;
+━━━ MARKETING COPY (render ALL of it — do not truncate) ━━━
+${copy.slice(0, 18000)}`;
 
   // Switch to SSE streaming so the Vercel 120s timeout never fires —
   // the connection stays alive the entire generation
