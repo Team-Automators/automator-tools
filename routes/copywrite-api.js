@@ -139,14 +139,14 @@ async function callAI(providerCfg, apiKey, model, prompt, maxTokens = 600) {
     const { data } = await axios.post(url, {
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       generationConfig: { maxOutputTokens: maxTokens },
-    });
+    }, { timeout: 60000 });
     console.log(`[callAI] gemini finish_reason=${data.candidates?.[0]?.finishReason}`);
     return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
   }
   if (providerCfg.type === 'cohere') {
     const { data } = await axios.post('https://api.cohere.com/v1/chat', {
       message: prompt, model, max_tokens: maxTokens,
-    }, { headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' } });
+    }, { headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, timeout: 60000 });
     return data.text || '';
   }
   return '';
@@ -2066,7 +2066,12 @@ Return ONLY JSON (no prose): {"styleShortlist": [<3 distinct indexes 0-${STYLES.
 
 MARKETING COPY:
 ${copy.slice(0, 4000)}`;
-    const raw = await callAI(providerCfg, resolvedKey, model, analysisPrompt, 500);
+    // Cap the analysis round-trip so a slow/stalled provider can't delay the
+    // whole generation — on timeout we fall through to random style + layout.
+    const raw = await Promise.race([
+      callAI(providerCfg, resolvedKey, model, analysisPrompt, 500),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('analysis timeout')), 15000)),
+    ]);
     const j = parseModelJSON(raw);
     let list = Array.isArray(j.styleShortlist) ? j.styleShortlist : (Number.isInteger(j.styleIndex) ? [j.styleIndex] : []);
     styleShortlist = [...new Set(list)].filter(i => Number.isInteger(i) && STYLES[i]).map(i => STYLES[i]);
@@ -2300,30 +2305,50 @@ ${copy.slice(0, 6000)}`;
     const isComplete = (h) => /<\/html>/i.test(h);
     const stripFences = (t) => (t || '').replace(/^\s*```[\w]*\s*/i, '').replace(/\s*```\s*$/i, '');
 
+    // A stream can silently stall — the provider stops sending tokens but never
+    // closes the connection or errors, so a naive `for await` waits forever. This
+    // watchdog aborts a turn when no token has arrived for STALL_MS; the loop then
+    // resumes from what we have, so a stall becomes a quick continue, not a hang.
+    const STALL_MS = 20000;
+
     // Stream ONE turn for the given message list; returns the text (and streams
-    // chunks to the client as they arrive).
+    // chunks to the client as they arrive). Returns partial text if it stalls.
     async function streamTurn(messages) {
       let text = '';
-      if (providerCfg.type === 'anthropic') {
-        const client = new Anthropic({ apiKey: resolvedKey });
-        const stream = client.messages.stream({ model, max_tokens: maxTok, messages });
-        for await (const event of stream) {
-          if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
-            text += event.delta.text; sendEvent({ chunk: event.delta.text });
+      const controller = new AbortController();
+      let watchdog;
+      const arm = () => { clearTimeout(watchdog); watchdog = setTimeout(() => controller.abort(), STALL_MS); };
+      try {
+        if (providerCfg.type === 'anthropic') {
+          const client = new Anthropic({ apiKey: resolvedKey });
+          const stream = client.messages.stream({ model, max_tokens: maxTok, messages }, { signal: controller.signal });
+          arm();
+          for await (const event of stream) {
+            if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
+              text += event.delta.text; sendEvent({ chunk: event.delta.text }); arm();
+            }
           }
+        } else if (providerCfg.type === 'openai-compat') {
+          const client = new OpenAI({ apiKey: resolvedKey, baseURL: providerCfg.baseUrl });
+          const stream = await client.chat.completions.create({ model, max_tokens: maxTok, messages, stream: true }, { signal: controller.signal });
+          arm();
+          for await (const chunk of stream) {
+            const t = chunk.choices[0]?.delta?.content || '';
+            if (t) { text += t; sendEvent({ chunk: t }); arm(); }
+          }
+        } else {
+          // Gemini / Cohere: single-prompt; heartbeat keeps SSE alive.
+          const heartbeat = setInterval(() => res.write(': heartbeat\n\n'), 5000);
+          try { text = await callAI(providerCfg, resolvedKey, model, messages.map(m => m.content).join('\n\n'), 8000); }
+          finally { clearInterval(heartbeat); }
         }
-      } else if (providerCfg.type === 'openai-compat') {
-        const client = new OpenAI({ apiKey: resolvedKey, baseURL: providerCfg.baseUrl });
-        const stream = await client.chat.completions.create({ model, max_tokens: maxTok, messages, stream: true });
-        for await (const chunk of stream) {
-          const t = chunk.choices[0]?.delta?.content || '';
-          if (t) { text += t; sendEvent({ chunk: t }); }
-        }
-      } else {
-        // Gemini / Cohere: single-prompt; heartbeat keeps SSE alive.
-        const heartbeat = setInterval(() => res.write(': heartbeat\n\n'), 5000);
-        try { text = await callAI(providerCfg, resolvedKey, model, messages.map(m => m.content).join('\n\n'), 8000); }
-        finally { clearInterval(heartbeat); }
+      } catch (e) {
+        // Aborted by the watchdog → keep the partial text and let the loop resume.
+        // Any other error with no text collected should propagate to the catch.
+        if (!controller.signal.aborted && !text) throw e;
+        if (controller.signal.aborted) console.warn(`[mockup] stream stalled (no tokens ${STALL_MS}ms) — resuming from ${text.length} chars`);
+      } finally {
+        clearTimeout(watchdog);
       }
       return text;
     }
@@ -2335,7 +2360,15 @@ ${copy.slice(0, 6000)}`;
     const convo = [{ role: 'user', content: designPrompt }];
     const MAX_TURNS = 4;
     const PAUSE_MS = 5000;
+    // Hard ceiling on the whole generation so it can never run away (a stalled or
+    // very slow provider is capped here). Whatever we have is finished + closed.
+    const TIME_BUDGET_MS = 180000; // 3 min
+    const startedAt = Date.now();
     for (let turn = 0; turn < MAX_TURNS; turn++) {
+      if (Date.now() - startedAt > TIME_BUDGET_MS) {
+        console.warn(`[mockup] time budget reached (${Math.round((Date.now() - startedAt) / 1000)}s, ${rawHtml.length} chars) — finishing with what we have`);
+        break;
+      }
       if (turn > 0) {
         // ~5s breather before auto-continuing; heartbeats keep the SSE alive.
         sendEvent({ status: 'continuing' });
