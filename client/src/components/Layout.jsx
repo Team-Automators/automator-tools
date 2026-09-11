@@ -1,4 +1,4 @@
-import { Outlet, NavLink, useNavigate } from 'react-router-dom'
+import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useState, useRef, useEffect } from 'react'
 import { useLocationId } from '../hooks/useLocationId.js'
 import { useAIConfig } from '../hooks/useAIConfig.js'
@@ -152,8 +152,9 @@ export default function Layout() {
   const userName = user?.name || user?.email || ''
   const initials = user ? userInitials(user.name, user.email) : (locationId ? locationId.slice(0, 2).toUpperCase() : 'GL')
 
+  const routerLocation = useLocation()
   function isActive(item) {
-    const path = window.location.pathname
+    const path = routerLocation.pathname
     if (item.path === '/') return path === '/' || path === '/dashboard'
     return path.startsWith(item.path)
   }

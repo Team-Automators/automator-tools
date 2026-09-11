@@ -1,27 +1,26 @@
 import { jsxs, jsx, Fragment } from "react/jsx-runtime";
-import { renderToString } from "react-dom/server";
+import { AsyncLocalStorage } from "node:async_hooks";
+import { renderToPipeableStream } from "react-dom/server";
 import { StaticRouter } from "react-router-dom/server.mjs";
 import { useEffect, useState, useCallback, useRef, lazy, Suspense } from "react";
-import { useSearchParams, useNavigate, NavLink, Outlet, Routes, Route, Navigate, useParams } from "react-router-dom";
+import { useSearchParams, useNavigate, useLocation, NavLink, Outlet, Routes, Route, Navigate, useParams } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
+let resolver = null;
+function setStateResolver(fn) {
+  resolver = fn;
+}
 function ssrState() {
+  if (resolver) {
+    try {
+      return resolver() || null;
+    } catch {
+      return null;
+    }
+  }
   try {
-    const g = typeof globalThis !== "undefined" ? globalThis : {};
-    return g.__SSR_STATE__ || null;
+    return typeof globalThis !== "undefined" && globalThis.__SSR_STATE__ || null;
   } catch {
     return null;
-  }
-}
-function setSsrState(s) {
-  try {
-    globalThis.__SSR_STATE__ = s || null;
-  } catch {
-  }
-}
-function clearSsrState() {
-  try {
-    globalThis.__SSR_STATE__ = null;
-  } catch {
   }
 }
 const LOCATION_KEY = "ghl_location_id";
@@ -995,8 +994,9 @@ function Layout() {
   const navItems = NAV_ITEMS.filter((i) => !i.adminOnly || (user == null ? void 0 : user.adm));
   const userName = (user == null ? void 0 : user.name) || (user == null ? void 0 : user.email) || "";
   const initials = user ? userInitials(user.name, user.email) : locationId ? locationId.slice(0, 2).toUpperCase() : "GL";
+  const routerLocation = useLocation();
   function isActive(item) {
-    const path = window.location.pathname;
+    const path = routerLocation.pathname;
     if (item.path === "/") return path === "/" || path === "/dashboard";
     return path.startsWith(item.path);
   }
@@ -1293,21 +1293,21 @@ function Login() {
     ] })
   ] }) });
 }
-const Dashboard = lazy(() => import("./assets/Dashboard-CFGK7sWL.js"));
-const CopywritersList = lazy(() => import("./assets/CopywritersList-DRBjpqvJ.js"));
-const CopywritersChat = lazy(() => import("./assets/CopywritersChat-CsdX_0lu.js"));
-const Library = lazy(() => import("./assets/Library-CKmwzB6R.js"));
-const CustomerDetail = lazy(() => import("./assets/CustomerDetail-B9LehXYL.js"));
-const LibraryChat = lazy(() => import("./assets/LibraryChat-G9Vrtnst.js"));
-const Settings = lazy(() => import("./assets/Settings-CQ3n2b3m.js"));
-const Tasks = lazy(() => import("./assets/Tasks-Cuds9vu7.js"));
-const Hooks = lazy(() => import("./assets/Hooks-Bjjq5RG9.js"));
-const Workflows = lazy(() => import("./assets/Workflows-fcR6wy43.js"));
-const Archive = lazy(() => import("./assets/Archive-CwmWe9kQ.js"));
-const Analyzer = lazy(() => import("./assets/Analyzer-C57P9Qtf.js"));
-const FunnelArchitect = lazy(() => import("./assets/FunnelArchitect-CIdfXWTH.js"));
-const Pipeline = lazy(() => import("./assets/Pipeline-BXjeXY0W.js"));
-const Admin = lazy(() => import("./assets/Admin-Bsch2XGM.js"));
+const Dashboard = lazy(() => import("./assets/Dashboard-_s47Mg-0.js"));
+const CopywritersList = lazy(() => import("./assets/CopywritersList-CkV70USI.js"));
+const CopywritersChat = lazy(() => import("./assets/CopywritersChat-I5skgXay.js"));
+const Library = lazy(() => import("./assets/Library-C8Se1Kfm.js"));
+const CustomerDetail = lazy(() => import("./assets/CustomerDetail-74-vXkQu.js"));
+const LibraryChat = lazy(() => import("./assets/LibraryChat-fdh054zA.js"));
+const Settings = lazy(() => import("./assets/Settings-OcO6Wapc.js"));
+const Tasks = lazy(() => import("./assets/Tasks-BDAFsCpe.js"));
+const Hooks = lazy(() => import("./assets/Hooks-3dkCEcup.js"));
+const Workflows = lazy(() => import("./assets/Workflows-D3oblaJ6.js"));
+const Archive = lazy(() => import("./assets/Archive-DGMLrToe.js"));
+const Analyzer = lazy(() => import("./assets/Analyzer-CK5ufbtR.js"));
+const FunnelArchitect = lazy(() => import("./assets/FunnelArchitect-XNCHFlGU.js"));
+const Pipeline = lazy(() => import("./assets/Pipeline-Dz9VfzXF.js"));
+const Admin = lazy(() => import("./assets/Admin-uieHiv6y.js"));
 async function bootstrapAuth() {
   if (window.location.pathname === "/login") return;
   const claims = getSessionClaims();
@@ -1399,16 +1399,13 @@ function App() {
     ] }) })
   ] });
 }
-function render(url, ssr) {
-  setSsrState(ssr || null);
-  try {
-    const html = renderToString(
-      /* @__PURE__ */ jsx(StaticRouter, { location: url, children: /* @__PURE__ */ jsx(App, {}) })
-    );
-    return { html };
-  } finally {
-    clearSsrState();
-  }
+const als = new AsyncLocalStorage();
+setStateResolver(() => als.getStore() || null);
+function renderStream(url, ssr, handlers) {
+  return als.run(ssr || null, () => {
+    const app = /* @__PURE__ */ jsx(StaticRouter, { location: url, children: /* @__PURE__ */ jsx(App, {}) });
+    return renderToPipeableStream(app, handlers);
+  });
 }
 export {
   api as a,
@@ -1417,7 +1414,7 @@ export {
   getSessionToken as d,
   getLocationId as g,
   persistLocationId as p,
-  render,
+  renderStream,
   setSessionToken as s,
   useAIConfig as u
 };
