@@ -787,7 +787,7 @@ const Library = withPreload(() => import("./assets/Library-BiIltWSU.js"));
 const CustomerDetail = withPreload(() => import("./assets/CustomerDetail-74-vXkQu.js"));
 const LibraryChat = withPreload(() => import("./assets/LibraryChat-fdh054zA.js"));
 const Settings = withPreload(() => import("./assets/Settings-OcO6Wapc.js"));
-const Tasks = withPreload(() => import("./assets/Tasks-0sJwHNpV.js"));
+const Tasks = withPreload(() => import("./assets/Tasks-C1WCGwxj.js"));
 const Hooks = withPreload(() => import("./assets/Hooks-3dkCEcup.js"));
 const Workflows = withPreload(() => import("./assets/Workflows-D3oblaJ6.js"));
 const Archive = withPreload(() => import("./assets/Archive-BxVK8TGk.js"));

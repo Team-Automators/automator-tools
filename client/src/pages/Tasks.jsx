@@ -162,6 +162,7 @@ function Column({ stage, tasks, onDragStart, onDragOver, onDrop, isDragOver, onA
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function Tasks() {
+  const locationId = getLocationId()
   const cacheKey = `tasks:${locationId}`
   const cached = getCached(cacheKey)
   const [tasks,     setTasks]     = useState(() => cached?.tasks || [])

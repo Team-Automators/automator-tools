@@ -1,7 +1,7 @@
 import { jsxs, Fragment, jsx } from "react/jsx-runtime";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { a as api, g as getLocationId } from "../entry-server.mjs";
+import { g as getLocationId, a as api } from "../entry-server.mjs";
 import { g as getCached, s as setCached } from "./useCachedResource-la3fKty1.js";
 import { S as STAGES, T as TaskModal, a as TaskDetail, s as stageOf, g as getNotes, b as SVC } from "./TaskModals-CJ215kkH.js";
 import "node:async_hooks";
@@ -46,14 +46,14 @@ function ProgressBar({ tasks }) {
 }
 function TaskCard({ task, onDragStart, onOpenDetail, onEdit, onDelete }) {
   const navigate = useNavigate();
-  const locationId2 = getLocationId();
+  const locationId = getLocationId();
   const stage = stageOf(task.stage);
   const notes = getNotes(task);
   const lastNote = notes[notes.length - 1];
   function goToLibrary(e) {
     e.stopPropagation();
     if (!task.customerId) return;
-    navigate(`/library/${task.customerId}${locationId2 ? `?locationId=${locationId2}` : ""}`);
+    navigate(`/library/${task.customerId}${locationId ? `?locationId=${locationId}` : ""}`);
   }
   return /* @__PURE__ */ jsxs(
     "div",
@@ -153,6 +153,7 @@ function Column({ stage, tasks, onDragStart, onDragOver, onDrop, isDragOver, onA
   );
 }
 function Tasks() {
+  const locationId = getLocationId();
   const cacheKey = `tasks:${locationId}`;
   const cached = getCached(cacheKey);
   const [tasks, setTasks] = useState(() => (cached == null ? void 0 : cached.tasks) || []);
