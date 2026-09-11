@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { api, getLocationId } from '../lib/api.js'
 import { useAIConfig } from '../hooks/useAIConfig.js'
 import { useCachedResource } from '../hooks/useCachedResource.js'
+import { SkeletonStats, SkeletonList } from '../components/Skeleton.jsx'
 import { TYPES, TYPE_ORDER } from '../lib/types.js'
 import { confirmToast, notifySuccess } from '../lib/toast.jsx'
 
@@ -79,8 +80,10 @@ export default function Dashboard() {
             <span className="breadcrumb-current">Dashboard</span>
           </div>
         </div>
-        <div className="content" style={{ display: 'flex', justifyContent: 'center', paddingTop: 48 }}>
-          <div className="spinner" />
+        <div className="content">
+          <SkeletonStats count={4} />
+          <div style={{ height: 20 }} />
+          <SkeletonList rows={5} />
         </div>
       </>
     )

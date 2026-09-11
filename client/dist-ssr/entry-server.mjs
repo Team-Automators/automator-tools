@@ -780,7 +780,7 @@ function withPreload(factory) {
   Component.preload = factory;
   return Component;
 }
-const Dashboard = withPreload(() => import("./assets/Dashboard-CR2oswdc.js"));
+const Dashboard = withPreload(() => import("./assets/Dashboard-slLNnT6b.js"));
 const CopywritersList = withPreload(() => import("./assets/CopywritersList-CkV70USI.js"));
 const CopywritersChat = withPreload(() => import("./assets/CopywritersChat-I5skgXay.js"));
 const Library = withPreload(() => import("./assets/Library-BiIltWSU.js"));
@@ -1155,7 +1155,7 @@ function Layout() {
         /* @__PURE__ */ jsx("span", { children: "No AI provider connected — set an API key to use Copywriters." }),
         /* @__PURE__ */ jsx(NavLink, { to: navPath("/settings"), className: "ai-banner-link", children: "Set up AI →" })
       ] }),
-      /* @__PURE__ */ jsx(Outlet, {})
+      /* @__PURE__ */ jsx("div", { className: "page-enter", children: /* @__PURE__ */ jsx(Outlet, {}) }, routerLocation.pathname)
     ] }),
     /* @__PURE__ */ jsx("nav", { className: "mobile-nav", children: navItems.map((item) => /* @__PURE__ */ jsxs(
       NavLink,

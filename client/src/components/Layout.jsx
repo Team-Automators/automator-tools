@@ -268,7 +268,9 @@ export default function Layout() {
           </div>
         )}
 
-        <Outlet />
+        <div className="page-enter" key={routerLocation.pathname}>
+          <Outlet />
+        </div>
       </main>
 
       {/* ── Mobile bottom nav ────────────────────────────────────── */}

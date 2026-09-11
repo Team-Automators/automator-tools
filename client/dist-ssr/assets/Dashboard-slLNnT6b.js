@@ -1,4 +1,4 @@
-import { jsxs, Fragment, jsx } from "react/jsx-runtime";
+import { jsx, jsxs, Fragment } from "react/jsx-runtime";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { g as getLocationId, u as useAIConfig, a as api } from "../entry-server.mjs";
@@ -9,6 +9,25 @@ import "node:async_hooks";
 import "react-dom/server";
 import "react-router-dom/server.mjs";
 import "react-toastify";
+function Skeleton({ w = "100%", h = 14, r = 8, style }) {
+  return /* @__PURE__ */ jsx("div", { className: "skeleton", style: { width: w, height: h, borderRadius: r, ...style } });
+}
+function SkeletonStats({ count = 4 }) {
+  return /* @__PURE__ */ jsx("div", { className: "skel-stats", children: Array.from({ length: count }).map((_, i) => /* @__PURE__ */ jsxs("div", { className: "card skel-stat", children: [
+    /* @__PURE__ */ jsx(Skeleton, { w: "40%", h: 12 }),
+    /* @__PURE__ */ jsx(Skeleton, { w: "60%", h: 26, style: { marginTop: 12 } })
+  ] }, i)) });
+}
+function SkeletonList({ rows = 5 }) {
+  return /* @__PURE__ */ jsx("div", { className: "skel-list", children: Array.from({ length: rows }).map((_, i) => /* @__PURE__ */ jsxs("div", { className: "card skel-row", children: [
+    /* @__PURE__ */ jsx(Skeleton, { w: 38, h: 38, r: 10 }),
+    /* @__PURE__ */ jsxs("div", { style: { flex: 1, minWidth: 0 }, children: [
+      /* @__PURE__ */ jsx(Skeleton, { w: "45%", h: 13 }),
+      /* @__PURE__ */ jsx(Skeleton, { w: "70%", h: 11, style: { marginTop: 8 } })
+    ] }),
+    /* @__PURE__ */ jsx(Skeleton, { w: 64, h: 24, r: 12 })
+  ] }, i)) });
+}
 const PAGE_SIZE = 5;
 function relTime(ts) {
   if (!ts) return "";
@@ -77,7 +96,11 @@ function Dashboard() {
   if (loading) {
     return /* @__PURE__ */ jsxs(Fragment, { children: [
       /* @__PURE__ */ jsx("div", { className: "topnav", children: /* @__PURE__ */ jsx("div", { className: "topnav-left", children: /* @__PURE__ */ jsx("span", { className: "breadcrumb-current", children: "Dashboard" }) }) }),
-      /* @__PURE__ */ jsx("div", { className: "content", style: { display: "flex", justifyContent: "center", paddingTop: 48 }, children: /* @__PURE__ */ jsx("div", { className: "spinner" }) })
+      /* @__PURE__ */ jsxs("div", { className: "content", children: [
+        /* @__PURE__ */ jsx(SkeletonStats, { count: 4 }),
+        /* @__PURE__ */ jsx("div", { style: { height: 20 } }),
+        /* @__PURE__ */ jsx(SkeletonList, { rows: 5 })
+      ] })
     ] });
   }
   const allCopies = (data == null ? void 0 : data.recentCopies) || [];

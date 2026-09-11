@@ -2583,3 +2583,92 @@ img { max-width: 100%; display: block; }
   .wf-sess-bar--ok   { background: #052E16; border-color: #166534; }
   .wf-sess-bar--warn { background: #1C1003; border-color: #92400E; }
 }
+
+/* ============================================================
+   Interface polish — transitions, depth, focus, skeletons, mobile
+   Additive layer; uses existing design tokens. Respects reduced-motion.
+   ============================================================ */
+
+/* ── Page entrance (retriggered on each route change) ─────────────────────── */
+@media (prefers-reduced-motion: no-preference) {
+  .page-enter { animation: pageIn .26s cubic-bezier(.22,.61,.36,1) both; }
+  @keyframes pageIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: none; }
+  }
+}
+
+/* ── Buttons: subtle lift + tactile press ─────────────────────────────────── */
+.btn { transition: background .14s, opacity .14s, transform .08s, box-shadow .14s, filter .14s; }
+.btn-primary { box-shadow: 0 1px 2px rgba(37,99,235,.25); }
+.btn-primary:hover { opacity: 1; filter: brightness(1.07); box-shadow: 0 4px 16px rgba(37,99,235,.30); }
+.btn-danger:hover  { opacity: 1; filter: brightness(1.07); }
+.btn:not(:disabled):active { transform: translateY(1px); }
+
+/* ── Cards: gentle hover lift on interactive cards ────────────────────────── */
+.type-card { transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease; }
+.type-card:hover { transform: translateY(-2px); box-shadow: 0 8px 26px rgba(0,0,0,.09); border-color: var(--accent); }
+
+/* ── Accessible, consistent focus ring ────────────────────────────────────── */
+a:focus-visible, button:focus-visible, .btn:focus-visible,
+input:focus-visible, textarea:focus-visible, select:focus-visible,
+.nav-item:focus-visible, .mobile-nav-item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* ── Sidebar active: accent bar + smoother state ──────────────────────────── */
+.nav-item { position: relative; }
+.nav-item.active::before {
+  content: '';
+  position: absolute; left: -2px; top: 50%; transform: translateY(-50%);
+  width: 3px; height: 58%; border-radius: 0 3px 3px 0; background: #60A5FA;
+}
+.mobile-nav-item { transition: color .14s, transform .1s; }
+.mobile-nav-item:active { transform: scale(.94); }
+
+/* ── Skeleton loading ─────────────────────────────────────────────────────── */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--border);
+  border-radius: 8px;
+}
+.skeleton::after {
+  content: '';
+  position: absolute; inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.45), transparent);
+  animation: skeletonShimmer 1.4s infinite;
+}
+:root:not([data-theme="light"]) .skeleton::after,
+[data-theme="dark"] .skeleton::after {
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.10), transparent);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .skeleton::after {
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,.10), transparent);
+  }
+}
+@keyframes skeletonShimmer { 100% { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) { .skeleton::after { animation: none; } }
+
+.skel-stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+@media (min-width: 768px) { .skel-stats { grid-template-columns: repeat(4, 1fr); } }
+.skel-stat { padding: 18px; }
+.skel-list { display: flex; flex-direction: column; gap: 10px; }
+.skel-row {
+  display: flex; align-items: center; gap: 14px;
+  padding: 16px 18px;
+}
+
+/* ── Mobile touch & spacing polish ────────────────────────────────────────── */
+@media (max-width: 767px) {
+  .btn { min-height: 46px; }
+  .mobile-nav-item { min-width: 52px; }
+}
