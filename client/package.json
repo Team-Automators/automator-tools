@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && vite build --ssr src/entry-server.jsx",
+    "build:client": "vite build",
+    "build:ssr": "vite build --ssr src/entry-server.jsx",
     "preview": "vite preview"
   },
   "dependencies": {

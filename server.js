@@ -81,10 +81,69 @@ app.use(express.static(clientDist, {
   },
 }));
 
-// SPA catch-all — any path not matched above serves the React app
-app.get('*', (req, res) => {
+// ── Server-side rendering ───────────────────────────────────────────────────────
+// The SPA is rendered on the server for a fast first paint, then hydrated in the
+// browser. Auth for the render comes from the verified ghl_session cookie (when
+// present — the GHL iframe blocks it, and those requests render neutrally and let
+// the client resolve auth from localStorage). Any render error falls back to
+// plain client-side rendering, so SSR can never take the app down.
+const fs = require('fs');
+const { pathToFileURL } = require('url');
+const { verify: verifySession } = require('./lib/session');
+
+const ssrEntry = path.join(__dirname, 'client', 'dist-ssr', 'entry-server.mjs');
+let ssrModPromise;
+function loadSSR() {
+  if (ssrModPromise === undefined) {
+    ssrModPromise = fs.existsSync(ssrEntry)
+      ? import(pathToFileURL(ssrEntry).href).catch(e => { console.warn('[ssr] module load failed:', e.message); return null; })
+      : Promise.resolve(null);
+  }
+  return ssrModPromise;
+}
+
+let htmlTemplate;
+function template() {
+  if (htmlTemplate === undefined) {
+    try { htmlTemplate = fs.readFileSync(path.join(clientDist, 'index.html'), 'utf8'); }
+    catch { htmlTemplate = ''; }
+  }
+  return htmlTemplate;
+}
+
+function readCookie(req, name) {
+  const header = req.headers.cookie || '';
+  for (const part of header.split(';')) {
+    const i = part.indexOf('=');
+    if (i > 0 && part.slice(0, i).trim() === name) return decodeURIComponent(part.slice(i + 1).trim());
+  }
+  return '';
+}
+
+// Escape '<' so the injected state can't break out of the <script> tag.
+const encodeState = (s) => JSON.stringify(s).replace(/</g, '\\u003c');
+
+// SPA catch-all — render the React app on the server, hydrate on the client.
+app.get('*', async (req, res) => {
   res.setHeader('Cache-Control', 'no-cache');
-  res.sendFile(path.join(clientDist, 'index.html'));
+  const tmpl = template();
+  const mod = await loadSSR();
+  if (mod && mod.render && tmpl) {
+    try {
+      const token = readCookie(req, 'ghl_session');
+      const claims = token ? verifySession(token) : null;
+      const ssr = claims ? { token, claims, locationId: claims.lid || '' } : null;
+      const { html } = mod.render(req.originalUrl, ssr);
+      const stateScript = ssr ? `<script>window.__SSR_STATE__=${encodeState(ssr)}</script>` : '';
+      const page = tmpl
+        .replace('<div id="root"></div>', `<div id="root">${html}</div>`)
+        .replace('</head>', `${stateScript}</head>`);
+      return res.send(page);
+    } catch (e) {
+      console.warn('[ssr] render failed, serving CSR:', e.message);
+    }
+  }
+  return res.sendFile(path.join(clientDist, 'index.html'));
 });
 
 // ── Error handler ──────────────────────────────────────────────────────────────

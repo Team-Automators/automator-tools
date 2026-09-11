@@ -3,10 +3,16 @@
 // (works inside the GHL iframe where third-party cookies may be blocked). The
 // server also sets an httpOnly cookie as a fallback for standalone use.
 
+import { ssrState } from './ssr-state.js'
+
 const KEY = 'ghl_session'
 const EMAIL_KEY = 'ghl_user_email'   // remembered so we can silently re-login as the user
 
 export function getSessionToken() {
+  // During SSR and the first client render, use the server-injected token so
+  // both renders agree; falls through to localStorage after hydration.
+  const s = ssrState()
+  if (s && s.token != null) return s.token || ''
   try { return localStorage.getItem(KEY) || '' } catch { return '' }
 }
 
@@ -49,11 +55,16 @@ function decodeClaims(t) {
 // Decode the (signed, not encrypted) session payload for UI gating only.
 // The server always re-verifies — never trust this for authorization.
 export function getSessionClaims() {
+  // During SSR / first client render use the claims the server already verified
+  // from the cookie, so gating decisions match on both sides.
+  const s = ssrState()
+  if (s && s.claims) return s.claims
   return decodeClaims(getSessionToken())
 }
 
 // The location context we can silently re-authenticate against.
 function currentLocationId() {
+  if (typeof window === 'undefined') return ''
   try {
     const fromUrl = new URL(window.location.href).searchParams.get('locationId')
     return fromUrl || localStorage.getItem('ghl_location_id') || ''

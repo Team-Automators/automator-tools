@@ -65,15 +65,28 @@ function CopywritersChatKeyed() {
 }
 
 function RequireLocation({ children }) {
-  if (!getLocationId())          return <Navigate to="/login" replace />
-  if (!getSessionToken())        return <Navigate to="/login" replace />
-  if (!getSessionClaims()?.uid)  return <Navigate to="/login" replace />  // needs verified user
-  // AI API key is NOT required to enter — users can explore and add it later in Settings.
-  return children
+  const authed = getLocationId() && getSessionToken() && getSessionClaims()?.uid
+  if (authed) return children  // AI API key is NOT required — users add it later in Settings
+  // On the server we can't always see auth (the GHL iframe blocks the cookie, so
+  // only the browser's localStorage knows) — render nothing and let the client
+  // decide routing, instead of redirecting and possibly bouncing a valid user.
+  if (typeof window === 'undefined') return null
+  return <Navigate to="/login" replace />
 }
 
 export default function App() {
-  const [booting, setBooting] = useState(true)
+  // Initial boot state must be identical on the server and on the client's first
+  // (hydration) render, so it's derived only from what BOTH can see: the injected
+  // session claims. If we already hold a valid user session, render immediately;
+  // never block during SSR; only the client, when it genuinely needs a silent
+  // re-auth, shows the boot spinner.
+  const [booting, setBooting] = useState(() => {
+    const claims = getSessionClaims()
+    if (claims?.uid && claims.exp && Date.now() < claims.exp) return false
+    if (typeof window === 'undefined') return false
+    if (window.location.pathname === '/login') return false
+    return true
+  })
 
   // Detect an existing authenticated state before rendering the route gate,
   // so an already-authenticated app is never bounced to the login screen.

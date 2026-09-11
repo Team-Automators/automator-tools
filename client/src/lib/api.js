@@ -1,6 +1,13 @@
+import { ssrState } from './ssr-state.js'
+
 const LOCATION_KEY = 'ghl_location_id'
 
 export function getLocationId() {
+  // Prefer the server-injected location during SSR / first client render so the
+  // markup matches; on the client after hydration, read URL + localStorage.
+  const s = ssrState()
+  if (s && s.locationId != null) return s.locationId || ''
+  if (typeof window === 'undefined') return ''
   const url = new URL(window.location.href)
   return url.searchParams.get('locationId') || localStorage.getItem(LOCATION_KEY) || ''
 }
