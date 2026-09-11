@@ -1,12 +1,13 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite'
 
 // Two build modes:
 //  • client (default) → dist/  — the browser bundle, code-split + vendor chunk
 //  • SSR (`vite build --ssr`) → dist-ssr/entry-server.cjs — a CommonJS module the
 //    Express server require()s to render pages on the server.
 export default defineConfig(({ isSsrBuild }) => ({
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
   build: isSsrBuild
     ? {
         outDir: 'dist-ssr',

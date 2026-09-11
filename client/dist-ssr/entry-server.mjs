@@ -780,7 +780,7 @@ function withPreload(factory) {
   Component.preload = factory;
   return Component;
 }
-const Dashboard = withPreload(() => import("./assets/Dashboard-slLNnT6b.js"));
+const Dashboard = withPreload(() => import("./assets/Dashboard-Dwjws8MU.js"));
 const CopywritersList = withPreload(() => import("./assets/CopywritersList-CkV70USI.js"));
 const CopywritersChat = withPreload(() => import("./assets/CopywritersChat-I5skgXay.js"));
 const Library = withPreload(() => import("./assets/Library-BiIltWSU.js"));

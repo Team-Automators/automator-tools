@@ -1,3 +1,28 @@
+/* ── Tailwind v4 (coexistence mode) ──────────────────────────────────────────
+   We pull in Tailwind's THEME + UTILITIES only — NOT preflight — so utilities are
+   available for new/migrated markup without resetting the existing design system.
+   Unlayered legacy CSS below still wins wherever it applies, so nothing breaks;
+   migrate a component by removing its old classes and using utilities instead.
+   Utilities are mapped to the existing tokens, so they follow light/dark too. */
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-card: var(--card);
+  --color-border: var(--border);
+  --color-text: var(--text);
+  --color-sub: var(--sub);
+  --color-accent: var(--accent);
+  --color-accent-bg: var(--accent-bg);
+  --color-danger: var(--danger);
+  --color-danger-bg: var(--danger-bg);
+  --color-success: var(--success);
+  --radius-card: var(--radius);
+  --radius-sm: var(--radius-sm);
+}
+
 /* ── Design tokens ─────────────────────────────────────────────────────────── */
 :root {
   --sidebar-w: 240px;
@@ -2653,19 +2678,6 @@ input:focus-visible, textarea:focus-visible, select:focus-visible,
 }
 @keyframes skeletonShimmer { 100% { transform: translateX(100%); } }
 @media (prefers-reduced-motion: reduce) { .skeleton::after { animation: none; } }
-
-.skel-stats {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
-}
-@media (min-width: 768px) { .skel-stats { grid-template-columns: repeat(4, 1fr); } }
-.skel-stat { padding: 18px; }
-.skel-list { display: flex; flex-direction: column; gap: 10px; }
-.skel-row {
-  display: flex; align-items: center; gap: 14px;
-  padding: 16px 18px;
-}
 
 /* ── Mobile touch & spacing polish ────────────────────────────────────────── */
 @media (max-width: 767px) {
